@@ -116,9 +116,10 @@ flowchart TD
 - **Data Types & Tags**: Author User Data Types (`tia_list_plc_types`, `tia_import_plc_type`) and manage tag tables (`tia_list_tag_tables`, `tia_get_tags`).
 - **Native Diagnostics**: Compile software containers via `ICompilable` and return exact error messages, line numbers, and warnings (`tia_compile`).
 
-### 2. WinCC Unified HMI Engineering (29 Tools)
-- **Screen Management**: Create, delete, and list Unified screens (`hmi_list_screens`, `hmi_create_screen`, `hmi_delete_screen`).
-- **Widgets & UI Elements**: Programmatically position labels with HTML typography (`hmi_add_label`), pushbuttons (`hmi_add_button`), geometric shapes (`hmi_add_shape`), and process I/O fields (`hmi_add_io_field`).
+### 2. WinCC Unified HMI Engineering (31 Tools)
+- **Screen Management**: Create and delete Unified screens, and list or target screens recursively through nested screen groups (`hmi_list_screens`, `hmi_create_screen`, `hmi_delete_screen`).
+- **Widgets & UI Elements**: Programmatically position labels with HTML typography (`hmi_add_label`), pushbuttons (`hmi_add_button`), tag-bound toggle switches (`hmi_add_toggle_switch`), geometric shapes (`hmi_add_shape`), and process I/O fields (`hmi_add_io_field`).
+- **Discrete Alarms**: Create or update discrete alarms with validated trigger tags, alarm classes, trigger modes, and multilingual event text (`hmi_create_discrete_alarm`).
 - **Range Dynamization**: Dynamize properties (e.g. `BackColor`, font color) to integer/real tags using `ConditionType.Range` (`hmi_set_tag_dynamization`).
 - **In-Place Script Updates**: Safely update button JavaScript handlers in-place without deleting or disrupting layout coordinates (`hmi_update_button_scripts`).
 - **Communication & Text Lists**: Create device-level text lists (`hmi_create_text_list`), export text lists (`hmi_export_text_lists`), and establish HMI-to-PLC communication links (`hmi_create_connection`).
@@ -273,7 +274,7 @@ stateDiagram-v2
 
 ---
 
-## Complete Tools Reference Dictionary (62 Tools)
+## Complete Tools Reference Dictionary (64 Tools)
 
 | # | Tool Name | Category | Primary Parameters | Description |
 |:---:|:---|:---:|:---|:---|
@@ -304,41 +305,43 @@ stateDiagram-v2
 | 25 | `hmi_delete_screen_items` | HMI Screen | `screen_name`, `item_names`, `prefix` | Delete specific screen widgets. |
 | 26 | `hmi_add_label` | HMI Widget | `screen_name`, `name`, `text`, `left`, `top` | Add HTML-formatted text label with typography controls. |
 | 27 | `hmi_add_button` | HMI Widget | `screen_name`, `name`, `text`, `script` | Add pushbutton with OnClick JavaScript script. |
-| 28 | `hmi_add_shape` | HMI Widget | `screen_name`, `type`, `width`, `height` | Add rectangle or circle with border and fill styling. |
-| 29 | `hmi_add_io_field` | HMI Widget | `screen_name`, `name`, `process_value_tag` | Add numeric/string Input-Output field bound to tag. |
-| 30 | `hmi_set_tag_dynamization`| HMI Logic | `screen_name`, `item_name`, `ranges` | Bind property (e.g. `BackColor`) to tag using Range entries. |
-| 31 | `hmi_update_button_scripts`| HMI Logic | `screen_name`, `button_name`, `script` | Update existing button scripts **in-place** with JS validation. |
-| 32 | `hmi_list_tag_tables` | HMI Tags | `target_name` (opt) | List HMI tag tables. |
-| 33 | `hmi_list_tags` | HMI Tags | `table_name` | List HMI tags with data types and connection bindings. |
-| 34 | `hmi_create_tag` | HMI Tags | `table_name`, `tag_name`, `connection` | Create HMI tag mapped to PLC address. |
-| 35 | `hmi_update_tag_acquisition_cycles` | HMI Tags | `tags` | Configure acquisition cycle rate (e.g. 100ms, 1s). |
-| 36 | `hmi_set_tag_range` | HMI Tags | `table_name`, `tag_name`, `min`, `max` | Configure linear limits and scaling. |
-| 37 | `hmi_create_data_log` | HMI Logging | `log_name`, `max_size_mb` | Create historical circular data log. |
-| 38 | `hmi_assign_logging_tags` | HMI Logging | `log_name`, `tag_names` | Assign process tags to historical archive. |
-| 39 | `hmi_list_connections` | HMI Comm | `device_name` (opt) | Enumerate all configured HMI communication links. |
-| 40 | `hmi_create_connection` | HMI Comm | `connection_name`, `plc_device_name` | Create a communication link between HMI and PLC. |
-| 41 | `hmi_delete_connection` | HMI Comm | `connection_name` | Remove an HMI communication link. |
-| 42 | `hmi_list_text_lists` | HMI Text | `device_name` (opt) | Enumerate all text and graphic lists. |
-| 43 | `hmi_create_text_list` | HMI Text | `name`, `list_type`, `entries` | Create value or range text list (e.g. status decoders). |
-| 44 | `hmi_delete_text_list` | HMI Text | `name` | Remove a text list. |
-| 45 | `hmi_export_text_lists` | HMI Text | `destination_folder`, `base_filename`| Export text lists to `.hmi.yml` files. |
-| 46 | `hmi_compile` | Compilation | `target_name` | Compile WinCC Unified runtime with diagnostics. |
-| 47 | `tia_list_tag_tables` | PLC Tags | `plc_name` | List PLC tag tables. |
-| 48 | `tia_get_tags` | PLC Tags | `table_name`, `plc_name` | Read PLC tags with `%I`, `%Q`, `%M` addresses. |
-| 49 | `tia_testsuite_list_tests`| TestSuite | `plc_name` | List configured Siemens TestSuite test cases. |
-| 50 | `tia_testsuite_load_test` | TestSuite | `file_path` | Import or reload `.tat` rule file with override. |
-| 51 | `plcsim_list_instances` | Simulation | *(none)* | List all registered S7-PLCSIM Advanced instances. |
-| 52 | `plcsim_connect` | Simulation | `instance_name` (default `"PLC_1"`) | Connect to S7-PLCSIM Advanced and cache symbolic tags. |
-| 53 | `plcsim_disconnect` | Simulation | *(none)* | Detach from active PLCSIM instance. |
-| 54 | `plcsim_get_status` | Simulation | *(none)* | Real-time status (Run/Stop, scale factor, tag counts). |
-| 55 | `plcsim_set_operating_state` | Simulation | `state` (`"Run"`, `"Stop"`, `"MemoryReset"`) | Switch virtual controller operating state. |
-| 56 | `plcsim_set_scale_factor` | Simulation | `scale_factor` (e.g. `2.0`) | Scale simulation clock to speed up execution. |
-| 57 | `plcsim_read_tag` | Live I/O | `tag_name` | Read live DB, I, Q, or M variable by symbolic name. |
-| 58 | `plcsim_write_tag` | Live I/O | `tag_name`, `value` | Write live value to variable in virtual PLC memory. |
-| 59 | `plcsim_read_tags` | Live I/O | `tag_names` | Bulk read multiple variables in a single call. |
-| 60 | `plcsim_write_tags` | Live I/O | `tags` (key-value object) | Bulk write multiple variables in a single call. |
-| 61 | `plcsim_run_sequence` | Verification | `start_command_tag`, `step_number_tag`, `done_tag`, ... | Universal automated sequence testing for any state machine. |
-| 62 | `plcsim_run_mixing_sequence`| Verification | Recipe parameters, `scale_factor` | Automated multi-parameter batch testing runner. |
+| 28 | `hmi_add_toggle_switch` | HMI Widget | `screen_name`, `name`, `off_text`, `on_text`, `process_tag` | Add a two-state toggle bound to `IsAlternateState`. |
+| 29 | `hmi_add_shape` | HMI Widget | `screen_name`, `type`, `width`, `height` | Add rectangle or circle with border and fill styling. |
+| 30 | `hmi_add_io_field` | HMI Widget | `screen_name`, `name`, `process_value_tag` | Add numeric/string Input-Output field bound to tag. |
+| 31 | `hmi_set_tag_dynamization`| HMI Logic | `screen_name`, `item_name`, `ranges` | Bind property (e.g. `BackColor`) to tag using Range entries. |
+| 32 | `hmi_update_button_scripts`| HMI Logic | `screen_name`, `button_name`, `script` | Update existing button scripts **in-place** with JS validation. |
+| 33 | `hmi_list_tag_tables` | HMI Tags | `target_name` (opt) | List HMI tag tables. |
+| 34 | `hmi_list_tags` | HMI Tags | `table_name` | List HMI tags with data types and connection bindings. |
+| 35 | `hmi_create_tag` | HMI Tags | `table_name`, `tag_name`, `connection` | Create HMI tag mapped to PLC address. |
+| 36 | `hmi_create_discrete_alarm` | HMI Alarms | `alarm_name`, `alarm_class`, `raised_state_tag`, `text` | Create a discrete alarm from an existing HMI trigger tag. |
+| 37 | `hmi_update_tag_acquisition_cycles` | HMI Tags | `tags` | Configure acquisition cycle rate (e.g. 100ms, 1s). |
+| 38 | `hmi_set_tag_range` | HMI Tags | `table_name`, `tag_name`, `min`, `max` | Configure linear limits and scaling. |
+| 39 | `hmi_create_data_log` | HMI Logging | `log_name`, `max_size_mb` | Create historical circular data log. |
+| 40 | `hmi_assign_logging_tags` | HMI Logging | `log_name`, `tag_names` | Assign process tags to historical archive. |
+| 41 | `hmi_list_connections` | HMI Comm | `device_name` (opt) | Enumerate all configured HMI communication links. |
+| 42 | `hmi_create_connection` | HMI Comm | `connection_name`, `plc_device_name` | Create a communication link between HMI and PLC. |
+| 43 | `hmi_delete_connection` | HMI Comm | `connection_name` | Remove an HMI communication link. |
+| 44 | `hmi_list_text_lists` | HMI Text | `device_name` (opt) | Enumerate all text and graphic lists. |
+| 45 | `hmi_create_text_list` | HMI Text | `name`, `list_type`, `entries` | Create value or range text list (e.g. status decoders). |
+| 46 | `hmi_delete_text_list` | HMI Text | `name` | Remove a text list. |
+| 47 | `hmi_export_text_lists` | HMI Text | `destination_folder`, `base_filename`| Export text lists to `.hmi.yml` files. |
+| 48 | `hmi_compile` | Compilation | `target_name` | Compile WinCC Unified runtime with diagnostics. |
+| 49 | `tia_list_tag_tables` | PLC Tags | `plc_name` | List PLC tag tables. |
+| 50 | `tia_get_tags` | PLC Tags | `table_name`, `plc_name` | Read PLC tags with `%I`, `%Q`, `%M` addresses. |
+| 51 | `tia_testsuite_list_tests`| TestSuite | `plc_name` | List configured Siemens TestSuite test cases. |
+| 52 | `tia_testsuite_load_test` | TestSuite | `file_path` | Import or reload `.tat` rule file with override. |
+| 53 | `plcsim_list_instances` | Simulation | *(none)* | List all registered S7-PLCSIM Advanced instances. |
+| 54 | `plcsim_connect` | Simulation | `instance_name` (default `"PLC_1"`) | Connect to S7-PLCSIM Advanced and cache symbolic tags. |
+| 55 | `plcsim_disconnect` | Simulation | *(none)* | Detach from active PLCSIM instance. |
+| 56 | `plcsim_get_status` | Simulation | *(none)* | Real-time status (Run/Stop, scale factor, tag counts). |
+| 57 | `plcsim_set_operating_state` | Simulation | `state` (`"Run"`, `"Stop"`, `"MemoryReset"`) | Switch virtual controller operating state. |
+| 58 | `plcsim_set_scale_factor` | Simulation | `scale_factor` (e.g. `2.0`) | Scale simulation clock to speed up execution. |
+| 59 | `plcsim_read_tag` | Live I/O | `tag_name` | Read live DB, I, Q, or M variable by symbolic name. |
+| 60 | `plcsim_write_tag` | Live I/O | `tag_name`, `value` | Write live value to variable in virtual PLC memory. |
+| 61 | `plcsim_read_tags` | Live I/O | `tag_names` | Bulk read multiple variables in a single call. |
+| 62 | `plcsim_write_tags` | Live I/O | `tags` (key-value object) | Bulk write multiple variables in a single call. |
+| 63 | `plcsim_run_sequence` | Verification | `start_command_tag`, `step_number_tag`, `done_tag`, ... | Universal automated sequence testing for any state machine. |
+| 64 | `plcsim_run_mixing_sequence`| Verification | Recipe parameters, `scale_factor` | Automated multi-parameter batch testing runner. |
 
 ---
 

@@ -1,5 +1,5 @@
 # Siemens TIA Portal V21 Openness MCP Server
-## Complete Tools Reference Dictionary (62 Tools)
+## Complete Tools Reference Dictionary (64 Tools)
 
 **Protocol Specification:** Model Context Protocol (MCP) JSON-RPC 2.0  
 **Transport Binding:** HTTP (`POST /mcp`), SSE (`GET /sse`), stdio  
@@ -15,7 +15,7 @@
 | **1** | [Connection & Session Management](#category-1-connection--session-management-8-tools) | 8 | `tia_get_status`, `tia_list_processes`, `tia_connect`, `tia_disconnect`, `tia_get_project_info`, `tia_open_project`, `tia_save_project`, `tia_close_project` |
 | **2** | [Hardware & Device Topology](#category-2-hardware--device-topology-2-tools) | 2 | `tia_list_devices`, `tia_get_device_tree` |
 | **3** | [PLC Software, Blocks & Compilation](#category-3-plc-software-blocks--compilation-9-tools) | 9 | `tia_list_plcs`, `tia_list_blocks`, `tia_get_block_code`, `tia_import_block`, `tia_delete_block`, `tia_list_plc_types`, `tia_get_plc_type`, `tia_import_plc_type`, `tia_compile` |
-| **4** | [WinCC Unified HMI Engineering](#category-4-wincc-unified-hmi-screen--widget-engineering-29-tools) | 29 | `hmi_list_targets`, `hmi_list_screens`, `hmi_create_screen`, `hmi_delete_screen`, `hmi_get_screen_items`, `hmi_delete_screen_items`, `hmi_add_label`, `hmi_add_button`, `hmi_add_shape`, `hmi_add_io_field`, `hmi_set_tag_dynamization`, `hmi_update_button_scripts`, `hmi_list_tag_tables`, `hmi_list_tags`, `hmi_create_tag`, `hmi_update_tag_acquisition_cycles`, `hmi_set_tag_range`, `hmi_create_data_log`, `hmi_assign_logging_tags`, `hmi_list_connections`, `hmi_create_connection`, `hmi_delete_connection`, `hmi_list_text_lists`, `hmi_create_text_list`, `hmi_delete_text_list`, `hmi_export_text_lists`, `hmi_compile`, `tia_list_tag_tables`, `tia_get_tags` |
+| **4** | [WinCC Unified HMI Engineering](#category-4-wincc-unified-hmi-screen--widget-engineering-31-tools) | 31 | `hmi_list_targets`, `hmi_list_screens`, `hmi_create_screen`, `hmi_delete_screen`, `hmi_get_screen_items`, `hmi_delete_screen_items`, `hmi_add_label`, `hmi_add_button`, `hmi_add_toggle_switch`, `hmi_add_shape`, `hmi_add_io_field`, `hmi_set_tag_dynamization`, `hmi_update_button_scripts`, `hmi_list_tag_tables`, `hmi_list_tags`, `hmi_create_tag`, `hmi_create_discrete_alarm`, `hmi_update_tag_acquisition_cycles`, `hmi_set_tag_range`, `hmi_create_data_log`, `hmi_assign_logging_tags`, `hmi_list_connections`, `hmi_create_connection`, `hmi_delete_connection`, `hmi_list_text_lists`, `hmi_create_text_list`, `hmi_delete_text_list`, `hmi_export_text_lists`, `hmi_compile`, `tia_list_tag_tables`, `tia_get_tags` |
 | **5** | [Siemens TestSuite Automation](#category-5-siemens-testsuite-automation-2-tools) | 2 | `tia_testsuite_list_tests`, `tia_testsuite_load_test` |
 | **6** | [S7-PLCSIM Advanced Live Simulation & Testing](#category-6-s7-plcsim-advanced-live-simulation--testing-12-tools) | 12 | `plcsim_list_instances`, `plcsim_connect`, `plcsim_disconnect`, `plcsim_get_status`, `plcsim_set_operating_state`, `plcsim_set_scale_factor`, `plcsim_read_tag`, `plcsim_write_tag`, `plcsim_read_tags`, `plcsim_write_tags`, `plcsim_run_sequence`, `plcsim_run_mixing_sequence` |
 
@@ -365,7 +365,7 @@
 ---
 
 ### 21. `hmi_list_screens`
-- **Description:** Lists all screens in the target HMI with resolution and item count.
+- **Description:** Lists all screens in the target HMI, including recursively nested screen groups, with resolution and item count.
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
   | :--- | :---: | :---: | :---: | :--- |
@@ -489,7 +489,19 @@
 
 ---
 
-### 28. `hmi_add_shape`
+### 28. `hmi_add_toggle_switch`
+- **Description:** Adds or updates a toggle switch with independent normal/alternate captions, bound to an HMI tag's `IsAlternateState`.
+- **Parameters:**
+  | Parameter | Type | Required | Default | Description |
+  | :--- | :---: | :---: | :---: | :--- |
+  | `screen_name`, `name`, `off_text`, `on_text` | string | **Yes** | — | Target screen, item name, and captions for normal and alternate states. |
+  | `left`, `top`, `width`, `height` | integer | **Yes** | — | Switch geometry. |
+  | `process_tag` | string | **Yes** | — | Existing HMI tag bound to `IsAlternateState`. |
+  | `target_name` | string | No | null | Target HMI software. |
+
+---
+
+### 29. `hmi_add_shape`
 - **Description:** Adds or updates a shape (`"Rectangle"` or `"Circle"`) with dimensions, center/radius, fill and border.
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
@@ -506,7 +518,7 @@
 
 ---
 
-### 29. `hmi_add_io_field`
+### 30. `hmi_add_io_field`
 - **Description:** Adds or updates an IO Field bound to an HMI tag for numeric or string display.
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
@@ -520,7 +532,7 @@
 
 ---
 
-### 30. `hmi_set_tag_dynamization`
+### 31. `hmi_set_tag_dynamization`
 - **Description:** Binds a screen item property (e.g. `BackColor`, `Visible`) to an HMI tag using `ConditionType.Range`.
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
@@ -549,7 +561,7 @@
 
 ---
 
-### 31. `hmi_update_button_scripts`
+### 32. `hmi_update_button_scripts`
 - **Description:** Modifies existing button scripts **in-place** without deleting screen items, running Openness JavaScript syntax checking.
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
@@ -563,7 +575,7 @@
 
 ---
 
-### 32. `hmi_list_tag_tables`
+### 33. `hmi_list_tag_tables`
 - **Description:** Lists all HMI tag tables in the HMI software target.
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
@@ -572,7 +584,7 @@
 
 ---
 
-### 33. `hmi_list_tags`
+### 34. `hmi_list_tags`
 - **Description:** Lists HMI tags with their table, connection, PLC tag binding, and data type.
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
@@ -582,7 +594,7 @@
 
 ---
 
-### 34. `hmi_create_tag`
+### 35. `hmi_create_tag`
 - **Description:** Creates or updates an HMI tag linked to a PLC tag path.
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
@@ -595,7 +607,23 @@
 
 ---
 
-### 35. `hmi_update_tag_acquisition_cycles`
+### 36. `hmi_create_discrete_alarm`
+- **Description:** Creates or updates a discrete alarm after validating its HMI alarm class and trigger tag.
+- **Parameters:**
+  | Parameter | Type | Required | Default | Description |
+  | :--- | :---: | :---: | :---: | :--- |
+  | `alarm_name` | string | **Yes** | — | Discrete alarm name. |
+  | `alarm_class` | string | **Yes** | — | Existing HMI alarm class name. |
+  | `raised_state_tag` | string | **Yes** | — | Existing HMI tag used as the alarm trigger. |
+  | `text` | string | **Yes** | — | Event text applied to active text languages. |
+  | `raised_state_tag_bit_number` | integer | No | `0` | Trigger bit number. |
+  | `trigger_mode` | string | No | `"OnRisingEdge"` | Discrete alarm trigger mode supported by TIA Portal V21. |
+  | `acknowledgment_control_tag` | string | No | null | Optional existing HMI acknowledgment-control tag. |
+  | `target_name` | string | No | null | Target HMI software. |
+
+---
+
+### 37. `hmi_update_tag_acquisition_cycles`
 - **Description:** Batch updates the acquisition cycle (e.g. `T100ms`, `T1s`, `T500ms`) for HMI tags in WinCC Unified.
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
@@ -620,7 +648,7 @@
 
 ---
 
-### 36. `hmi_set_tag_range`
+### 38. `hmi_set_tag_range`
 - **Description:** Configures minimum and maximum range limits (constant values) on an HMI tag (`InitialMinValue` / `InitialMaxValue`).
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
@@ -635,7 +663,7 @@
 
 ---
 
-### 37. `hmi_create_data_log`
+### 39. `hmi_create_data_log`
 - **Description:** Creates a new DataLog in WinCC Unified HMI software.
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
@@ -647,7 +675,7 @@
 
 ---
 
-### 38. `hmi_assign_logging_tags`
+### 40. `hmi_assign_logging_tags`
 - **Description:** Assigns multiple HMI tags to a DataLog with logging mode (`Cyclic`, `OnChange`, `OnDemand`) and cycle (`T1s`, `T500ms`, `T100ms`).
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
@@ -675,7 +703,7 @@
 
 ---
 
-### 39. `hmi_compile`
+### 41. `hmi_compile`
 - **Description:** Compiles the WinCC Unified HMI device and runtime software using Openness `ICompilable`.
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
@@ -699,7 +727,7 @@
 
 ---
 
-### 40. `hmi_list_connections`
+### 42. `hmi_list_connections`
 - **Description:** List all HMI communication connections in the WinCC Unified HMI software (name, communication driver, partner station, partner node, and disabled status).
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
@@ -722,7 +750,7 @@
 
 ---
 
-### 41. `hmi_create_connection`
+### 43. `hmi_create_connection`
 - **Description:** Create or configure an integrated HMI connection between a WinCC Unified HMI target and a partner PLC device/CPU over industrial Ethernet. Automatically creates the integrated hardware connection using `CommunicationManagement.Connections.Create<HmiConnection>` between local and partner CPU interfaces.
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
@@ -752,7 +780,7 @@
 
 ---
 
-### 42. `hmi_delete_connection`
+### 44. `hmi_delete_connection`
 - **Description:** Delete an HMI connection from WinCC Unified software and/or hardware communication management. Removes the connection from both hardware topology (`CommunicationManagement.Connections`) and runtime software connections (`HmiSoftware.Connections`).
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
@@ -772,7 +800,7 @@
 
 ---
 
-### 43. `hmi_list_text_lists`
+### 45. `hmi_list_text_lists`
 - **Description:** List all user-defined text lists on a WinCC Unified device with their integer values/ranges, default texts, and multilingual entries.
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
@@ -827,7 +855,7 @@
 
 ---
 
-### 44. `hmi_create_text_list`
+### 46. `hmi_create_text_list`
 - **Description:** Create a new text list on a WinCC Unified device with specified entries and values/ranges. Automatically discovers configured device runtime languages (`en-US`, `fr-CA`, etc.) and populates entries across all languages.
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
@@ -862,7 +890,7 @@
 
 ---
 
-### 45. `hmi_delete_text_list`
+### 47. `hmi_delete_text_list`
 - **Description:** Delete an existing HMI text list from a WinCC Unified device.
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
@@ -890,7 +918,7 @@
 
 ---
 
-### 46. `hmi_export_text_lists`
+### 48. `hmi_export_text_lists`
 - **Description:** Export all HMI text lists on a WinCC Unified device to YAML files (`.hmi.yml` and `.TextLibrary.hmi.yml`) in a target directory.
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
@@ -908,7 +936,7 @@
 
 ---
 
-### 47. `tia_list_tag_tables`
+### 49. `tia_list_tag_tables`
 - **Description:** Enumerate PLC tag tables in the CPU software container.
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
@@ -917,7 +945,7 @@
 
 ---
 
-### 48. `tia_get_tags`
+### 50. `tia_get_tags`
 - **Description:** Read PLC tags (%I, %Q, %M addresses, data types, comments) from a PLC tag table.
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
@@ -929,7 +957,7 @@
 
 ## Category 5: Siemens TestSuite Automation (2 Tools)
 
-### 49. `tia_testsuite_list_tests`
+### 51. `tia_testsuite_list_tests`
 - **Description:** Lists all configured application test cases in the project's TestSuite container.
 - **Parameters:** None (`{}`)
 - **Response Example:**
@@ -944,7 +972,7 @@
 
 ---
 
-### 50. `tia_testsuite_load_test`
+### 52. `tia_testsuite_load_test`
 - **Description:** Loads, imports, or reloads a `.tat` test file into the project with `ImportOptions.Override`.
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
@@ -977,7 +1005,7 @@
 
 ## Category 6: S7-PLCSIM Advanced Live Simulation & Testing (11 Tools)
 
-### 51. `plcsim_list_instances`
+### 53. `plcsim_list_instances`
 - **Description:** Lists all registered virtual S7-1500 controller instances managed by S7-PLCSIM Advanced runtime with ID, name, operating state, CPU type, and IP address.
 - **Parameters:** None (`{}`)
 - **Sample Response:**
@@ -995,7 +1023,7 @@
 
 ---
 
-### 52. `plcsim_connect`
+### 54. `plcsim_connect`
 - **Description:** Attaches directly to a virtual S7-PLCSIM Advanced instance by name, caching symbolic tag tables for zero-overhead live I/O.
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
@@ -1026,13 +1054,13 @@
 
 ---
 
-### 53. `plcsim_disconnect`
+### 55. `plcsim_disconnect`
 - **Description:** Disconnects from the current virtual PLC instance and clears cached tag metadata.
 - **Parameters:** None (`{}`)
 
 ---
 
-### 54. `plcsim_get_status`
+### 56. `plcsim_get_status`
 - **Description:** Retrieves real-time status of the connected virtual controller: state (`Run`/`Stop`), scale factor, CPU model, IP, and total tags in memory.
 - **Parameters:** None (`{}`)
 - **Response Example:**
@@ -1051,7 +1079,7 @@
 
 ---
 
-### 55. `plcsim_set_operating_state`
+### 57. `plcsim_set_operating_state`
 - **Description:** Commands the virtual CPU operating mode (`Run`, `Stop`, or `MemoryReset`).
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
@@ -1060,7 +1088,7 @@
 
 ---
 
-### 56. `plcsim_set_scale_factor`
+### 58. `plcsim_set_scale_factor`
 - **Description:** Sets the simulation clock scale factor (e.g. `2.0` = 2x speed, `5.0` = 5x speed) to accelerate automated testing deterministically.
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
@@ -1069,7 +1097,7 @@
 
 ---
 
-### 57. `plcsim_read_tag`
+### 59. `plcsim_read_tag`
 - **Description:** Reads the live value and data type of any variable from DBs, inputs, outputs, or markers by symbolic name.
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
@@ -1086,7 +1114,7 @@
 
 ---
 
-### 58. `plcsim_write_tag`
+### 60. `plcsim_write_tag`
 - **Description:** Writes a live value to a symbolic variable in virtual PLC memory.
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
@@ -1096,7 +1124,7 @@
 
 ---
 
-### 59. `plcsim_read_tags`
+### 61. `plcsim_read_tags`
 - **Description:** Efficient bulk read of multiple variables in a single call.
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
@@ -1105,7 +1133,7 @@
 
 ---
 
-### 60. `plcsim_write_tags`
+### 62. `plcsim_write_tags`
 - **Description:** Bulk write to multiple symbolic variables in a single call.
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
@@ -1114,7 +1142,7 @@
 
 ---
 
-### 61. `plcsim_run_sequence`
+### 63. `plcsim_run_sequence`
 - **Description:** Executes a generic automated online sequence test on any PLC sequence or state machine in S7-PLCSIM Advanced. Writes initial and parameter tags, pulses the start tag, tracks step number progression, samples specified monitored tags at ~80ms, and generates an execution telemetry report.
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
@@ -1154,7 +1182,7 @@
 
 ---
 
-### 62. `plcsim_run_mixing_sequence`
+### 64. `plcsim_run_mixing_sequence`
 - **Description:** Executes an automated multi-parameter batch sequence test. Sets recipe parameters, triggers start, tracks step transitions, records 80ms telemetry, and generates an execution report.
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
@@ -1194,4 +1222,3 @@
     ]
   }
   ```
-

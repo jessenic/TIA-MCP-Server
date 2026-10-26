@@ -600,6 +600,40 @@ namespace TiaOpennessMcp.Tools
                     return CallToolResult.Json(res);
                 });
 
+            // hmi_add_toggle_switch
+            Register("hmi_add_toggle_switch", "Add or update a tag-bound toggle switch with separate off/on captions.",
+                schema =>
+                {
+                    schema.Properties["screen_name"] = new ToolProperty { Type = "string", Description = "Screen name." };
+                    schema.Properties["name"] = new ToolProperty { Type = "string", Description = "Toggle switch item name." };
+                    schema.Properties["off_text"] = new ToolProperty { Type = "string", Description = "Caption shown in the normal state." };
+                    schema.Properties["on_text"] = new ToolProperty { Type = "string", Description = "Caption shown in the alternate state." };
+                    schema.Properties["left"] = new ToolProperty { Type = "integer", Description = "X position." };
+                    schema.Properties["top"] = new ToolProperty { Type = "integer", Description = "Y position." };
+                    schema.Properties["width"] = new ToolProperty { Type = "integer", Description = "Width." };
+                    schema.Properties["height"] = new ToolProperty { Type = "integer", Description = "Height." };
+                    schema.Properties["process_tag"] = new ToolProperty { Type = "string", Description = "HMI tag bound to IsAlternateState." };
+                    schema.Properties["target_name"] = new ToolProperty { Type = "string", Description = "Target HMI software name (optional)." };
+                    schema.Required = new List<string> { "screen_name", "name", "off_text", "on_text", "left", "top", "width", "height", "process_tag" };
+                },
+                args =>
+                {
+                    string screen = GetStringProp(args, "screen_name") ?? throw new ArgumentException("screen_name required.");
+                    string name = GetStringProp(args, "name") ?? throw new ArgumentException("name required.");
+                    string offText = GetStringProp(args, "off_text") ?? throw new ArgumentException("off_text required.");
+                    string onText = GetStringProp(args, "on_text") ?? throw new ArgumentException("on_text required.");
+                    int left = GetIntProp(args, "left") ?? throw new ArgumentException("left required.");
+                    int top = GetIntProp(args, "top") ?? throw new ArgumentException("top required.");
+                    uint width = GetUIntProp(args, "width") ?? throw new ArgumentException("width required.");
+                    uint height = GetUIntProp(args, "height") ?? throw new ArgumentException("height required.");
+                    string processTag = GetStringProp(args, "process_tag") ?? throw new ArgumentException("process_tag required.");
+                    string? target = GetStringProp(args, "target_name");
+
+                    var result = TiaManager.Instance.AddOrUpdateToggleSwitch(
+                        screen, name, offText, onText, left, top, width, height, processTag, target);
+                    return CallToolResult.Text(result);
+                });
+
             // 30. hmi_add_shape
             Register("hmi_add_shape", "Add or update a shape ('Rectangle' or 'Circle') with dimensions, center/radius, fill and border colors.",
                 schema =>
@@ -771,6 +805,39 @@ namespace TiaOpennessMcp.Tools
 
                     var res = TiaManager.Instance.CreateOrUpdateHmiTag(tag, plcTag, conn, table, target);
                     return CallToolResult.Text(res);
+                });
+
+            // hmi_create_discrete_alarm
+            Register("hmi_create_discrete_alarm", "Create or update a WinCC Unified discrete alarm with an alarm class, HMI tag trigger, and multilingual event text.",
+                schema =>
+                {
+                    schema.Properties["alarm_name"] = new ToolProperty { Type = "string", Description = "Discrete alarm name." };
+                    schema.Properties["alarm_class"] = new ToolProperty { Type = "string", Description = "Existing HMI alarm class name." };
+                    schema.Properties["raised_state_tag"] = new ToolProperty { Type = "string", Description = "Existing HMI tag that raises the alarm." };
+                    schema.Properties["raised_state_tag_bit_number"] = new ToolProperty { Type = "integer", Description = "Bit number in the trigger tag (default: 0)." };
+                    schema.Properties["trigger_mode"] = new ToolProperty { Type = "string", Description = "Discrete alarm trigger mode (default: OnRisingEdge)." };
+                    schema.Properties["text"] = new ToolProperty { Type = "string", Description = "Alarm event text." };
+                    schema.Properties["acknowledgment_control_tag"] = new ToolProperty { Type = "string", Description = "Optional existing HMI tag used to control acknowledgment." };
+                    schema.Properties["target_name"] = new ToolProperty { Type = "string", Description = "Target HMI software name (optional)." };
+                    schema.Required = new List<string> { "alarm_name", "alarm_class", "raised_state_tag", "text" };
+                },
+                args =>
+                {
+                    string alarmName = GetStringProp(args, "alarm_name") ?? throw new ArgumentException("alarm_name required.");
+                    string alarmClass = GetStringProp(args, "alarm_class") ?? throw new ArgumentException("alarm_class required.");
+                    string raisedStateTag = GetStringProp(args, "raised_state_tag") ?? throw new ArgumentException("raised_state_tag required.");
+                    string text = GetStringProp(args, "text") ?? throw new ArgumentException("text required.");
+                    int? requestedBit = GetIntProp(args, "raised_state_tag_bit_number");
+                    if (requestedBit.HasValue && requestedBit.Value < 0)
+                        throw new ArgumentOutOfRangeException("raised_state_tag_bit_number", "Alarm trigger bit must be non-negative.");
+                    uint bit = (uint)(requestedBit ?? 0);
+                    string triggerMode = GetStringProp(args, "trigger_mode") ?? "OnRisingEdge";
+                    string? acknowledgmentTag = GetStringProp(args, "acknowledgment_control_tag");
+                    string? target = GetStringProp(args, "target_name");
+
+                    var result = TiaManager.Instance.CreateOrUpdateHmiDiscreteAlarm(
+                        alarmName, alarmClass, raisedStateTag, text, bit, triggerMode, acknowledgmentTag, target);
+                    return CallToolResult.Text(result);
                 });
 
             // 37. hmi_update_tag_acquisition_cycles

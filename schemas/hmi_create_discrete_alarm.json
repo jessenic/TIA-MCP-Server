@@ -1,0 +1,24 @@
+{
+  "name": "hmi_create_discrete_alarm",
+  "description": "Create or update a WinCC Unified discrete alarm with an alarm class, HMI tag trigger, and multilingual event text.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "alarm_name": { "description": "Discrete alarm name.", "type": "string" },
+      "alarm_class": { "description": "Existing HMI alarm class name.", "type": "string" },
+      "raised_state_tag": { "description": "Existing HMI tag that raises the alarm.", "type": "string" },
+      "raised_state_tag_bit_number": { "description": "Bit number in the trigger tag (default: 0).", "type": "integer" },
+      "trigger_mode": { "description": "Discrete alarm trigger mode (default: OnRisingEdge).", "type": "string" },
+      "text": { "description": "Alarm event text.", "type": "string" },
+      "acknowledgment_control_tag": { "description": "Optional existing HMI tag used to control acknowledgment.", "type": "string" },
+      "target_name": { "description": "Target HMI software name (optional).", "type": "string" }
+    },
+    "required": [
+      "alarm_name",
+      "alarm_class",
+      "raised_state_tag",
+      "text"
+    ],
+    "type": "object"
+  }
+}

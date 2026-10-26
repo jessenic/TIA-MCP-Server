@@ -11,11 +11,14 @@ using Siemens.Engineering.Compiler;
 using Siemens.Engineering.HW;
 using Siemens.Engineering.HW.Features;
 using Siemens.Engineering.HmiUnified;
+using Siemens.Engineering.HmiUnified.HmiAlarm;
+using Siemens.Engineering.HmiUnified.HmiAlarm.HmiAlarmCommon;
 using Siemens.Engineering.HmiUnified.HmiTags;
 using Siemens.Engineering.HmiUnified.UI.Dynamization;
 using Siemens.Engineering.HmiUnified.UI.Dynamization.Tag;
 using Siemens.Engineering.HmiUnified.UI.Enum;
 using Siemens.Engineering.HmiUnified.UI.Screens;
+using Siemens.Engineering.HmiUnified.UI.ScreenGroup;
 using Siemens.Engineering.HmiUnified.UI.Shapes;
 using Siemens.Engineering.HmiUnified.UI.Widgets;
 using Siemens.Engineering.HmiUnified.UI.Base;
@@ -43,83 +46,98 @@ namespace TiaOpennessMcp.Tia
 
         private void FindHmiInDevice(Device dev, List<HmiTargetInfo> list)
         {
-            foreach (DeviceItem item in dev.DeviceItems)
+            FindHmiInDeviceItems(dev.DeviceItems, dev.Name, list);
+        }
+
+        private static void FindHmiInDeviceItems(IEnumerable<DeviceItem> items, string deviceName, List<HmiTargetInfo> list)
+        {
+            foreach (DeviceItem item in items)
             {
                 var sc = item.GetService<SoftwareContainer>();
                 if (sc != null && sc.Software is HmiSoftware hmiSw)
                 {
                     list.Add(new HmiTargetInfo
                     {
-                        DeviceName = dev.Name,
+                        DeviceName = deviceName,
                         DeviceItemName = item.Name,
                         SoftwareName = hmiSw.Name,
-                        ScreenCount = hmiSw.Screens.Count,
+                        ScreenCount = EnumerateHmiScreens(hmiSw.Screens, hmiSw.ScreenGroups).Count(),
                         TagTableCount = hmiSw.TagTables.Count
                     });
                 }
-                foreach (DeviceItem sub in item.DeviceItems)
-                {
-                    var subSc = sub.GetService<SoftwareContainer>();
-                    if (subSc != null && subSc.Software is HmiSoftware subHmi)
-                    {
-                        list.Add(new HmiTargetInfo
-                        {
-                            DeviceName = dev.Name,
-                            DeviceItemName = sub.Name,
-                            SoftwareName = subHmi.Name,
-                            ScreenCount = subHmi.Screens.Count,
-                            TagTableCount = subHmi.TagTables.Count
-                        });
-                    }
-                }
+                FindHmiInDeviceItems(item.DeviceItems, deviceName, list);
             }
         }
 
         public HmiSoftware FindHmiSoftware(string? targetName = null)
         {
             EnsureProjectOpen();
-            HmiSoftware? found = null;
+            var candidates = new List<HmiTargetInfo>();
             foreach (Device dev in _project!.Devices)
-            {
-                if (found != null) break;
-                foreach (DeviceItem item in dev.DeviceItems)
-                {
-                    if (found != null) break;
-                    var sc = item.GetService<SoftwareContainer>();
-                    if (sc != null && sc.Software is HmiSoftware hmiSw)
-                    {
-                        if (string.IsNullOrEmpty(targetName) ||
-                            string.Equals(dev.Name, targetName, StringComparison.OrdinalIgnoreCase) ||
-                            string.Equals(item.Name, targetName, StringComparison.OrdinalIgnoreCase) ||
-                            string.Equals(hmiSw.Name, targetName, StringComparison.OrdinalIgnoreCase))
-                        {
-                            found = hmiSw;
-                            break;
-                        }
-                    }
-                    foreach (DeviceItem sub in item.DeviceItems)
-                    {
-                        var subSc = sub.GetService<SoftwareContainer>();
-                        if (subSc != null && subSc.Software is HmiSoftware subHmi)
-                        {
-                            if (string.IsNullOrEmpty(targetName) ||
-                                string.Equals(dev.Name, targetName, StringComparison.OrdinalIgnoreCase) ||
-                                string.Equals(sub.Name, targetName, StringComparison.OrdinalIgnoreCase) ||
-                                string.Equals(subHmi.Name, targetName, StringComparison.OrdinalIgnoreCase))
-                            {
-                                found = subHmi;
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
+                FindHmiInDevice(dev, candidates);
 
-            if (found == null)
+            var matches = string.IsNullOrWhiteSpace(targetName)
+                ? candidates
+                : candidates.Where(candidate =>
+                    string.Equals(candidate.DeviceName, targetName, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(candidate.DeviceItemName, targetName, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(candidate.SoftwareName, targetName, StringComparison.OrdinalIgnoreCase)).ToList();
+
+            if (matches.Count == 0)
             {
                 throw new InvalidOperationException($"No HMI Software target found matching '{targetName ?? "(any)"}'.");
             }
-            return found;
+            if (matches.Count > 1)
+            {
+                throw new InvalidOperationException(
+                    $"HMI target selector '{targetName ?? "(any)"}' matched multiple targets: {string.Join(", ", matches.Select(m => m.SoftwareName))}.");
+            }
+
+            foreach (Device dev in _project.Devices)
+            {
+                HmiSoftware? software = FindHmiSoftwareInDeviceItems(dev.DeviceItems, dev.Name, matches[0]);
+                if (software != null) return software;
+            }
+            throw new InvalidOperationException($"HMI Software target '{matches[0].SoftwareName}' could not be resolved.");
+        }
+
+        private static HmiSoftware? FindHmiSoftwareInDeviceItems(IEnumerable<DeviceItem> items, string deviceName, HmiTargetInfo target)
+        {
+            foreach (DeviceItem item in items)
+            {
+                var sc = item.GetService<SoftwareContainer>();
+                if (sc?.Software is HmiSoftware hmiSw &&
+                    string.Equals(deviceName, target.DeviceName, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(item.Name, target.DeviceItemName, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(hmiSw.Name, target.SoftwareName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return hmiSw;
+                }
+
+                var nested = FindHmiSoftwareInDeviceItems(item.DeviceItems, deviceName, target);
+                if (nested != null) return nested;
+            }
+            return null;
+        }
+
+        private static IEnumerable<HmiScreen> EnumerateHmiScreens(HmiScreenComposition screens, HmiScreenGroupComposition groups)
+        {
+            foreach (HmiScreen screen in screens) yield return screen;
+            foreach (HmiScreenGroup group in groups)
+                foreach (HmiScreen screen in EnumerateHmiScreens(group.Screens, group.Groups))
+                    yield return screen;
+        }
+
+        private static HmiScreen? FindHmiScreen(HmiSoftware hmiSw, string screenName)
+        {
+            var matches = EnumerateHmiScreens(hmiSw.Screens, hmiSw.ScreenGroups)
+                .Where(screen => string.Equals(screen.Name, screenName, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            if (matches.Count > 1)
+            {
+                throw new InvalidOperationException($"Screen name '{screenName}' is ambiguous across HMI screen groups.");
+            }
+            return matches.FirstOrDefault();
         }
 
         #endregion
@@ -130,7 +148,7 @@ namespace TiaOpennessMcp.Tia
         {
             var hmiSw = FindHmiSoftware(targetName);
             var list = new List<HmiScreenSummary>();
-            foreach (HmiScreen s in hmiSw.Screens)
+            foreach (HmiScreen s in EnumerateHmiScreens(hmiSw.Screens, hmiSw.ScreenGroups))
             {
                 list.Add(new HmiScreenSummary
                 {
@@ -146,7 +164,7 @@ namespace TiaOpennessMcp.Tia
         public HmiScreenSummary CreateHmiScreen(string screenName, uint? width = null, uint? height = null, string? targetName = null)
         {
             var hmiSw = FindHmiSoftware(targetName);
-            var screen = hmiSw.Screens.Find(screenName) ?? hmiSw.Screens.Create(screenName);
+            var screen = FindHmiScreen(hmiSw, screenName) ?? hmiSw.Screens.Create(screenName);
             if (width.HasValue) screen.Width = width.Value;
             if (height.HasValue) screen.Height = height.Value;
 
@@ -162,7 +180,7 @@ namespace TiaOpennessMcp.Tia
         public void DeleteHmiScreen(string screenName, string? targetName = null)
         {
             var hmiSw = FindHmiSoftware(targetName);
-            var screen = hmiSw.Screens.Find(screenName);
+            var screen = FindHmiScreen(hmiSw, screenName);
             if (screen == null)
             {
                 throw new InvalidOperationException($"Screen '{screenName}' not found.");
@@ -173,7 +191,7 @@ namespace TiaOpennessMcp.Tia
         public List<HmiScreenItemDetails> GetHmiScreenItems(string screenName, string? targetName = null)
         {
             var hmiSw = FindHmiSoftware(targetName);
-            var screen = hmiSw.Screens.Find(screenName);
+            var screen = FindHmiScreen(hmiSw, screenName);
             if (screen == null)
             {
                 throw new InvalidOperationException($"Screen '{screenName}' not found.");
@@ -290,7 +308,7 @@ namespace TiaOpennessMcp.Tia
         public int DeleteHmiScreenItems(string screenName, List<string>? itemNames = null, string? prefix = null, string? targetName = null)
         {
             var hmiSw = FindHmiSoftware(targetName);
-            var screen = hmiSw.Screens.Find(screenName);
+            var screen = FindHmiScreen(hmiSw, screenName);
             if (screen == null)
             {
                 throw new InvalidOperationException($"Screen '{screenName}' not found.");
@@ -333,7 +351,7 @@ namespace TiaOpennessMcp.Tia
             string? targetName = null)
         {
             var hmiSw = FindHmiSoftware(targetName);
-            var screen = hmiSw.Screens.Find(screenName) ?? hmiSw.Screens.Create(screenName);
+            var screen = FindHmiScreen(hmiSw, screenName) ?? hmiSw.Screens.Create(screenName);
 
             var label = screen.ScreenItems.Find(name) as HmiTextBox ?? screen.ScreenItems.Create<HmiTextBox>(name);
             label.Left = left;
@@ -387,7 +405,7 @@ namespace TiaOpennessMcp.Tia
             string? targetName = null)
         {
             var hmiSw = FindHmiSoftware(targetName);
-            var screen = hmiSw.Screens.Find(screenName) ?? hmiSw.Screens.Create(screenName);
+            var screen = FindHmiScreen(hmiSw, screenName) ?? hmiSw.Screens.Create(screenName);
 
             var btn = screen.ScreenItems.Find(name) as HmiButton ?? screen.ScreenItems.Create<HmiButton>(name);
             btn.Left = left;
@@ -436,6 +454,44 @@ namespace TiaOpennessMcp.Tia
             return result;
         }
 
+        public string AddOrUpdateToggleSwitch(
+            string screenName,
+            string name,
+            string offText,
+            string onText,
+            int left, int top, uint width, uint height,
+            string processTag,
+            string? targetName = null)
+        {
+            var hmiSw = FindHmiSoftware(targetName);
+            var screen = FindHmiScreen(hmiSw, screenName) ?? hmiSw.Screens.Create(screenName);
+            var existing = screen.ScreenItems.Find(name);
+            if (existing != null && !(existing is HmiToggleSwitch))
+                throw new InvalidOperationException($"Screen item '{name}' exists but is not an HMI toggle switch.");
+            if (hmiSw.Tags.Find(processTag) == null)
+                throw new InvalidOperationException($"HMI tag '{processTag}' not found.");
+
+            var toggle = existing as HmiToggleSwitch ?? screen.ScreenItems.Create<HmiToggleSwitch>(name);
+            toggle.Left = left;
+            toggle.Top = top;
+            toggle.Width = width;
+            toggle.Height = height;
+
+            if (toggle.Text.Items.Count == 0 || toggle.AlternateText.Items.Count == 0)
+                throw new InvalidOperationException($"Toggle switch '{name}' has no active text language.");
+            foreach (var value in toggle.Text.Items) value.Text = FormatHtmlText(offText);
+            foreach (var value in toggle.AlternateText.Items) value.Text = FormatHtmlText(onText);
+
+            var dynamization = toggle.Dynamizations.Find("IsAlternateState");
+            if (dynamization != null && !(dynamization is TagDynamization))
+                throw new InvalidOperationException($"Refusing to overwrite non-tag dynamization: {name}.IsAlternateState");
+            var tagDynamization = dynamization as TagDynamization
+                                  ?? toggle.Dynamizations.Create<TagDynamization>("IsAlternateState");
+            tagDynamization.Tag = processTag;
+
+            return $"Toggle switch '{name}' added/updated on screen '{screenName}' and bound to '{processTag}'.";
+        }
+
         public string AddOrUpdateShape(
             string screenName,
             string name,
@@ -448,7 +504,7 @@ namespace TiaOpennessMcp.Tia
             string? targetName = null)
         {
             var hmiSw = FindHmiSoftware(targetName);
-            var screen = hmiSw.Screens.Find(screenName) ?? hmiSw.Screens.Create(screenName);
+            var screen = FindHmiScreen(hmiSw, screenName) ?? hmiSw.Screens.Create(screenName);
 
             if (shapeType.Equals("Circle", StringComparison.OrdinalIgnoreCase))
             {
@@ -484,7 +540,7 @@ namespace TiaOpennessMcp.Tia
             string? targetName = null)
         {
             var hmiSw = FindHmiSoftware(targetName);
-            var screen = hmiSw.Screens.Find(screenName) ?? hmiSw.Screens.Create(screenName);
+            var screen = FindHmiScreen(hmiSw, screenName) ?? hmiSw.Screens.Create(screenName);
 
             var io = screen.ScreenItems.Find(name) as HmiIOField ?? screen.ScreenItems.Create<HmiIOField>(name);
             io.Left = left;
@@ -517,7 +573,7 @@ namespace TiaOpennessMcp.Tia
             string? targetName = null)
         {
             var hmiSw = FindHmiSoftware(targetName);
-            var screen = hmiSw.Screens.Find(screenName);
+            var screen = FindHmiScreen(hmiSw, screenName);
             if (screen == null) throw new InvalidOperationException($"Screen '{screenName}' not found.");
 
             var item = screen.ScreenItems.Find(itemName);
@@ -564,7 +620,7 @@ namespace TiaOpennessMcp.Tia
             string? targetName = null)
         {
             var hmiSw = FindHmiSoftware(targetName);
-            var screen = hmiSw.Screens.Find(screenName);
+            var screen = FindHmiScreen(hmiSw, screenName);
             if (screen == null) throw new InvalidOperationException($"Screen '{screenName}' not found.");
 
             var summary = new ScriptUpdateSummary();
@@ -691,6 +747,44 @@ namespace TiaOpennessMcp.Tia
             }
 
             return $"HMI Tag '{tagName}' -> '{hmiTag.PlcTag}' (Connection '{connection}') in table '{tagTable.Name}'.";
+        }
+
+        public string CreateOrUpdateHmiDiscreteAlarm(
+            string alarmName,
+            string alarmClass,
+            string raisedStateTag,
+            string text,
+            uint raisedStateTagBitNumber = 0,
+            string triggerMode = "OnRisingEdge",
+            string? acknowledgmentControlTag = null,
+            string? targetName = null)
+        {
+            var hmiSw = FindHmiSoftware(targetName);
+            if (hmiSw.AlarmClasses.Find(alarmClass) == null)
+                throw new InvalidOperationException($"HMI alarm class '{alarmClass}' not found.");
+            if (hmiSw.Tags.Find(raisedStateTag) == null)
+                throw new InvalidOperationException($"HMI tag '{raisedStateTag}' not found.");
+            if (!Enum.TryParse(triggerMode, true, out HmiDiscreteAlarmTriggerMode parsedTriggerMode) ||
+                !Enum.IsDefined(typeof(HmiDiscreteAlarmTriggerMode), parsedTriggerMode))
+                throw new ArgumentException($"Unsupported discrete alarm trigger mode '{triggerMode}'.", nameof(triggerMode));
+            if (!string.IsNullOrEmpty(acknowledgmentControlTag) && hmiSw.Tags.Find(acknowledgmentControlTag) == null)
+                throw new InvalidOperationException($"Acknowledgment HMI tag '{acknowledgmentControlTag}' not found.");
+
+            var alarm = hmiSw.DiscreteAlarms.Find(alarmName) ?? hmiSw.DiscreteAlarms.Create(alarmName);
+            alarm.AlarmClass = alarmClass;
+            alarm.RaisedStateTag = raisedStateTag;
+            alarm.RaisedStateTagBitNumber = raisedStateTagBitNumber;
+            alarm.TriggerMode = parsedTriggerMode;
+            if (acknowledgmentControlTag != null)
+                alarm.AcknowledgmentControlTag = acknowledgmentControlTag;
+
+            if (alarm.EventText.Items.Count == 0)
+                throw new InvalidOperationException($"Discrete alarm '{alarmName}' has no active text language.");
+            string formattedText = FormatHtmlText(text);
+            foreach (var languageText in alarm.EventText.Items)
+                languageText.Text = formattedText;
+
+            return $"Discrete alarm '{alarmName}' configured for tag '{raisedStateTag}' bit {raisedStateTagBitNumber} in class '{alarmClass}'.";
         }
 
         public Dictionary<string, object> UpdateHmiTagAcquisitionCycles(
@@ -1809,4 +1903,3 @@ namespace TiaOpennessMcp.Tia
 
     #endregion
 }
-
