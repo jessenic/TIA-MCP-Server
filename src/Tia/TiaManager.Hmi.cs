@@ -224,6 +224,18 @@ namespace TiaOpennessMcp.Tia
                 {
                     details.Text = tb.Text.Items[0].Text;
                 }
+                else if (item is HmiToggleSwitch toggleSwitch)
+                {
+                    if (toggleSwitch.Text.Items.Count > 0)
+                    {
+                        details.Text = toggleSwitch.Text.Items[0].Text;
+                    }
+                    var handler = toggleSwitch.EventHandlers.Find(HmiToggleSwitchEventType.Tapped);
+                    if (handler != null)
+                    {
+                        details.TappedScript = handler.Script.ScriptCode;
+                    }
+                }
                 else if (item is HmiButton btn && btn.Text.Items.Count > 0)
                 {
                     details.Text = btn.Text.Items[0].Text;
