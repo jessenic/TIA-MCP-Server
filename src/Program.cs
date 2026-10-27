@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Threading;
@@ -21,9 +22,18 @@ namespace TiaOpennessMcp
         [STAThread]
         static void Main(string[] args)
         {
-            // Register assembly resolver before touching any Siemens types
             AppDomain.CurrentDomain.AssemblyResolve += ResolveV21Assembly;
+            if (args.Contains("--render-hmi"))
+            {
+                Environment.ExitCode = Rendering.HmiRenderCommand.Run(args);
+                return;
+            }
+            Run(args);
+        }
 
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void Run(string[] args)
+        {
             string? configPath = null;
             int? cliPort = null;
             string? cliMode = null;
@@ -194,6 +204,7 @@ namespace TiaOpennessMcp
             Console.WriteLine("  TiaOpennessMcp.exe --test              Run quick connection test");
             Console.WriteLine("  TiaOpennessMcp.exe --run-sequence-test [report.md] Run online mixing sequence verification tests");
             Console.WriteLine("  TiaOpennessMcp.exe --export-schemas    Export tool JSON schemas");
+            Console.WriteLine("  TiaOpennessMcp.exe --render-hmi INPUT --output OUTPUT [--screen GROUP/NAME] [--language en-US] [--scale 2]");
             Console.WriteLine("  TiaOpennessMcp.exe --register-whitelist Register in Siemens Openness AllowList");
             Console.WriteLine("  TiaOpennessMcp.exe --help              Show this help message");
         }

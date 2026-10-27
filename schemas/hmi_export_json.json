@@ -1,0 +1,29 @@
+{
+  "name": "hmi_export_json",
+  "description": "Export a Unified HMI target as a versioned JSON directory containing screens, tag tables, alarms, optional styles, and file hashes.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "compact": {
+        "description": "Omit item properties equal to their TIA-created type defaults (default: true).",
+        "type": "boolean"
+      },
+      "output_directory": {
+        "description": "Directory to write the hmi/<Target> JSON export.",
+        "type": "string"
+      },
+      "script_files": {
+        "description": "Write event scripts into .js sidecar files instead of inline JSON strings (default: false).",
+        "type": "boolean"
+      },
+      "target_name": {
+        "description": "Target HMI software/device selector (optional when only one target exists).",
+        "type": "string"
+      }
+    },
+    "required": [
+      "output_directory"
+    ],
+    "type": "object"
+  }
+}

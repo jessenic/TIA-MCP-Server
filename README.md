@@ -5,12 +5,12 @@
 [![Protocol](https://img.shields.io/badge/MCP-2024--11--05-blue.svg)](https://modelcontextprotocol.io)
 [![Runtime](https://img.shields.io/badge/.NET%20Framework-4.8%20x64-512BD4.svg)](https://dotnet.microsoft.com)
 [![Version](https://img.shields.io/badge/Version-v0.0.2-blue.svg)](release/release0.0.2.zip)
-[![Tools](https://img.shields.io/badge/Tools-62%20Registered-brightgreen.svg)](#complete-tools-reference-dictionary-62-tools)
+[![Tools](https://img.shields.io/badge/Tools-68%20Registered-brightgreen.svg)](#complete-tools-reference-dictionary-68-tools)
 [![License](https://img.shields.io/badge/License-MIT-orange.svg)](LICENSE)
 
 A high-performance, persistent **Model Context Protocol (MCP)** server providing AI coding agents (such as **Google Antigravity**, **Claude Desktop**, **Cursor**, and **VS Code**) with direct programmatic control over **Siemens TIA Portal V21** and **S7-PLCSIM Advanced V8.0**.
 
-Equipped with **62 specialized industrial automation tools**, this server bridges generative AI with deterministic industrial hardware and software—enabling automated PLC logic authoring, model-based architecture ingestion (Draw.io / PlantUML / Mermaid), automated design-to-HMI pipelines (Figma to WinCC Unified), live simulation memory I/O, and automated Hardware-in-the-Loop (HIL) sequence verification with telemetry report generation.
+Equipped with **68 specialized industrial automation tools**, this server bridges generative AI with deterministic industrial hardware and software—enabling automated PLC logic authoring, model-based architecture ingestion (Draw.io / PlantUML / Mermaid), automated design-to-HMI pipelines (Figma to WinCC Unified), live simulation memory I/O, and automated Hardware-in-the-Loop (HIL) sequence verification with telemetry report generation.
 
 ---
 
@@ -69,7 +69,7 @@ flowchart TD
     subgraph SERVER["⚡ TiaOpennessMcp Server (Persistent Daemon)"]
         TransportStdio["MCP stdio Handler<br/>Framing & JSON-RPC"]
         TransportHttp["HTTP / SSE Engine<br/>Port 5001"]
-        ToolRegistry["Tool Registry<br/>62 Industrial Automation Tools"]
+        ToolRegistry["Tool Registry<br/>68 Industrial Automation Tools"]
         TiaMgr["TiaManager (Singleton)<br/>Openness COM Bridge"]
         PlcSimMgr["PlcSimManager (Singleton)<br/>PLCSIM API V8.0 Bridge"]
     end
@@ -116,14 +116,61 @@ flowchart TD
 - **Data Types & Tags**: Author User Data Types (`tia_list_plc_types`, `tia_import_plc_type`) and manage tag tables (`tia_list_tag_tables`, `tia_get_tags`).
 - **Native Diagnostics**: Compile software containers via `ICompilable` and return exact error messages, line numbers, and warnings (`tia_compile`).
 
-### 2. WinCC Unified HMI Engineering (31 Tools)
+### 2. WinCC Unified HMI Engineering (35 Tools)
 - **Screen Management**: Create and delete Unified screens, and list or target screens recursively through nested screen groups (`hmi_list_screens`, `hmi_create_screen`, `hmi_delete_screen`).
 - **Widgets & UI Elements**: Programmatically position labels with HTML typography (`hmi_add_label`), pushbuttons (`hmi_add_button`), tag-bound toggle switches (`hmi_add_toggle_switch`), geometric shapes (`hmi_add_shape`), and process I/O fields (`hmi_add_io_field`).
 - **Discrete Alarms**: Create or update discrete alarms with validated trigger tags, alarm classes, trigger modes, and multilingual event text (`hmi_create_discrete_alarm`).
 - **Range Dynamization**: Dynamize properties (e.g. `BackColor`, font color) to integer/real tags using `ConditionType.Range` (`hmi_set_tag_dynamization`).
 - **In-Place Script Updates**: Safely update button JavaScript handlers in-place without deleting or disrupting layout coordinates (`hmi_update_button_scripts`).
+- **JSON-Based HMI Engineering**: Export, import, and patch screens, tags, and discrete alarms using versioned `tia-mcp-hmi/1` JSON files (`hmi_export_json`, `hmi_import_json`, `hmi_patch_json`). Imports are transactional, verified, compiled, and never save the project.
 - **Communication & Text Lists**: Create device-level text lists (`hmi_create_text_list`), export text lists (`hmi_export_text_lists`), and establish HMI-to-PLC communication links (`hmi_create_connection`).
 - **Compile Diagnostics**: Full Unified runtime compilation diagnostics with item-level error reporting (`hmi_compile`).
+
+HMI JSON exports are organized as `manifest.json`, `screens/`, `tags/`, `alarms/discrete.json`, and optional shared `styles.json`. File hashes are verified by default on import; use `verify_hashes: false` only when intentionally editing exported files without updating their manifest hashes. Imports support a dry run and optional item pruning; patch files support guarded set/bind/delete operations and verification requirements.
+
+Tag and Expression dynamizations preserve value converters and typed Simple/Range mappings.
+Faceplates retain their contained-type identity; internal tags retain their data type and unset limits.
+Custom widgets export supported full properties but must already exist when importing; their
+interfaces and complex control compositions are not serialized. Inspect manifest warnings;
+the JSON export is not a complete project backup. Unsupported dynamizations, bitmask mappings,
+and tag-based limits fail explicitly.
+
+#### Offline screen rendering for AI layout review
+
+`hmi_render_json` renders an exported directory without connecting to TIA Portal or
+executing JavaScript, expressions, or tag reads. The equivalent Windows CLI is:
+
+```powershell
+.\src\bin\Debug\net48\TiaOpennessMcp.exe --render-hmi C:\Projects\Plant\hmi\HMI_RT_1 --output C:\Projects\Plant\previews --language en-US --scale 2
+# Optional: --screen ParameterScreen (or group/name to disambiguate).
+```
+
+Each screen produces a clean lossless `.png`, a numbered `.layout.png`, and a
+`.layout.json` containing matching IDs, item paths, z-order, screen-space bounds,
+visibility, clipping, possible text overflow, placeholders, and unresolved dynamic
+properties. `render-index.json` links the results. Default scale is 2x for readable
+AI inspection; coordinates in reports remain unscaled screen pixels. Review the
+clean image first, then use overlay IDs and JSON to locate layout problems precisely.
+
+The renderer resolves shared styles, localized text/markup, rounded shapes, lines,
+buttons, IO fields, and static nested screen windows (including clipping, zoom, and
+scroll offsets). Dynamic process values are shown as `?`. Default language is `en-US`
+when available, otherwise the first manifest language. Explicitly select a language
+for reproducible review. Output files are never overwritten.
+
+New compact exports include a hashed `defaults.json` referenced by `defaultsFile`,
+so omitted properties can be resolved offline. Old compact exports still render,
+but emit an approximation warning; prefer a full export or re-export for exact defaults.
+These captured defaults are preview metadata; imports still use the destination TIA's
+own type defaults.
+
+**Fidelity limits:** this is an engineering preview, not a runtime screenshot.
+Faceplates, custom SVG/widgets, alarm/trend controls, and other unavailable control
+compositions are hatched placeholders. Graphic assets are not present in the export.
+Missing fonts, inline rich-text formatting, window adaption/chrome, switch skins,
+fill patterns and compositing approximations are disclosed in each report. Install
+the original fonts for reliable text metrics. `textOverflow` is a heuristic, not a
+runtime compiler verdict. Use runtime validation for final visual sign-off.
 
 ### 3. S7-PLCSIM Advanced Live Simulation & Testing (12 Tools)
 - **Direct Runtime Link**: Connects to virtual S7-1500 controllers via shared memory API V8.0 (`plcsim_connect`).
@@ -274,7 +321,7 @@ stateDiagram-v2
 
 ---
 
-## Complete Tools Reference Dictionary (64 Tools)
+## Complete Tools Reference Dictionary (68 Tools)
 
 | # | Tool Name | Category | Primary Parameters | Description |
 |:---:|:---|:---:|:---|:---|
@@ -328,20 +375,24 @@ stateDiagram-v2
 | 48 | `hmi_compile` | Compilation | `target_name` | Compile WinCC Unified runtime with diagnostics. |
 | 49 | `tia_list_tag_tables` | PLC Tags | `plc_name` | List PLC tag tables. |
 | 50 | `tia_get_tags` | PLC Tags | `table_name`, `plc_name` | Read PLC tags with `%I`, `%Q`, `%M` addresses. |
-| 51 | `tia_testsuite_list_tests`| TestSuite | `plc_name` | List configured Siemens TestSuite test cases. |
-| 52 | `tia_testsuite_load_test` | TestSuite | `file_path` | Import or reload `.tat` rule file with override. |
-| 53 | `plcsim_list_instances` | Simulation | *(none)* | List all registered S7-PLCSIM Advanced instances. |
-| 54 | `plcsim_connect` | Simulation | `instance_name` (default `"PLC_1"`) | Connect to S7-PLCSIM Advanced and cache symbolic tags. |
-| 55 | `plcsim_disconnect` | Simulation | *(none)* | Detach from active PLCSIM instance. |
-| 56 | `plcsim_get_status` | Simulation | *(none)* | Real-time status (Run/Stop, scale factor, tag counts). |
-| 57 | `plcsim_set_operating_state` | Simulation | `state` (`"Run"`, `"Stop"`, `"MemoryReset"`) | Switch virtual controller operating state. |
-| 58 | `plcsim_set_scale_factor` | Simulation | `scale_factor` (e.g. `2.0`) | Scale simulation clock to speed up execution. |
-| 59 | `plcsim_read_tag` | Live I/O | `tag_name` | Read live DB, I, Q, or M variable by symbolic name. |
-| 60 | `plcsim_write_tag` | Live I/O | `tag_name`, `value` | Write live value to variable in virtual PLC memory. |
-| 61 | `plcsim_read_tags` | Live I/O | `tag_names` | Bulk read multiple variables in a single call. |
-| 62 | `plcsim_write_tags` | Live I/O | `tags` (key-value object) | Bulk write multiple variables in a single call. |
-| 63 | `plcsim_run_sequence` | Verification | `start_command_tag`, `step_number_tag`, `done_tag`, ... | Universal automated sequence testing for any state machine. |
-| 64 | `plcsim_run_mixing_sequence`| Verification | Recipe parameters, `scale_factor` | Automated multi-parameter batch testing runner. |
+| 51 | `hmi_export_json` | HMI JSON | `output_directory`, `compact`, `script_files`, `target_name` | Export a Unified HMI target to versioned, hashed JSON files. |
+| 52 | `hmi_import_json` | HMI JSON | `input_directory`, `prune_items`, `dry_run`, `verify_hashes`, `target_name` | Validate and transactionally import HMI JSON; compile without saving. |
+| 53 | `hmi_patch_json` | HMI JSON | `file_path`, `dry_run`, `target_name` | Apply a guarded JSON patch to Unified HMI objects. |
+| 54 | `tia_testsuite_list_tests`| TestSuite | `plc_name` | List configured Siemens TestSuite test cases. |
+| 55 | `tia_testsuite_load_test` | TestSuite | `file_path` | Import or reload `.tat` rule file with override. |
+| 56 | `plcsim_list_instances` | Simulation | *(none)* | List all registered S7-PLCSIM Advanced instances. |
+| 57 | `plcsim_connect` | Simulation | `instance_name` (default `"PLC_1"`) | Connect to S7-PLCSIM Advanced and cache symbolic tags. |
+| 58 | `plcsim_disconnect` | Simulation | *(none)* | Detach from active PLCSIM instance. |
+| 59 | `plcsim_get_status` | Simulation | *(none)* | Real-time status (Run/Stop, scale factor, tag counts). |
+| 60 | `plcsim_set_operating_state` | Simulation | `state` (`"Run"`, `"Stop"`, `"MemoryReset"`) | Switch virtual controller operating state. |
+| 61 | `plcsim_set_scale_factor` | Simulation | `scale_factor` (e.g. `2.0`) | Scale simulation clock to speed up execution. |
+| 62 | `plcsim_read_tag` | Live I/O | `tag_name` | Read live DB, I, Q, or M variable by symbolic name. |
+| 63 | `plcsim_write_tag` | Live I/O | `tag_name`, `value` | Write live value to variable in virtual PLC memory. |
+| 64 | `plcsim_read_tags` | Live I/O | `tag_names` | Bulk read multiple variables in a single call. |
+| 65 | `plcsim_write_tags` | Live I/O | `tags` (key-value object) | Bulk write multiple variables in a single call. |
+| 66 | `plcsim_run_sequence` | Verification | `start_command_tag`, `step_number_tag`, `done_tag`, ... | Universal automated sequence testing for any state machine. |
+| 67 | `plcsim_run_mixing_sequence`| Verification | Recipe parameters, `scale_factor` | Automated multi-parameter batch testing runner. |
+| 68 | `hmi_render_json` | HMI Preview | `input_directory`, `output_directory`, `screen_name`, `language`, `scale` | Offline PNGs, numbered overlays, and layout reports with nested screens. |
 
 ---
 
@@ -422,6 +473,16 @@ From the repository root, validate generated MCP schemas without connecting to T
 ```
 This checks that every array parameter declares an `items` schema and that its item definition matches the checked-in schema. After updating the server binary, restart the MCP server/client connection to reload the tool definitions.
 
+Run HMI JSON regression checks after building (Debug by default):
+```powershell
+.\scripts\Test-HmiJson.ps1
+.\scripts\Test-HmiRenderer.ps1
+# Optional live tests: select the exact open project PID and target, and explicitly authorize temporary objects.
+.\scripts\Test-HmiJson.ps1 -TiaProcessId 12345 -TargetName HMI_RT_1 -AllowRollbackTests
+```
+The live tests clone item types, bindings/converters, and scripts into a temporary screen,
+check internal tags, and verify rollback. They never commit the test transaction or save.
+
 ### 4. Siemens Openness Whitelist Authorization (One-Time Setup)
 Siemens TIA Portal requires external applications accessing its Openness API to be registered in the Windows Registry with their file path and SHA-256 hash.
 
@@ -493,7 +554,7 @@ Open or create your Antigravity MCP configuration file at:
 *(Replace `C:\\path\\to\\TIA-MCP-Server\\release` with your actual absolute path using escaped backslashes `\\`)*.
 
 #### B. Tool Schema Registration (Lazy Loading)
-To enable Antigravity to lazy-load all 62 tools on demand, copy the JSON schemas from the repository's `schemas/` folder into your Antigravity MCP directory:
+To enable Antigravity to lazy-load all 68 tools on demand, copy the JSON schemas from the repository's `schemas/` folder into your Antigravity MCP directory:
 ```powershell
 New-Item -ItemType Directory -Path "$env:USERPROFILE\.gemini\antigravity\mcp\tia-portal-v21" -Force
 Copy-Item -Path ".\schemas\*.json" -Destination "$env:USERPROFILE\.gemini\antigravity\mcp\tia-portal-v21\" -Force
@@ -541,7 +602,7 @@ Launch Claude Code and check registered tools:
 claude
 > /mcp
 ```
-All 62 tools (`tia_*`, `hmi_*`, `plcsim_*`) will appear in the active MCP tools list. You can immediately ask:
+All 68 tools (`tia_*`, `hmi_*`, `plcsim_*`) will appear in the active MCP tools list. You can immediately ask:
 > *"Inspect the device tree of the active PLC and compile the software."*
 
 ---
@@ -559,7 +620,7 @@ All 62 tools (`tia_*`, `hmi_*`, `plcsim_*`) will appear in the active MCP tools 
   }
 }
 ```
-Restart Claude Desktop. The hammer icon (🛠️) in the input bar will display all 62 tools.
+Restart Claude Desktop. The hammer icon (🛠️) in the input bar will display all 68 tools.
 
 ---
 
@@ -628,7 +689,9 @@ Options:
   --pid <pid>                            Attach to specific TIA Portal process ID
   --config <path>, -c <path>             Load specific config.json file
   --test                                 Execute rapid TIA Portal connectivity test
-  --export-schemas [dir]                 Export all 62 MCP tool JSON schemas
+  --export-schemas [dir]                 Export all 68 MCP tool JSON schemas
+  --render-hmi INPUT --output OUTPUT     Offline PNG/overlay/layout JSON rendering
+    [--screen GROUP/NAME] [--language en-US] [--scale 2]
   --register-whitelist                   Register SHA-256 hash in Siemens AllowList
   --run-sequence-test [report.md]        Execute automated online sequence verification
 ```
@@ -658,7 +721,7 @@ This repository includes 3 turnkey agent skills located in `.agents/skills/`:
 * **Pre-Compiled Release Package v0.0.2**: Published [`release/release0.0.2.zip`](release/release0.0.2.zip) containing the updated executable, configuration, whitelist registration script, and all runtime dependencies.
 
 ### [v0.0.1] - 2026-10-02
-* Initial open-source release with 62 specialized industrial automation tools.
+* Initial open-source release with 67 specialized industrial automation tools.
 * TIA Portal V21 Openness integration (PLC logic, SimaticML, UDTs, tag tables, native diagnostics).
 * WinCC Unified HMI generation from Figma design tokens and SVG vectors.
 * S7-PLCSIM Advanced V8.0 live simulation, clock scaling, and automated sequence testing (`plcsim_run_sequence`).

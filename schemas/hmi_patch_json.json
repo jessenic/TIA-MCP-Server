@@ -1,0 +1,25 @@
+{
+  "name": "hmi_patch_json",
+  "description": "Validate or apply declarative Unified HMI JSON set/bind/delete operations with require and verify guards; changes are transactional, compiled, and never saved.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "dry_run": {
+        "description": "Validate preconditions and report operations without applying them (default: false).",
+        "type": "boolean"
+      },
+      "file_path": {
+        "description": "Path to a tia-mcp-hmi-patch/1 JSON patch file.",
+        "type": "string"
+      },
+      "target_name": {
+        "description": "Target HMI software/device selector (optional when only one target exists).",
+        "type": "string"
+      }
+    },
+    "required": [
+      "file_path"
+    ],
+    "type": "object"
+  }
+}

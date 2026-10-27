@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text.Json;
 using TiaOpennessMcp.Protocol;
 using TiaOpennessMcp.Tia;
+using TiaOpennessMcp.Rendering;
 
 namespace TiaOpennessMcp.Tools
 {
@@ -486,6 +487,79 @@ namespace TiaOpennessMcp.Tools
                     string screen = GetStringProp(args, "screen_name") ?? throw new ArgumentException("screen_name is required.");
                     string? target = GetStringProp(args, "target_name");
                     return CallToolResult.Json(TiaManager.Instance.GetHmiScreenItems(screen, target));
+                });
+
+            Register("hmi_export_json", "Export a Unified HMI target as a versioned JSON directory containing screens, tag tables, alarms, optional styles, and file hashes.",
+                schema =>
+                {
+                    schema.Properties["output_directory"] = new ToolProperty { Type = "string", Description = "Directory to write the hmi/<Target> JSON export." };
+                    schema.Properties["compact"] = new ToolProperty { Type = "boolean", Description = "Omit item properties equal to their TIA-created type defaults (default: true)." };
+                    schema.Properties["script_files"] = new ToolProperty { Type = "boolean", Description = "Write event scripts into .js sidecar files instead of inline JSON strings (default: false)." };
+                    schema.Properties["target_name"] = new ToolProperty { Type = "string", Description = "Target HMI software/device selector (optional when only one target exists)." };
+                    schema.Required = new List<string> { "output_directory" };
+                },
+                args =>
+                {
+                    string directory = GetStringProp(args, "output_directory") ?? throw new ArgumentException("output_directory is required.");
+                    bool compact = GetBoolProp(args, "compact", true);
+                    bool scriptFiles = GetBoolProp(args, "script_files", false);
+                    string? target = GetStringProp(args, "target_name");
+                    return CallToolResult.Json(TiaManager.Instance.ExportHmiJson(directory, compact, scriptFiles, target));
+                });
+
+            Register("hmi_render_json", "Render exported Unified HMI JSON offline to lossless PNG previews, numbered layout overlays and geometry/warnings reports. Resolves static nested screen windows; never connects to TIA or executes scripts. Complex controls use explicit placeholders.",
+                schema =>
+                {
+                    schema.Properties["input_directory"] = new ToolProperty { Type = "string", Description = "Export directory containing manifest.json. Full exports or compact exports with defaultsFile give best fidelity." };
+                    schema.Properties["output_directory"] = new ToolProperty { Type = "string", Description = "Separate output directory for PNGs, layout reports and render-index.json. Existing output files are never overwritten." };
+                    schema.Properties["screen_name"] = new ToolProperty { Type = "string", Description = "Optional screen name or group/name path; omitted renders every exported screen." };
+                    schema.Properties["language"] = new ToolProperty { Type = "string", Description = "Text language from manifest (default: en-US when available, otherwise first exported language)." };
+                    schema.Properties["scale"] = new ToolProperty { Type = "number", Description = "Output pixels per screen pixel, 0.5 to 4 (default: 2). Maximum 8192 per axis and 32 megapixels." };
+                    schema.Required = new List<string> { "input_directory", "output_directory" };
+                },
+                args =>
+                {
+                    string input = GetStringProp(args, "input_directory") ?? throw new ArgumentException("input_directory is required.");
+                    string output = GetStringProp(args, "output_directory") ?? throw new ArgumentException("output_directory is required.");
+                    double scale = args.HasValue && args.Value.TryGetProperty("scale", out JsonElement value) ? value.GetDouble() : 2;
+                    return CallToolResult.Json(HmiJsonRenderer.Render(input, output,
+                        GetStringProp(args, "screen_name"), GetStringProp(args, "language"), scale));
+                });
+
+            Register("hmi_import_json", "Upsert a versioned Unified HMI JSON directory under an Openness transaction, verify it, compile, and never save the project.",
+                schema =>
+                {
+                    schema.Properties["input_directory"] = new ToolProperty { Type = "string", Description = "Directory containing manifest.json and the referenced screen/tag/alarm files." };
+                    schema.Properties["prune_items"] = new ToolProperty { Type = "boolean", Description = "Delete screen items absent from imported screen files (default: false)." };
+                    schema.Properties["dry_run"] = new ToolProperty { Type = "boolean", Description = "Validate the files and target without making changes (default: false)." };
+                    schema.Properties["verify_hashes"] = new ToolProperty { Type = "boolean", Description = "Verify exported file hashes (default: true). Set false only when intentionally editing exported JSON without refreshing manifest hashes." };
+                    schema.Properties["target_name"] = new ToolProperty { Type = "string", Description = "Target HMI software/device selector (optional when only one target exists)." };
+                    schema.Required = new List<string> { "input_directory" };
+                },
+                args =>
+                {
+                    string directory = GetStringProp(args, "input_directory") ?? throw new ArgumentException("input_directory is required.");
+                    bool pruneItems = GetBoolProp(args, "prune_items", false);
+                    bool dryRun = GetBoolProp(args, "dry_run", false);
+                    bool verifyHashes = GetBoolProp(args, "verify_hashes", true);
+                    string? target = GetStringProp(args, "target_name");
+                    return CallToolResult.Json(TiaManager.Instance.ImportHmiJson(directory, pruneItems, dryRun, target, verifyHashes));
+                });
+
+            Register("hmi_patch_json", "Validate or apply declarative Unified HMI JSON set/bind/delete operations with require and verify guards; changes are transactional, compiled, and never saved.",
+                schema =>
+                {
+                    schema.Properties["file_path"] = new ToolProperty { Type = "string", Description = "Path to a tia-mcp-hmi-patch/1 JSON patch file." };
+                    schema.Properties["dry_run"] = new ToolProperty { Type = "boolean", Description = "Validate preconditions and report operations without applying them (default: false)." };
+                    schema.Properties["target_name"] = new ToolProperty { Type = "string", Description = "Target HMI software/device selector (optional when only one target exists)." };
+                    schema.Required = new List<string> { "file_path" };
+                },
+                args =>
+                {
+                    string filePath = GetStringProp(args, "file_path") ?? throw new ArgumentException("file_path is required.");
+                    bool dryRun = GetBoolProp(args, "dry_run", false);
+                    string? target = GetStringProp(args, "target_name");
+                    return CallToolResult.Json(TiaManager.Instance.ApplyHmiJsonPatch(filePath, dryRun, target));
                 });
 
             // 27. hmi_delete_screen_items

@@ -1,0 +1,34 @@
+{
+  "name": "hmi_render_json",
+  "description": "Render exported Unified HMI JSON offline to lossless PNG previews, numbered layout overlays and geometry/warnings reports. Resolves static nested screen windows; never connects to TIA or executes scripts. Complex controls use explicit placeholders.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "input_directory": {
+        "type": "string",
+        "description": "Export directory containing manifest.json. Full exports or compact exports with defaultsFile give best fidelity."
+      },
+      "output_directory": {
+        "type": "string",
+        "description": "Separate output directory for PNGs, layout reports and render-index.json. Existing output files are never overwritten."
+      },
+      "screen_name": {
+        "type": "string",
+        "description": "Optional screen name or group/name path; omitted renders every exported screen."
+      },
+      "language": {
+        "type": "string",
+        "description": "Text language from manifest (default: en-US when available, otherwise first exported language)."
+      },
+      "scale": {
+        "type": "number",
+        "description": "Output pixels per screen pixel, 0.5 to 4 (default: 2). Maximum 8192 per axis and 32 megapixels."
+      }
+    },
+    "required": [
+      "input_directory",
+      "output_directory"
+    ],
+    "additionalProperties": false
+  }
+}

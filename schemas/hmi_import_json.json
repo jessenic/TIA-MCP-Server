@@ -1,0 +1,33 @@
+{
+  "name": "hmi_import_json",
+  "description": "Upsert a versioned Unified HMI JSON directory under an Openness transaction, verify it, compile, and never save the project.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "dry_run": {
+        "description": "Validate the files and target without making changes (default: false).",
+        "type": "boolean"
+      },
+      "input_directory": {
+        "description": "Directory containing manifest.json and the referenced screen/tag/alarm files.",
+        "type": "string"
+      },
+      "prune_items": {
+        "description": "Delete screen items absent from imported screen files (default: false).",
+        "type": "boolean"
+      },
+      "target_name": {
+        "description": "Target HMI software/device selector (optional when only one target exists).",
+        "type": "string"
+      },
+      "verify_hashes": {
+        "description": "Verify exported file hashes (default: true). Set false only when intentionally editing exported JSON without refreshing manifest hashes.",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "input_directory"
+    ],
+    "type": "object"
+  }
+}

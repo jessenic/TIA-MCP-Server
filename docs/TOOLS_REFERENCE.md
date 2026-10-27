@@ -1,5 +1,5 @@
 # Siemens TIA Portal V21 Openness MCP Server
-## Complete Tools Reference Dictionary (64 Tools)
+## Complete Tools Reference Dictionary (68 Tools)
 
 **Protocol Specification:** Model Context Protocol (MCP) JSON-RPC 2.0  
 **Transport Binding:** HTTP (`POST /mcp`), SSE (`GET /sse`), stdio  
@@ -15,7 +15,7 @@
 | **1** | [Connection & Session Management](#category-1-connection--session-management-8-tools) | 8 | `tia_get_status`, `tia_list_processes`, `tia_connect`, `tia_disconnect`, `tia_get_project_info`, `tia_open_project`, `tia_save_project`, `tia_close_project` |
 | **2** | [Hardware & Device Topology](#category-2-hardware--device-topology-2-tools) | 2 | `tia_list_devices`, `tia_get_device_tree` |
 | **3** | [PLC Software, Blocks & Compilation](#category-3-plc-software-blocks--compilation-9-tools) | 9 | `tia_list_plcs`, `tia_list_blocks`, `tia_get_block_code`, `tia_import_block`, `tia_delete_block`, `tia_list_plc_types`, `tia_get_plc_type`, `tia_import_plc_type`, `tia_compile` |
-| **4** | [WinCC Unified HMI Engineering](#category-4-wincc-unified-hmi-screen--widget-engineering-31-tools) | 31 | `hmi_list_targets`, `hmi_list_screens`, `hmi_create_screen`, `hmi_delete_screen`, `hmi_get_screen_items`, `hmi_delete_screen_items`, `hmi_add_label`, `hmi_add_button`, `hmi_add_toggle_switch`, `hmi_add_shape`, `hmi_add_io_field`, `hmi_set_tag_dynamization`, `hmi_update_button_scripts`, `hmi_list_tag_tables`, `hmi_list_tags`, `hmi_create_tag`, `hmi_create_discrete_alarm`, `hmi_update_tag_acquisition_cycles`, `hmi_set_tag_range`, `hmi_create_data_log`, `hmi_assign_logging_tags`, `hmi_list_connections`, `hmi_create_connection`, `hmi_delete_connection`, `hmi_list_text_lists`, `hmi_create_text_list`, `hmi_delete_text_list`, `hmi_export_text_lists`, `hmi_compile`, `tia_list_tag_tables`, `tia_get_tags` |
+| **4** | [WinCC Unified HMI Engineering](#category-4-wincc-unified-hmi-screen--widget-engineering-35-tools) | 35 | `hmi_list_targets`, `hmi_list_screens`, `hmi_create_screen`, `hmi_delete_screen`, `hmi_get_screen_items`, `hmi_delete_screen_items`, `hmi_add_label`, `hmi_add_button`, `hmi_add_toggle_switch`, `hmi_add_shape`, `hmi_add_io_field`, `hmi_set_tag_dynamization`, `hmi_update_button_scripts`, `hmi_list_tag_tables`, `hmi_list_tags`, `hmi_create_tag`, `hmi_create_discrete_alarm`, `hmi_update_tag_acquisition_cycles`, `hmi_set_tag_range`, `hmi_create_data_log`, `hmi_assign_logging_tags`, `hmi_list_connections`, `hmi_create_connection`, `hmi_delete_connection`, `hmi_list_text_lists`, `hmi_create_text_list`, `hmi_delete_text_list`, `hmi_export_text_lists`, `hmi_compile`, `tia_list_tag_tables`, `tia_get_tags`, `hmi_export_json`, `hmi_import_json`, `hmi_patch_json`, `hmi_render_json` |
 | **5** | [Siemens TestSuite Automation](#category-5-siemens-testsuite-automation-2-tools) | 2 | `tia_testsuite_list_tests`, `tia_testsuite_load_test` |
 | **6** | [S7-PLCSIM Advanced Live Simulation & Testing](#category-6-s7-plcsim-advanced-live-simulation--testing-12-tools) | 12 | `plcsim_list_instances`, `plcsim_connect`, `plcsim_disconnect`, `plcsim_get_status`, `plcsim_set_operating_state`, `plcsim_set_scale_factor`, `plcsim_read_tag`, `plcsim_write_tag`, `plcsim_read_tags`, `plcsim_write_tags`, `plcsim_run_sequence`, `plcsim_run_mixing_sequence` |
 
@@ -344,7 +344,7 @@
 
 ---
 
-## Category 4: WinCC Unified HMI Screen & Widget Engineering (18 Tools)
+## Category 4: WinCC Unified HMI Screen & Widget Engineering (35 Tools)
 
 ### 20. `hmi_list_targets`
 - **Description:** Enumerates all WinCC Unified runtime devices and software containers.
@@ -955,9 +955,75 @@
 
 ---
 
+### 51. `hmi_export_json`
+- **Description:** Export a Unified HMI target to `tia-mcp-hmi/1` JSON files, including group-aware screens, tag tables, discrete alarms, optional styles, and SHA-256 file hashes.
+- **Parameters:**
+  | Parameter | Type | Required | Default | Description |
+  | :--- | :---: | :---: | :---: | :--- |
+  | `output_directory` | string | **Yes** | — | Destination directory for `manifest.json`, `screens/`, `tags/`, and `alarms/`. |
+  | `compact` | boolean | No | `true` | Omit item properties equal to the TIA-created type defaults. |
+  | `script_files` | boolean | No | `false` | Store event scripts as `.js` sidecar files rather than inline strings. |
+  | `target_name` | string | No | null | Target HMI software/device selector. |
+
+**JSON fidelity:** Tag and Expression dynamizations include their value converters,
+ordered Simple/Range mapping entries, typed values, flashing settings, and raw text
+markup. Faceplates include `containedType`; compact defaults are cached per contained
+type. Internal tags include `dataType`; unset limits are null. Unsupported dynamizations,
+bitmask mappings, and tag-based limits fail explicitly rather than exporting lossy placeholders.
+Custom widgets export supported full properties (`compact: false`) and a manifest
+warning: their creation identity and interface are not serialized, so imports require
+the widget to already exist. Complex control compositions are outside this format's
+scope; this is not a complete project backup.
+Compact exports also contain a hashed `defaults.json`, referenced by manifest
+`defaultsFile`, for offline rendering. Imports continue to use destination TIA defaults.
+
+---
+
+### 52. `hmi_import_json`
+- **Description:** Validate and upsert a versioned JSON export under an Openness transaction, apply declared verification requirements, and compile the HMI without saving the project.
+- **Parameters:**
+  | Parameter | Type | Required | Default | Description |
+  | :--- | :---: | :---: | :---: | :--- |
+  | `input_directory` | string | **Yes** | — | Directory containing `manifest.json` and referenced JSON/script files. |
+  | `prune_items` | boolean | No | `false` | Delete screen items absent from imported screen files. |
+  | `dry_run` | boolean | No | `false` | Validate the files and target without making changes. |
+  | `verify_hashes` | boolean | No | `true` | Verify exported hashes. Set false only for intentional edits that have not refreshed manifest hashes. |
+  | `target_name` | string | No | null | Target HMI software/device selector. |
+
+---
+
+### 53. `hmi_patch_json`
+- **Description:** Validate or apply guarded `set`, `bind`, and `delete` operations from a `tia-mcp-hmi-patch/1` file, then verify and compile without saving.
+- **Parameters:**
+  | Parameter | Type | Required | Default | Description |
+  | :--- | :---: | :---: | :---: | :--- |
+  | `file_path` | string | **Yes** | — | Path to the JSON patch file. |
+  | `dry_run` | boolean | No | `false` | Validate preconditions and report operations without applying them. |
+  | `target_name` | string | No | null | Target HMI software/device selector. |
+
+---
+
+### 68. `hmi_render_json`
+- **Description:** Offline Windows rendering of `tia-mcp-hmi/1` exports to PNGs, numbered layout overlays, and JSON geometry/warnings reports. Does not connect to TIA, run scripts, or evaluate tag/expression state.
+- **Parameters:**
+  | Parameter | Type | Required | Default | Description |
+  | :--- | :---: | :---: | :---: | :--- |
+  | `input_directory` | string | **Yes** | — | Export directory containing `manifest.json`. |
+  | `output_directory` | string | **Yes** | — | Separate output directory; existing output files are never overwritten. |
+  | `screen_name` | string | No | all screens | Screen name or group/name path. Ambiguous names fail. |
+  | `language` | string | No | en-US, else first manifest language | Exported text language. Missing translations are reported. |
+  | `scale` | number | No | 2 | Output pixels per screen pixel; 0.5–4, max 8192 per axis and 32 megapixels per image. |
+- **Outputs:** `render-index.json` plus `<screen>.png`, `<screen>.layout.png`, and `<screen>.layout.json`. The tool returns absolute paths and counts. Report IDs match overlay labels. Bounds `[x,y,width,height]` are unscaled screen-space axis-aligned bounds including ancestor transformations and rotation.
+- **Resolution:** Shared styles, captured compact defaults, text/markup language selection, z-order, geometry, colors, fonts, static visibility, and nested screen windows with clipping/zoom/scroll. IO fields bound to runtime values display `?`.
+- **Limits:** Legacy compact exports without `defaultsFile` use approximate omitted values and warn. Faceplates, custom widgets/SVG, alarm/trend controls and other unsupported controls are explicit geometry placeholders. Graphics are not embedded in the export. Font substitutions, rich-text/skin/window-adaption/chrome/compositing approximations are reported. Dynamic visibility/text/color remain static and are identified in the report. This is not a runtime screenshot or visual sign-off.
+- **Integrity:** Rendering intentionally accepts edited JSON without checking manifest hashes. It never imports changes. Import still verifies hashes by default. Relative paths are confined to the input directory; cyclic nested windows and excessive dimensions fail explicitly.
+- **CLI:** `TiaOpennessMcp.exe --render-hmi INPUT --output OUTPUT [--screen GROUP/NAME] [--language en-US] [--scale 2]`. This mode bypasses server startup and auto-connection.
+
+---
+
 ## Category 5: Siemens TestSuite Automation (2 Tools)
 
-### 51. `tia_testsuite_list_tests`
+### 54. `tia_testsuite_list_tests`
 - **Description:** Lists all configured application test cases in the project's TestSuite container.
 - **Parameters:** None (`{}`)
 - **Response Example:**
@@ -972,7 +1038,7 @@
 
 ---
 
-### 52. `tia_testsuite_load_test`
+### 55. `tia_testsuite_load_test`
 - **Description:** Loads, imports, or reloads a `.tat` test file into the project with `ImportOptions.Override`.
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
@@ -1005,7 +1071,7 @@
 
 ## Category 6: S7-PLCSIM Advanced Live Simulation & Testing (11 Tools)
 
-### 53. `plcsim_list_instances`
+### 56. `plcsim_list_instances`
 - **Description:** Lists all registered virtual S7-1500 controller instances managed by S7-PLCSIM Advanced runtime with ID, name, operating state, CPU type, and IP address.
 - **Parameters:** None (`{}`)
 - **Sample Response:**
@@ -1023,7 +1089,7 @@
 
 ---
 
-### 54. `plcsim_connect`
+### 57. `plcsim_connect`
 - **Description:** Attaches directly to a virtual S7-PLCSIM Advanced instance by name, caching symbolic tag tables for zero-overhead live I/O.
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
@@ -1054,13 +1120,13 @@
 
 ---
 
-### 55. `plcsim_disconnect`
+### 58. `plcsim_disconnect`
 - **Description:** Disconnects from the current virtual PLC instance and clears cached tag metadata.
 - **Parameters:** None (`{}`)
 
 ---
 
-### 56. `plcsim_get_status`
+### 59. `plcsim_get_status`
 - **Description:** Retrieves real-time status of the connected virtual controller: state (`Run`/`Stop`), scale factor, CPU model, IP, and total tags in memory.
 - **Parameters:** None (`{}`)
 - **Response Example:**
@@ -1079,7 +1145,7 @@
 
 ---
 
-### 57. `plcsim_set_operating_state`
+### 60. `plcsim_set_operating_state`
 - **Description:** Commands the virtual CPU operating mode (`Run`, `Stop`, or `MemoryReset`).
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
@@ -1088,7 +1154,7 @@
 
 ---
 
-### 58. `plcsim_set_scale_factor`
+### 61. `plcsim_set_scale_factor`
 - **Description:** Sets the simulation clock scale factor (e.g. `2.0` = 2x speed, `5.0` = 5x speed) to accelerate automated testing deterministically.
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
@@ -1097,7 +1163,7 @@
 
 ---
 
-### 59. `plcsim_read_tag`
+### 62. `plcsim_read_tag`
 - **Description:** Reads the live value and data type of any variable from DBs, inputs, outputs, or markers by symbolic name.
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
@@ -1114,7 +1180,7 @@
 
 ---
 
-### 60. `plcsim_write_tag`
+### 63. `plcsim_write_tag`
 - **Description:** Writes a live value to a symbolic variable in virtual PLC memory.
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
@@ -1124,7 +1190,7 @@
 
 ---
 
-### 61. `plcsim_read_tags`
+### 64. `plcsim_read_tags`
 - **Description:** Efficient bulk read of multiple variables in a single call.
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
@@ -1133,7 +1199,7 @@
 
 ---
 
-### 62. `plcsim_write_tags`
+### 65. `plcsim_write_tags`
 - **Description:** Bulk write to multiple symbolic variables in a single call.
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
@@ -1142,7 +1208,7 @@
 
 ---
 
-### 63. `plcsim_run_sequence`
+### 66. `plcsim_run_sequence`
 - **Description:** Executes a generic automated online sequence test on any PLC sequence or state machine in S7-PLCSIM Advanced. Writes initial and parameter tags, pulses the start tag, tracks step number progression, samples specified monitored tags at ~80ms, and generates an execution telemetry report.
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
@@ -1182,7 +1248,7 @@
 
 ---
 
-### 64. `plcsim_run_mixing_sequence`
+### 67. `plcsim_run_mixing_sequence`
 - **Description:** Executes an automated multi-parameter batch sequence test. Sets recipe parameters, triggers start, tracks step transitions, records 80ms telemetry, and generates an execution report.
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
