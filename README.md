@@ -416,6 +416,12 @@ dotnet build -c Release
 ```
 Output binary: `src\bin\Release\net48\TiaOpennessMcp.exe`.
 
+From the repository root, validate generated MCP schemas without connecting to TIA Portal:
+```powershell
+.\scripts\Test-ToolSchemas.ps1 -ExecutablePath .\src\bin\Release\net48\TiaOpennessMcp.exe
+```
+This checks that every array parameter declares an `items` schema and that its item definition matches the checked-in schema. After updating the server binary, restart the MCP server/client connection to reload the tool definitions.
+
 ### 4. Siemens Openness Whitelist Authorization (One-Time Setup)
 Siemens TIA Portal requires external applications accessing its Openness API to be registered in the Windows Registry with their file path and SHA-256 hash.
 

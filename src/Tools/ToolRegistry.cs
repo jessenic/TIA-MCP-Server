@@ -500,6 +500,7 @@ namespace TiaOpennessMcp.Tools
                     schema.Properties["item_names"] = new ToolProperty
                     {
                         Type = "array",
+                        Items = new ToolProperty { Type = "string" },
                         Description = "List of item names to delete."
                     };
                     schema.Properties["prefix"] = new ToolProperty
@@ -715,7 +716,22 @@ namespace TiaOpennessMcp.Tools
                     schema.Properties["property_name"] = new ToolProperty { Type = "string", Description = "Property to dynamize (e.g. 'BackColor', 'Visibility')." };
                     schema.Properties["tag_name"] = new ToolProperty { Type = "string", Description = "HMI tag name to evaluate." };
                     schema.Properties["condition_type"] = new ToolProperty { Type = "string", Description = "'None' or 'Range'." };
-                    schema.Properties["ranges"] = new ToolProperty { Type = "array", Description = "List of ranges: [{from: 0, to: 0, value: 'gray'}, {from: 1, to: 1, value: 'green'}]." };
+                    schema.Properties["ranges"] = new ToolProperty
+                    {
+                        Type = "array",
+                        Description = "List of ranges: [{from: 0, to: 0, value: 'gray'}, {from: 1, to: 1, value: 'green'}].",
+                        Items = new ToolProperty
+                        {
+                            Type = "object",
+                            Properties = new Dictionary<string, ToolProperty>
+                            {
+                                ["from"] = new ToolProperty { Type = "number" },
+                                ["to"] = new ToolProperty { Type = "number" },
+                                ["value"] = new ToolProperty { Type = "string" }
+                            },
+                            Required = new List<string> { "from", "to", "value" }
+                        }
+                    };
                     schema.Properties["target_name"] = new ToolProperty { Type = "string", Description = "Target HMI software name (optional)." };
                     schema.Required = new List<string> { "screen_name", "item_name", "property_name", "tag_name" };
                 },
@@ -741,7 +757,7 @@ namespace TiaOpennessMcp.Tools
                     schema.Properties["find_text"] = new ToolProperty { Type = "string", Description = "Substring to find in button scripts (e.g. 'SetBitInTag')." };
                     schema.Properties["replace_text"] = new ToolProperty { Type = "string", Description = "Replacement string (e.g. 'InvertBitInTag')." };
                     schema.Properties["new_script"] = new ToolProperty { Type = "string", Description = "Exact new script code to set unconditionally (optional)." };
-                    schema.Properties["button_names"] = new ToolProperty { Type = "array", Description = "Filter by specific button names (optional)." };
+                    schema.Properties["button_names"] = new ToolProperty { Type = "array", Items = new ToolProperty { Type = "string" }, Description = "Filter by specific button names (optional)." };
                     schema.Properties["target_name"] = new ToolProperty { Type = "string", Description = "Target HMI software name (optional)." };
                     schema.Required = new List<string> { "screen_name" };
                 },
@@ -906,7 +922,7 @@ namespace TiaOpennessMcp.Tools
                 schema =>
                 {
                     schema.Properties["log_name"] = new ToolProperty { Type = "string", Description = "Target DataLog name." };
-                    schema.Properties["tag_names"] = new ToolProperty { Type = "array", Description = "List of HMI tag names to log." };
+                    schema.Properties["tag_names"] = new ToolProperty { Type = "array", Items = new ToolProperty { Type = "string" }, Description = "List of HMI tag names to log." };
                     schema.Properties["cycle"] = new ToolProperty { Type = "string", Description = "Logging cycle (e.g. 'T1s', 'T500ms', default: 'T1s')." };
                     schema.Properties["mode"] = new ToolProperty { Type = "string", Description = "Logging mode ('Cyclic', 'OnChange', 'OnDemand', default: 'Cyclic')." };
                     schema.Properties["target_name"] = new ToolProperty { Type = "string", Description = "Target HMI software name (optional)." };
@@ -1029,7 +1045,23 @@ namespace TiaOpennessMcp.Tools
                     schema.Properties["entries"] = new ToolProperty
                     {
                         Type = "array",
-                        Description = "List of text entries. Each entry: { value, from_value (optional), to_value (optional), text, multilingual_texts (optional dict of lang->text) }."
+                        Description = "List of text entries. Each entry: { value, from_value (optional), to_value (optional), text, multilingual_texts (optional dict of lang->text) }.",
+                        Items = new ToolProperty
+                        {
+                            Type = "object",
+                            Properties = new Dictionary<string, ToolProperty>
+                            {
+                                ["value"] = new ToolProperty { Type = "integer" },
+                                ["from_value"] = new ToolProperty { Type = "integer" },
+                                ["to_value"] = new ToolProperty { Type = "integer" },
+                                ["text"] = new ToolProperty { Type = "string" },
+                                ["multilingual_texts"] = new ToolProperty
+                                {
+                                    Type = "object",
+                                    AdditionalProperties = new ToolProperty { Type = "string" }
+                                }
+                            }
+                        }
                     };
                     schema.Properties["device_name"] = new ToolProperty { Type = "string", Description = "Target HMI device or software name (optional)." };
                     schema.Required = new List<string> { "list_name", "entries" };
@@ -1209,6 +1241,7 @@ namespace TiaOpennessMcp.Tools
                     schema.Properties["tag_names"] = new ToolProperty
                     {
                         Type = "array",
+                        Items = new ToolProperty { Type = "string" },
                         Description = "List of symbolic tag names to read."
                     };
                     schema.Required = new List<string> { "tag_names" };
@@ -1285,7 +1318,7 @@ namespace TiaOpennessMcp.Tools
                     schema.Properties["idle_step"] = new ToolProperty { Type = "integer", Description = "Step integer value that indicates idle state (default 0)." };
                     schema.Properties["initial_tags"] = new ToolProperty { Type = "object", Description = "Optional key-value map of tags to initialize before sequence start." };
                     schema.Properties["parameter_tags"] = new ToolProperty { Type = "object", Description = "Optional key-value map of recipe/setpoint parameters to apply." };
-                    schema.Properties["monitored_tags"] = new ToolProperty { Type = "array", Description = "Optional array of tag names to sample in real-time telemetry." };
+                    schema.Properties["monitored_tags"] = new ToolProperty { Type = "array", Items = new ToolProperty { Type = "string" }, Description = "Optional array of tag names to sample in real-time telemetry." };
                     schema.Properties["scale_factor"] = new ToolProperty { Type = "number", Description = "Virtual controller speed scale factor (default 1.0)." };
                     schema.Properties["timeout_seconds"] = new ToolProperty { Type = "integer", Description = "Timeout in seconds to wait for sequence completion (default 60)." };
                     schema.Required = new List<string> { "start_command_tag", "step_number_tag", "done_tag" };

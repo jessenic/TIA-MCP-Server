@@ -1,1 +1,67 @@
-{"name":"hmi_set_tag_dynamization","description":"Set tag dynamization on a screen item property (e.g. BackColor range dynamization linked to a tag with range entries).","parameters":{"additionalProperties":false,"properties":{"condition_type":{"description":"'None' or 'Range'.","type":"string"},"item_name":{"description":"Item name.","type":"string"},"property_name":{"description":"Property to dynamize (e.g. 'BackColor', 'Visibility').","type":"string"},"ranges":{"description":"List of ranges: [{from: 0, to: 0, value: 'gray'}, {from: 1, to: 1, value: 'green'}].","type":"array"},"screen_name":{"description":"Screen name.","type":"string"},"tag_name":{"description":"HMI tag name to evaluate.","type":"string"},"target_name":{"description":"Target HMI software name (optional).","type":"string"}},"required":["screen_name","item_name","property_name","tag_name"],"type":"object"}}
+{
+  "name": "hmi_set_tag_dynamization",
+  "description": "Set tag dynamization on a screen item property (e.g. BackColor range dynamization linked to a tag with range entries).",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "screen_name": {
+        "type": "string",
+        "description": "Screen name."
+      },
+      "item_name": {
+        "type": "string",
+        "description": "Item name."
+      },
+      "property_name": {
+        "type": "string",
+        "description": "Property to dynamize (e.g. \u0027BackColor\u0027, \u0027Visibility\u0027)."
+      },
+      "tag_name": {
+        "type": "string",
+        "description": "HMI tag name to evaluate."
+      },
+      "condition_type": {
+        "type": "string",
+        "description": "\u0027None\u0027 or \u0027Range\u0027."
+      },
+      "ranges": {
+        "type": "array",
+        "description": "List of ranges: [{from: 0, to: 0, value: \u0027gray\u0027}, {from: 1, to: 1, value: \u0027green\u0027}].",
+        "items": {
+          "type": "object",
+          "description": "",
+          "properties": {
+            "from": {
+              "type": "number",
+              "description": ""
+            },
+            "to": {
+              "type": "number",
+              "description": ""
+            },
+            "value": {
+              "type": "string",
+              "description": ""
+            }
+          },
+          "required": [
+            "from",
+            "to",
+            "value"
+          ]
+        }
+      },
+      "target_name": {
+        "type": "string",
+        "description": "Target HMI software name (optional)."
+      }
+    },
+    "required": [
+      "screen_name",
+      "item_name",
+      "property_name",
+      "tag_name"
+    ],
+    "additionalProperties": false
+  }
+}

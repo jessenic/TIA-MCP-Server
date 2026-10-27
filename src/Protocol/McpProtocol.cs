@@ -138,6 +138,22 @@ namespace TiaOpennessMcp.Protocol
         [JsonPropertyName("default")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public object? Default { get; set; }
+
+        [JsonPropertyName("items")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public ToolProperty? Items { get; set; }
+
+        [JsonPropertyName("properties")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public Dictionary<string, ToolProperty>? Properties { get; set; }
+
+        [JsonPropertyName("required")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<string>? Required { get; set; }
+
+        [JsonPropertyName("additionalProperties")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public ToolProperty? AdditionalProperties { get; set; }
     }
 
     public class ToolsListResult

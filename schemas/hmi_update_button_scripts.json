@@ -1,1 +1,41 @@
-{"name":"hmi_update_button_scripts","description":"Update button scripts in place on a screen matching text search/replace or list of button names without deleting items.","parameters":{"additionalProperties":false,"properties":{"button_names":{"description":"Filter by specific button names (optional).","type":"array"},"find_text":{"description":"Substring to find in button scripts (e.g. 'SetBitInTag').","type":"string"},"new_script":{"description":"Exact new script code to set unconditionally (optional).","type":"string"},"replace_text":{"description":"Replacement string (e.g. 'InvertBitInTag').","type":"string"},"screen_name":{"description":"Screen name.","type":"string"},"target_name":{"description":"Target HMI software name (optional).","type":"string"}},"required":["screen_name"],"type":"object"}}
+{
+  "name": "hmi_update_button_scripts",
+  "description": "Update button scripts in place on a screen matching text search/replace or list of button names without deleting items.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "screen_name": {
+        "type": "string",
+        "description": "Screen name."
+      },
+      "find_text": {
+        "type": "string",
+        "description": "Substring to find in button scripts (e.g. \u0027SetBitInTag\u0027)."
+      },
+      "replace_text": {
+        "type": "string",
+        "description": "Replacement string (e.g. \u0027InvertBitInTag\u0027)."
+      },
+      "new_script": {
+        "type": "string",
+        "description": "Exact new script code to set unconditionally (optional)."
+      },
+      "button_names": {
+        "type": "array",
+        "description": "Filter by specific button names (optional).",
+        "items": {
+          "type": "string",
+          "description": ""
+        }
+      },
+      "target_name": {
+        "type": "string",
+        "description": "Target HMI software name (optional)."
+      }
+    },
+    "required": [
+      "screen_name"
+    ],
+    "additionalProperties": false
+  }
+}

@@ -1,1 +1,33 @@
-{"name":"hmi_delete_screen_items","description":"Delete specific screen items by name list or by name prefix (e.g. 'btn_', 'lbl_').","parameters":{"additionalProperties":false,"properties":{"item_names":{"description":"List of item names to delete.","type":"array"},"prefix":{"description":"Prefix of item names to delete (e.g. 'M101_').","type":"string"},"screen_name":{"description":"Name of the screen containing the items.","type":"string"},"target_name":{"description":"Target HMI software name (optional).","type":"string"}},"required":["screen_name"],"type":"object"}}
+{
+  "name": "hmi_delete_screen_items",
+  "description": "Delete specific screen items by name list or by name prefix (e.g. \u0027btn_\u0027, \u0027lbl_\u0027).",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "screen_name": {
+        "type": "string",
+        "description": "Name of the screen containing the items."
+      },
+      "item_names": {
+        "type": "array",
+        "description": "List of item names to delete.",
+        "items": {
+          "type": "string",
+          "description": ""
+        }
+      },
+      "prefix": {
+        "type": "string",
+        "description": "Prefix of item names to delete (e.g. \u0027M101_\u0027)."
+      },
+      "target_name": {
+        "type": "string",
+        "description": "Target HMI software name (optional)."
+      }
+    },
+    "required": [
+      "screen_name"
+    ],
+    "additionalProperties": false
+  }
+}
