@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Siemens HMI Binding Namespace Schema -->
+<!-- Defines attributes for dynamic property binding in HMI elements -->
+
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+  elementFormDefault="qualified"
+  attributeFormDefault="qualified"
+  targetNamespace="http://svg.siemens.com/hmi/bind/"
+  xmlns:hmi-bind="http://svg.siemens.com/hmi/bind/">
+
+  <xs:annotation>
+    <xs:documentation>
+      HMI Binding Schema - Defines attributes used for dynamic binding of properties
+      to parameter values and local definitions. Supports binding of display, fill,
+      stroke, transform, and other SVG/HMI properties.
+    </xs:documentation>
+  </xs:annotation>
+
+  <!-- Binding expression type - typically contains expressions like {{ParamProps.ShowBackground ? 'inline':'none'}} -->
+  <xs:simpleType name="BindingExpression">
+    <xs:annotation>
+      <xs:documentation>A binding expression that can reference ParamProps, LocalProps, and Converter functions</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string"/>
+  </xs:simpleType>
+
+  <!-- Common binding attributes that can be applied to any HMI/SVG element -->
+  <xs:attributeGroup name="HmiBindAttributes">
+    <xs:annotation>
+      <xs:documentation>Binding attributes for dynamic property binding</xs:documentation>
+    </xs:annotation>
+    <xs:attribute name="display" type="hmi-bind:BindingExpression">
+      <xs:annotation>
+        <xs:documentation>Binding for display property (inline/none)</xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+    <xs:attribute name="fill" type="hmi-bind:BindingExpression">
+      <xs:annotation>
+        <xs:documentation>Binding for fill color property</xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+    <xs:attribute name="stroke" type="hmi-bind:BindingExpression">
+      <xs:annotation>
+        <xs:documentation>Binding for stroke color property</xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+    <xs:attribute name="transform" type="hmi-bind:BindingExpression">
+      <xs:annotation>
+        <xs:documentation>Binding for transform property</xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+    <xs:attribute name="value" type="hmi-bind:BindingExpression">
+      <xs:annotation>
+        <xs:documentation>Binding for value property (used in localDef for dynamic values)</xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+    <xs:attribute name="opacity" type="hmi-bind:BindingExpression">
+      <xs:annotation>
+        <xs:documentation>Binding for opacity property</xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+    <xs:attribute name="width" type="hmi-bind:BindingExpression">
+      <xs:annotation>
+        <xs:documentation>Binding for width property</xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+    <xs:attribute name="height" type="hmi-bind:BindingExpression">
+      <xs:annotation>
+        <xs:documentation>Binding for height property</xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+    <xs:attribute name="x" type="hmi-bind:BindingExpression">
+      <xs:annotation>
+        <xs:documentation>Binding for x coordinate property</xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+    <xs:attribute name="y" type="hmi-bind:BindingExpression">
+      <xs:annotation>
+        <xs:documentation>Binding for y coordinate property</xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+    <xs:attribute name="offset" type="hmi-bind:BindingExpression">
+      <xs:annotation>
+        <xs:documentation>Binding for gradient stop offset property</xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+  </xs:attributeGroup>
+
+</xs:schema>

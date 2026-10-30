@@ -1,0 +1,366 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright (c) Siemens AG 2017  All Rights Reserved. -->
+
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+  elementFormDefault="qualified"
+  targetNamespace="http://svg.siemens.com/hmi/"
+  xmlns:hmi="http://svg.siemens.com/hmi/"
+  xmlns:hmi-element="http://svg.siemens.com/hmi/element/"
+  xmlns:hmi-bind="http://svg.siemens.com/hmi/bind/"
+  xmlns:xlink="http://www.w3.org/1999/xlink"
+  xmlns:xml="http://www.w3.org/XML/1998/namespace"
+  xmlns:svg="http://www.w3.org/2000/svg"
+  xmlns:rtpu="http://siemens.com/rtpu">
+
+  <xs:import namespace="http://www.w3.org/1999/xlink"
+    schemaLocation="xlink.xsd" />
+  <xs:import namespace="http://www.w3.org/XML/1998/namespace"
+    schemaLocation="xml.xsd" />
+  <xs:import namespace="http://svg.siemens.com/hmi/element/"
+    schemaLocation="hmi-element.xsd" />
+  <xs:import namespace="http://svg.siemens.com/hmi/bind/"
+    schemaLocation="hmi-bind.xsd" />
+  <xs:import namespace="http://www.w3.org/2000/svg"
+    schemaLocation="svghmi.xsd" />
+
+
+  <xs:simpleType name="NumberType">
+    <xs:annotation>
+      <xs:documentation>One simple number only</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:pattern value="((((\+|\-)?((\d+)))|((\+|\-)?(((((\d+)?\.(\d+))|((\d+)\.))([eE](\+|\-)?(\d+))?)|((\d+)([eE](\+|\-)?(\d+)))))))"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="FqPropId">
+    <xs:annotation>
+      <xs:documentation>Full qualified property id. This is basically a string for the verfier.</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string"/>
+  </xs:simpleType>
+
+  <!-- All HMI Elements have to derive (substitutionGroup) from this element-class -->
+  <xs:element name="HMI.Elements.class" abstract="true" />
+
+  <!-- All HMI Elements in def section -->
+  <xs:element name="HMI.Def.class" abstract="true" />
+
+  <!-- All HMI Elements in hmi-types section -->
+  <xs:element name="HMI.Types.class" abstract="true" />
+
+  <!-- Attribute Groups -->
+
+  <!-- Def Section -->
+  <!--hmi:data -->
+  <xs:element name="data">
+    <xs:complexType>
+      <xs:attribute name="type" use="required" type="xs:string" />
+    </xs:complexType>
+  </xs:element>
+
+  <!--hmi:focus -->
+  <xs:element name="focus">
+    <xs:complexType>
+      <xs:attribute name="focusVisual"  rtpu:enabled="true" rtpu:attributeClass="StringToNumeric" rtpu:attributeTypeId="hmiFocusVisual">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="system"/>
+            <xs:enumeration value="local"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute name="canFocus" use="optional" rtpu:enabled="true" rtpu:attributeClass="Boolean" rtpu:attributeTypeId="hmiCanFocus" rtpu:symbolType="Boolean" rtpu:valueType="Boolean"/>
+    </xs:complexType>
+  </xs:element>
+
+  <!-- Svg childs -->
+  <xs:complexType name="HMI.Self.content">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <!--<xs:element ref="svg:SVG.Description.class" /> -->
+      <xs:element ref="hmi:paramDef" />
+      <xs:element ref="hmi:data" />
+      <xs:element ref="hmi:focus" />
+    </xs:choice>
+  </xs:complexType>
+
+  <!-- hmi:self -->
+  <xs:element name="self" substitutionGroup="hmi:HMI.Elements.class">
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="hmi:HMI.Self.content">
+          <xs:attributeGroup ref="svg:stdAttrs" />
+          <xs:attribute name="name" type="xs:string" rtpu:enabled="true" rtpu:attributeClass="String" rtpu:attributeTypeId="hmiName" rtpu:valueType="String"/>
+          <xs:attribute name="guid" type="xs:string" />
+          <!-- FIXME: This is added for RTPU. Usually it is simply the id -->
+          <xs:attribute name="displayName" use="optional" type="xs:string" />
+          <xs:attribute name="version" type="xs:string" rtpu:attributeTypeId="version" />
+          <xs:attribute name="type" type="xs:string" />
+
+          <xs:attribute name="performanceClass" rtpu:enabled="true" rtpu:attributeClass="StringToNumericComposition" rtpu:delimiter=",">
+            <xs:simpleType>
+              <xs:restriction base="xs:token">
+                <xs:enumeration value="s" />
+                <xs:enumeration value="S" />
+                <xs:enumeration value="m" />
+                <xs:enumeration value="M" />
+                <xs:enumeration value="l" />
+                <xs:enumeration value="L" />
+                <xs:enumeration value="xl"/>
+                <xs:enumeration value="XL"/>
+              </xs:restriction>
+            </xs:simpleType>
+          </xs:attribute>
+
+          <xs:attribute name="optimizations">
+            <xs:simpleType>
+              <xs:restriction base="xs:token">
+                <xs:enumeration value="svg-attr-order" />
+                <xs:enumeration value="native-attr-order" />
+              </xs:restriction>
+            </xs:simpleType>
+          </xs:attribute>
+          <xs:attribute name="systemFocus" use="optional" rtpu:enabled="true" rtpu:attributeClass="Boolean" rtpu:attributeTypeId="hmiSystemFocus" rtpu:symbolType="Boolean" rtpu:valueType="Boolean"/>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>  
+  <xs:attributeGroup name="EventActionTaskAttrs">
+    <xs:annotation>
+      <xs:documentation>The following are the different types of  attributes supported for setProperty</xs:documentation>
+    </xs:annotation>
+      <xs:attribute name="name" use="required" rtpu:enabled="true" rtpu:attributeClass="String" rtpu:attributeTypeId="hmiEventName" rtpu:symbolType="String"  rtpu:valueType="String"/>
+      <xs:attribute name="value" use="required" rtpu:enabled="true" rtpu:attributeClass="String" rtpu:attributeTypeId="hmiEventValue" rtpu:symbolType="String" rtpu:valueType="String"/>
+     <xs:attribute name="condition" use="optional" rtpu:enabled="true" rtpu:attributeClass="Boolean" rtpu:attributeTypeId="hmiCondition" rtpu:symbolType="Boolean" rtpu:valueType="Boolean"/>
+      <xs:attribute name="type" type="xs:string" />
+  </xs:attributeGroup>
+  <xs:attribute name="if" />
+  <xs:attribute name="focusArea">
+    <xs:simpleType>
+      <xs:restriction base="xs:token">
+        <xs:enumeration value="box" />
+        <xs:enumeration value="outline" />
+      </xs:restriction>
+    </xs:simpleType>
+  </xs:attribute>
+
+  <xs:attribute name="changes"  rtpu:enabled="true" rtpu:attributeClass="StringToNumeric">
+    <xs:simpleType>
+      <xs:restriction base="xs:string">
+        <!-- As per SDS rete the following values are treated as case insensitive.-->
+        <xs:enumeration value="frequently"/>
+        <xs:enumeration value="often"/>
+        <xs:enumeration value="rarely"/>
+        <xs:enumeration value="never"/>
+      </xs:restriction>
+    </xs:simpleType>
+  </xs:attribute>
+
+  <xs:element name="setProperty" substitutionGroup="hmi:HMI.Elements.class">
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="hmi:HMI.Self.content">
+          <xs:attributeGroup ref="hmi:EventActionTaskAttrs" />
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="sendCommand" substitutionGroup="hmi:HMI.Elements.class">
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="hmi:HMI.Self.content">
+          <xs:attributeGroup ref="hmi:EventActionTaskAttrs" />
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="setCursor" substitutionGroup="hmi:HMI.Elements.class">
+    <xs:complexType>
+      <xs:attribute name="name" use="required" rtpu:enabled="true" rtpu:attributeClass="StringToNumeric" rtpu:attributeTypeId="hmiSetCursorName">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <!-- As per SDS rete the following values are treated as case insensitive.-->
+            <xs:enumeration value="auto"/>
+            <xs:enumeration value="crosshair"/>
+            <xs:enumeration value="help"/>
+            <xs:enumeration value="move"/>
+            <xs:enumeration value="not-allowed"/>
+            <xs:enumeration value="pointer"/>
+            <xs:enumeration value="text"/>
+            <xs:enumeration value="wait"/>
+            <xs:enumeration value="zoom-in"/>
+            <xs:enumeration value="zoom-out"/>
+            <xs:enumeration value="e-resize"/>
+            <xs:enumeration value="ew-resize"/>
+            <xs:enumeration value="n-resize"/>
+            <xs:enumeration value="ne-resize"/>
+            <xs:enumeration value="nesw-resize"/>
+            <xs:enumeration value="ns-resize"/>
+            <xs:enumeration value="nw-resize"/>
+            <xs:enumeration value="nwse-resize"/>
+            <xs:enumeration value="s-resize"/>
+            <xs:enumeration value="se-resize"/>
+            <xs:enumeration value="sw-resize"/>
+            <xs:enumeration value="w-resize"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute name="value" rtpu:enabled="true" rtpu:attributeClass="StringToNumeric" rtpu:attributeTypeId="hmiSetCursorValue">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="screen" />
+            <xs:enumeration value="item" />
+            <xs:enumeration value="element" />
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute name="condition" use="optional" rtpu:enabled="true" rtpu:attributeClass="Boolean" rtpu:attributeTypeId="hmiCondition" rtpu:symbolType="Boolean" rtpu:valueType="Boolean"/>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="call" substitutionGroup="hmi:HMI.Elements.class">
+    <xs:complexType>
+      <xs:attribute name="method" use="required" rtpu:enabled="true" rtpu:attributeClass="String" rtpu:attributeTypeId="hmiEventMethod" rtpu:symbolType="String"  rtpu:valueType="String"/>
+      <xs:attribute name="name" use="required" rtpu:enabled="true" rtpu:attributeClass="String" rtpu:attributeTypeId="hmiEventName" rtpu:symbolType="String"  rtpu:valueType="String"/>
+      <xs:attribute name="condition" use="optional" rtpu:enabled="true" rtpu:attributeClass="Boolean" rtpu:attributeTypeId="hmiCondition" rtpu:symbolType="Boolean" rtpu:valueType="Boolean"/>
+    </xs:complexType>
+  </xs:element>
+
+  <!--events-->
+  <xs:element name="action" substitutionGroup="hmi:HMI.Elements.class">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="hmi:setProperty"/>
+        <xs:element ref="hmi:sendCommand"/>
+        <xs:element ref="hmi:setCursor"/>
+        <xs:element ref="hmi:call"/>
+      </xs:sequence>
+      <xs:attribute name="id" type="xs:ID" use="required" rtpu:enabled="true" rtpu:valueType="UInt32" rtpu:attributeClass="Id" rtpu:symbolType="String" rtpu:attributeTypeId="id"/>
+      <xs:attribute name="condition" use="optional" rtpu:enabled="true" rtpu:attributeClass="Boolean" rtpu:attributeTypeId="hmiCondition" rtpu:symbolType="Boolean" rtpu:valueType="Boolean"/>
+      <xs:attribute name="event-propagation" use="optional" rtpu:enabled="true" rtpu:attributeClass="Boolean" rtpu:attributeTypeId="hmiEventPropagation" rtpu:symbolType="Boolean" rtpu:valueType="Boolean"/>
+      <xs:attribute name="trigger"  rtpu:enabled="true" rtpu:attributeClass="StringToNumeric" rtpu:attributeTypeId="hmiActionTrigger">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="accept"/>
+            <xs:enumeration value="cancel"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+    </xs:complexType>
+  </xs:element>
+
+  <!-- hmi:localdef-->
+  <xs:element name="localDef" substitutionGroup="hmi:HMI.Def.class">
+    <xs:complexType>
+      <xs:attribute name="name" use="required" rtpu:enabled="true" rtpu:valueType="UInt32" rtpu:attributeClass="Id" rtpu:symbolType="String" rtpu:attributeTypeId="hmiId" />
+      <xs:attribute name="type" use="required" type="xs:string" />
+      <xs:attribute name="value" use="optional" rtpu:enabled="true" rtpu:attributeClass="Any" rtpu:attributeTypeId="hmiAnyValue" rtpu:symbolType="Any" rtpu:valueType="Any"/>
+      <xs:attributeGroup ref="hmi-bind:HmiBindAttributes"/>
+    </xs:complexType>
+  </xs:element>
+  <!-- hmi:include-->
+  <xs:element name="include" substitutionGroup="hmi:HMI.Elements.class">
+    <xs:complexType>
+      <xs:choice minOccurs="0" maxOccurs="unbounded">
+        <xs:element ref="hmi:param"/>
+      </xs:choice>
+      <xs:attribute name="template" use="required" type="xs:string" />
+      <xs:attribute name="for" use="optional" type="xs:string" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number"/>
+      <xs:attribute name="forEach" use="optional" type="xs:string" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number"/>
+      <xs:attribute name="x" type="svg:CoordinateType" use="optional" rtpu:attributeTypeId="x"/>
+      <xs:attribute name="y" type="svg:CoordinateType" use="optional" rtpu:attributeTypeId="y"/>
+      <xs:attribute name="width" type="svg:LengthType" use="required" rtpu:attributeTypeId="width"/>
+      <xs:attribute name="height" type="svg:LengthType" use="required" rtpu:attributeTypeId="height"/>
+      <xs:attributeGroup ref="svg:FlexAttrs"/>
+    </xs:complexType>
+  </xs:element>
+  <!-- hmi:enum-member -->
+  <xs:element name="enum-member">
+    <xs:complexType>
+      <xs:attribute name="name" use="required" type="xs:string" />
+      <xs:attribute name="value" use="required" type="xs:string" />
+    </xs:complexType>
+  </xs:element>
+  <!-- hmi:paramDef-->
+  <xs:element name="paramDef" substitutionGroup="hmi:HMI.Elements.class">
+    <xs:complexType>
+      <xs:choice minOccurs="0" maxOccurs="unbounded">
+        <xs:element ref="hmi:enum-member"/>
+      </xs:choice>
+      <xs:attribute name="name" use="required" rtpu:enabled="true" rtpu:valueType="UInt32" rtpu:attributeClass="Id" rtpu:symbolType="String" rtpu:attributeTypeId="hmiId"/>
+      <xs:attribute name="type" use="required" type="xs:string" />
+      <xs:attribute name="default" use="optional" type="xs:string" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number"/>
+      <xs:attribute name="two-way" use="optional" rtpu:enabled="true" rtpu:attributeClass="Boolean" rtpu:attributeTypeId="hmiTwoWay" rtpu:symbolType="Boolean" rtpu:valueType="Boolean"/>
+    </xs:complexType>
+  </xs:element>
+  <!-- hmi:param-->
+  <xs:element name="param" substitutionGroup="hmi:HMI.Elements.class">
+    <xs:complexType>
+      <xs:attribute name="name" use="required" rtpu:enabled="true" rtpu:valueType="UInt32" rtpu:attributeClass="Id" rtpu:symbolType="String" rtpu:attributeTypeId="hmiId"/>
+    </xs:complexType>
+  </xs:element>
+
+  <!-- hmi:text-->
+  <xs:element name="text" substitutionGroup="hmi:HMI.Elements.class">
+    <xs:complexType>
+      <!-- TODO: FIXME The user specified attribute type id is not generated for 'value' -->
+      <xs:attribute name="value" use="optional" type="xs:string" rtpu:enabled="true" rtpu:attributeClass="String" rtpu:attributeTypeId="hmiTextValue" rtpu:symbolType="String" rtpu:valueType="String"/>
+      <xs:attributeGroup ref="hmi-bind:HmiBindAttributes"/>
+    </xs:complexType>
+  </xs:element>
+
+  <!-- hmi:template -->
+  <xs:element name="template" substitutionGroup="hmi:HMI.Def.class">
+  </xs:element>
+
+  <!-- hmi:inline -->
+  <xs:element name="inline" substitutionGroup="hmi:HMI.Def.class">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="hmi:param"/>
+        <xs:element ref="hmi:template"/>
+      </xs:sequence>
+      <xs:attribute name="for" use="optional" type="xs:string" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number"/>
+      <xs:attribute name="forEach" use="optional" type="xs:string" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number"/>
+      <xs:attribute name="x" type="svg:CoordinateType" use="optional" rtpu:attributeTypeId="x"/>
+      <xs:attribute name="y" type="svg:CoordinateType" use="optional" rtpu:attributeTypeId="y"/>
+      <xs:attribute name="width" type="svg:LengthType" use="required" rtpu:attributeTypeId="width"/>
+      <xs:attribute name="height" type="svg:LengthType" use="required" rtpu:attributeTypeId="height"/>
+      <xs:attributeGroup ref="svg:FlexAttrs"/>
+    </xs:complexType>
+  </xs:element>
+
+  <!-- hmi:master-include -->
+  <xs:element name="master-include" substitutionGroup="hmi:HMI.Def.class">
+    <xs:complexType>
+      <xs:choice minOccurs="0" maxOccurs="unbounded">
+        <xs:element ref="hmi:param"/>
+      </xs:choice>
+      <xs:attribute name="template" use="required" type="xs:string" />
+      <!-- FIXME: As per SDS 'for' attribute is not supported -->
+      <xs:attribute name="for" use="optional" type="xs:string" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number"/>
+      <xs:attribute name="x" type="svg:CoordinateType" use="optional" rtpu:attributeTypeId="x"/>
+      <xs:attribute name="y" type="svg:CoordinateType" use="optional" rtpu:attributeTypeId="y"/>
+      <xs:attribute name="width" type="svg:LengthType" use="required" rtpu:attributeTypeId="width"/>
+      <xs:attribute name="height" type="svg:LengthType" use="required" rtpu:attributeTypeId="height"/>
+    </xs:complexType>
+  </xs:element>
+
+  <!-- hmi:master-inline -->
+  <xs:element name="master-inline" substitutionGroup="hmi:HMI.Def.class">
+    <xs:complexType>
+      <xs:choice minOccurs="0" maxOccurs="unbounded">
+        <xs:element ref="hmi:param"/>
+      </xs:choice>
+      <!-- FIXME: As per SDS 'for' attribute is not supported -->
+      <xs:attribute name="for" use="optional" type="xs:string" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number"/>
+      <xs:attribute name="x" type="svg:CoordinateType" use="optional" rtpu:attributeTypeId="x"/>
+      <xs:attribute name="y" type="svg:CoordinateType" use="optional" rtpu:attributeTypeId="y"/>
+      <xs:attribute name="width" type="svg:LengthType" use="required" rtpu:attributeTypeId="width"/>
+      <xs:attribute name="height" type="svg:LengthType" use="required" rtpu:attributeTypeId="height"/>
+    </xs:complexType>
+  </xs:element>
+
+
+</xs:schema>

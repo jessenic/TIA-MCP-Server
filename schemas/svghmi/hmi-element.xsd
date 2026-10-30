@@ -1,0 +1,234 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright (c) Siemens AG 2017  All Rights Reserved. -->
+
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+  elementFormDefault="qualified" targetNamespace="http://svg.siemens.com/hmi/element/"
+
+  xmlns:hmi="http://svg.siemens.com/hmi/" xmlns:hmi-element="http://svg.siemens.com/hmi/element/"
+  xmlns:hmi-feature="http://svg.siemens.com/hmi/feature/"
+
+  xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xml="http://www.w3.org/XML/1998/namespace"
+  xmlns:svg="http://www.w3.org/2000/svg"
+  xmlns:rtpu="http://svg.siemens.com/hmi/rtpu">
+
+  <xs:import namespace="http://svg.siemens.com/hmi/"
+    schemaLocation="hmi.xsd" />
+  <xs:import namespace="http://svg.siemens.com/hmi/feature/"
+    schemaLocation="hmi-feature.xsd" />
+  <xs:import namespace="http://www.w3.org/2000/svg"
+    schemaLocation="svghmi.xsd" />
+  <xs:import namespace="http://www.w3.org/1999/xlink"
+    schemaLocation="xlink.xsd" />
+  <xs:import namespace="http://www.w3.org/XML/1998/namespace"
+    schemaLocation="xml.xsd" />
+
+
+  <xs:complexType name="HMI.NVE.straightDial.content">
+    <xs:choice minOccurs="1" maxOccurs="1">
+      <xs:element ref="hmi-feature:scale" />
+    </xs:choice>
+  </xs:complexType>
+
+  <xs:element name="straightDial" substitutionGroup="hmi:HMI.Elements.class">
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="hmi-element:HMI.NVE.straightDial.content">
+          <xs:attributeGroup ref="svg:stdAttrs" />
+          <xs:attribute name="start-x" use="optional"
+            type="svg:CoordinateType" />
+          <xs:attribute name="start-y" use="optional"
+            type="svg:CoordinateType" />
+
+          <!-- TODO: What is length in NVEs really? do we support em,px,% ? -->
+          <xs:attribute name="length" use="required" type="svg:LengthType" />
+          <xs:attribute name="begin-surcharge" use="optional" type="svg:LengthType" />
+          <xs:attribute name="end-surcharge" use="optional" type="svg:LengthType" />
+          <xs:attribute name="orientation" use="optional">
+            <xs:simpleType>
+              <xs:restriction base="xs:token">
+                <xs:enumeration value="horizontal" />
+                  <xs:enumeration value="vertical" />
+              </xs:restriction>
+            </xs:simpleType>
+          </xs:attribute>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="arcDial" substitutionGroup="hmi:HMI.Elements.class">
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="hmi-element:HMI.NVE.straightDial.content">
+          <xs:attributeGroup ref="svg:stdAttrs" />
+          <xs:attribute name="center-x" use="optional"
+            type="svg:CoordinateType" />
+          <xs:attribute name="center-y" use="optional"
+            type="svg:CoordinateType" />
+
+          <xs:attribute name="radius" use="required" type="svg:LengthType" />
+          <xs:attribute name="begin-angle" use="optional" type="svg:AngleType" />
+          <xs:attribute name="angle-range" use="optional" type="svg:AngleType" />
+          <xs:attribute name="begin-surcharge" use="optional" type="svg:LengthType" />
+          <xs:attribute name="end-surcharge" use="optional" type="svg:LengthType" />
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="textField" substitutionGroup="hmi:HMI.Elements.class">
+    <xs:complexType>
+      <xs:attributeGroup ref="svg:stdAttrs" />
+      <xs:attribute name="start-x" use="optional" type="svg:CoordinateType" />
+      <xs:attribute name="start-y" use="optional" type="svg:CoordinateType" />
+      <xs:attribute name="width" use="required" type="svg:LengthType" rtpu:attributeTypeId="width"/>
+      <xs:attribute name="height" use="required" type="svg:LengthType" rtpu:attributeTypeId="height"/>
+      <xs:attribute name="enabled" use="optional" rtpu:enabled="true" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiTextFieldEnabled"/>
+      <xs:attribute name="read-only" use="optional" rtpu:enabled="true" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiTextFieldReadOnly"/>
+      <xs:attribute name="value" use="optional" rtpu:enabled="true" rtpu:valueType="String" rtpu:attributeClass="String" rtpu:symbolType="String" rtpu:attributeTypeId="hmiTextFieldValue"/>
+      <xs:attribute name="target" use="optional" rtpu:enabled="true" rtpu:valueType="String" rtpu:attributeClass="String" rtpu:symbolType="String" rtpu:attributeTypeId="hmiTextFieldTarget"/>
+      <xs:attribute name="presentation" use="optional" rtpu:enabled="true" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiTextFieldPresentation"/>
+      <xs:attribute name="multi-line" use="optional" rtpu:enabled="true" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiTextFieldMultiLine"/>
+      <xs:attribute name="text-wrapping" use="optional" rtpu:enabled="true" rtpu:attributeTypeId="hmiTextFieldTextWrap">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="no-wrap" />
+            <xs:enumeration value="word-wrap" />
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute name="text-trimming" use="optional" rtpu:enabled="true" rtpu:attributeTypeId="hmiTextFieldTextTrimming">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="none" />
+            <xs:enumeration value="character-ellipsis" />
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute name="padding" use="optional" rtpu:enabled="true" rtpu:attributeClass="String" rtpu:symbolType="String" rtpu:valueType="String" rtpu:attributeTypeId="hmiTextFieldPadding"/>
+      <xs:attribute name="fore-color" type="svg:PaintType" use="optional" rtpu:enabled="true" rtpu:attributeTypeId="hmiTextFieldForeColor"/>
+      <xs:attribute name="horizontal-text-alignment" use="optional" rtpu:enabled="true" rtpu:attributeTypeId="hmiTextFieldHorizontalAlignment">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="left" />
+            <xs:enumeration value="center" />
+            <xs:enumeration value="right"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute name="vertical-text-alignment" use="optional" rtpu:enabled="true" rtpu:attributeTypeId="hmiTextFieldVerticalAlignment">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="top" />
+            <xs:enumeration value="middle" />
+            <xs:enumeration value="bottom"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute name="output-format" use="optional" type="xs:string" />
+      <xs:attribute name="format-pattern" use="optional" type="xs:string" />
+      <xs:attribute name="horizontal-scrollbar-visibility" use="optional" rtpu:enabled="true" rtpu:attributeTypeId="hmiHorizontalScrollBarVisibility">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="automatic" />
+            <xs:enumeration value="visible" />
+            <xs:enumeration value="collapsed" />
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute name="vertical-scrollbar-visibility" use="optional" rtpu:enabled="true" rtpu:attributeTypeId="hmiVerticalScrollBarVisibility">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="automatic" />
+            <xs:enumeration value="visible" />
+            <xs:enumeration value="collapsed" />
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+    </xs:complexType>
+  </xs:element>
+
+
+  <xs:complexType name="table.content">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element ref="hmi-feature:HMI.TableNveContent.class" />
+    </xs:choice>
+  </xs:complexType>
+
+  <xs:element name="table" substitutionGroup="hmi:HMI.Elements.class">
+    <xs:complexType>
+      <xs:complexContent>
+        <xs:extension base="hmi-element:table.content">
+          <xs:attribute name="x" use="optional" type="svg:CoordinateType"/>
+          <xs:attribute name="y" use="optional" type="svg:CoordinateType"/>
+          <xs:attribute name="width" use="required" type="svg:LengthType" rtpu:attributeTypeId="width"/>
+          <xs:attribute name="height" use="required" type="svg:LengthType" rtpu:attributeTypeId="height"/>
+          <xs:attribute name="configuration" use="required" type="hmi:FqPropId" rtpu:enabled="true" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiConfig"/>
+          <xs:attribute name="auto-scroll" use="optional" rtpu:enabled="true" rtpu:attributeClass="Boolean" rtpu:attributeTypeId="hmiTableAutoScroll" rtpu:symbolType="Boolean" rtpu:valueType="Boolean"/>
+          <xs:attribute name="row-selection" use="optional" rtpu:enabled="true" rtpu:attributeClass="Boolean" rtpu:attributeTypeId="hmiTableRowSelection" rtpu:symbolType="Boolean" rtpu:valueType="Boolean"/>
+        </xs:extension>
+      </xs:complexContent>
+    </xs:complexType>
+  </xs:element>
+  
+  <xs:element name="content" substitutionGroup="hmi:HMI.Elements.class">
+    <xs:complexType>
+        <xs:attributeGroup ref="svg:stdAttrs"/>
+        <xs:attribute name="left" use="required" type="svg:LengthType" rtpu:attributeTypeId="hmiContentLeft"/>
+        <xs:attribute name="top" use="optional" type="svg:LengthType" rtpu:attributeTypeId="hmiContentTop"/>
+        <xs:attribute name="width" use="optional" type="svg:LengthType" rtpu:attributeTypeId="width"/>
+        <xs:attribute name="height" use="optional" type="svg:LengthType" rtpu:attributeTypeId="height"/>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="chart" substitutionGroup="hmi:HMI.Elements.class">
+    <xs:complexType>
+      <xs:attributeGroup ref="svg:stdAttrs"/>
+      <xs:attribute name="start-x" use="optional" type="svg:CoordinateType"/>
+      <xs:attribute name="start-y" use="optional" type="svg:CoordinateType"/>
+      <xs:attribute name="width" use="required" type="svg:LengthType" rtpu:attributeTypeId="width"/>
+      <xs:attribute name="height" use="required" type="svg:LengthType" rtpu:attributeTypeId="height"/>
+      <xs:attribute name="config" use="required" type="hmi:FqPropId" rtpu:enabled="true" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiConfig"/>
+      <xs:attribute name="area-spacing" use="optional" type="svg:LengthType" rtpu:attributeTypeId="hmiChartAreaSpacing"/>
+      <xs:attribute name="shift-axes" use="optional" rtpu:enabled="true" rtpu:valueType="Boolean" rtpu:attributeClass="Boolean" rtpu:symbolType="Boolean" rtpu:attributeTypeId="hmiChartShiftAxes"/>
+      <xs:attribute name="online" use="optional" rtpu:enabled="true" rtpu:valueType="Boolean" rtpu:attributeClass="Boolean" rtpu:symbolType="Boolean" rtpu:attributeTypeId="hmiChartOnline"/>
+      <xs:attribute name="timezone" use="optional" rtpu:enabled="true" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiChartTimeZone"/>
+      <xs:attribute name="show-ruler" use="optional" rtpu:enabled="true" rtpu:valueType="Boolean" rtpu:attributeClass="Boolean" rtpu:symbolType="Boolean" rtpu:attributeTypeId="hmiChartShowRuler"/>
+      <xs:attribute name="show-selector-rulers" use="optional" rtpu:enabled="true" rtpu:valueType="Boolean" rtpu:attributeClass="Boolean" rtpu:symbolType="Boolean" rtpu:attributeTypeId="hmiChartShowSelectorRulers"/>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="listContainer" substitutionGroup="hmi:HMI.Elements.class">
+    <xs:complexType>
+      <xs:attributeGroup ref="svg:stdAttrs"/>
+      <xs:attribute name="start-x" use="optional" type="svg:CoordinateType"/>
+      <xs:attribute name="start-y" use="optional" type="svg:CoordinateType"/>
+      <xs:attribute name="width" use="required" type="svg:LengthType" rtpu:attributeTypeId="width"/>
+      <xs:attribute name="height" use="required" type="svg:LengthType" rtpu:attributeTypeId="height"/>
+      <xs:attribute name="source" use="required" rtpu:enabled="true" rtpu:valueType="String" rtpu:attributeClass="String" rtpu:symbolType="String" rtpu:attributeTypeId="hmiListContainerSource"/>
+      <xs:attribute name="delay" use="optional" rtpu:enabled="true" rtpu:attributeClass="Boolean" rtpu:attributeTypeId="hmiListContainerDelay" rtpu:symbolType="Boolean" rtpu:valueType="Boolean"/>
+      <xs:attribute name="limit" use="required" rtpu:enabled="true" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiListContainerLimit"/>
+    </xs:complexType>
+  </xs:element>
+
+<xs:element name="scrollableArea" substitutionGroup="hmi:HMI.Elements.class">
+  <xs:complexType>
+    <xs:attributeGroup ref="svg:stdAttrs"/>
+    <xs:attribute name="start-x" use="optional" type="svg:CoordinateType"/>
+    <xs:attribute name="start-y" use="optional" type="svg:CoordinateType"/>
+    <xs:attribute name="width" use="required" type="svg:LengthType" rtpu:attributeTypeId="width"/>
+    <xs:attribute name="height" use="required" type="svg:LengthType" rtpu:attributeTypeId="height"/>
+    <xs:attribute name="items" use="required" type="hmi:FqPropId" rtpu:enabled="true" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiScrollableAreaItems"/>
+    <xs:attribute name="item-size" use="required" rtpu:enabled="true" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiScrollableAreaItemSize"/>
+    <xs:attribute name="layout" use="optional" rtpu:enabled="true" rtpu:attributeClass="StringToNumeric" rtpu:attributeTypeId="hmiScrollableAreaLayout" rtpu:symbolType="String" rtpu:valueType="UInt32">
+      <xs:simpleType>
+        <xs:restriction base="xs:token">
+          <xs:enumeration value="vertical"/>
+          <xs:enumeration value="horizontal"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+  </xs:complexType>
+</xs:element>
+
+</xs:schema>

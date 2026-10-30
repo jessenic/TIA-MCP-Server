@@ -1,0 +1,63 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright © Siemens AG 2017-2022. All rights reserved. -->
+
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+  elementFormDefault="qualified" targetNamespace="http://svg.siemens.com/hmi/types/"
+  xmlns:hmi="http://svg.siemens.com/hmi/"
+  xmlns:hmi-feature="http://svg.siemens.com/hmi/feature/"
+  xmlns:hmi-element="http://svg.siemens.com/hmi/element/"
+  xmlns:hmi-event="http://svg.siemens.com/hmi/event/"
+  xmlns:hmi-types="http://svg.siemens.com/hmi/types/"
+  xmlns:xlink="http://www.w3.org/1999/xlink"
+  xmlns:xml="http://www.w3.org/XML/1998/namespace"
+  xmlns:svg="http://www.w3.org/2000/svg"
+  xmlns:rtpu="http://svg.siemens.com/hmi/rtpu">
+
+  <xs:import namespace="http://www.w3.org/1999/xlink"
+    schemaLocation="xlink.xsd" />
+  <xs:import namespace="http://www.w3.org/XML/1998/namespace"
+    schemaLocation="xml.xsd" />
+  <xs:import namespace="http://svg.siemens.com/hmi/"
+    schemaLocation="hmi.xsd" />
+  <xs:import namespace="http://www.w3.org/2000/svg"
+    schemaLocation="svghmi.xsd" />
+  <xs:import namespace="http://svg.siemens.com/hmi/element/"
+    schemaLocation="hmi-element.xsd" />
+
+  <xs:element name="content" substitutionGroup="hmi:HMI.Types.class">
+    <xs:complexType>
+      <xs:attribute name="SplitRatio" use="optional" rtpu:enabled="true" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiTypesContentSplitRatio"/>
+      <xs:attribute name="ContentMode" use="optional" rtpu:enabled="true" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiTypesContentMode"/>
+      <xs:attribute name="TextPosition" use="optional" rtpu:enabled="true" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiTypesContentTextPosition"/>
+      <xs:attribute name="GraphicStretchMode" use="optional" rtpu:enabled="true" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiTypesContentGraphicStretchMode"/>
+      <xs:attribute name="VerticalTextAlignment" use="optional" rtpu:enabled="true" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiTypesContentVerticalTextAlignment"/>
+      <xs:attribute name="HorizontalTextAlignment" use="optional" rtpu:enabled="true" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiTypesContentHorizontalTextAlignment"/>
+      <xs:attribute name="Spacing" use="optional" rtpu:enabled="true" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiTypesContentSpacing"/>
+      <xs:attribute name="TextTrimming" use="optional" rtpu:enabled="true" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiTypesContentTextTrimming"/>
+      <xs:attributeGroup ref="svg:HmiIdentifierFeature" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="padding" substitutionGroup="hmi:HMI.Types.class">
+    <xs:complexType>
+      <xs:attribute name="Top" use="optional" rtpu:enabled="true" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiTypesPaddingTop"/>
+      <xs:attribute name="Left" use="optional" rtpu:enabled="true" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiTypesPaddingLeft"/>
+      <xs:attribute name="Right" use="optional" rtpu:enabled="true" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiTypesPaddingRight"/>
+      <xs:attribute name="Bottom" use="optional" rtpu:enabled="true" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiTypesPaddingBottom"/>
+      <xs:attributeGroup ref="svg:HmiIdentifierFeature" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="font" substitutionGroup="hmi:HMI.Types.class">
+    <xs:complexType>
+      <xs:attribute name="Weight" use="optional" rtpu:enabled="true" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiTypesFontWeight"/>
+      <xs:attribute name="Name" use="optional" rtpu:enabled="true" rtpu:valueType="String" rtpu:attributeClass="String" rtpu:symbolType="String" rtpu:attributeTypeId="hmiTypesFontName"/>
+      <xs:attribute name="Italic" use="optional" rtpu:enabled="true" rtpu:valueType="Boolean" rtpu:attributeClass="Boolean" rtpu:symbolType="Boolean" rtpu:attributeTypeId="hmiTypesFontItalic"/>
+      <xs:attribute name="Size" use="optional" rtpu:enabled="true" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiTypesFontSize"/>
+      <xs:attribute name="Underline" use="optional" rtpu:enabled="true" rtpu:valueType="Boolean" rtpu:attributeClass="Boolean" rtpu:symbolType="Boolean" rtpu:attributeTypeId="hmiTypesFontUnderline"/>
+      <xs:attribute name="StrikeOut" use="optional" rtpu:enabled="true" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiTypesFontStrikeOut"/>
+      <xs:attributeGroup ref="svg:HmiIdentifierFeature" />
+    </xs:complexType>
+  </xs:element>
+
+</xs:schema>

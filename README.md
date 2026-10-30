@@ -130,10 +130,28 @@ HMI JSON exports are organized as `manifest.json`, `screens/`, `tags/`, `alarms/
 
 Tag and Expression dynamizations preserve value converters and typed Simple/Range mappings.
 Faceplates retain their contained-type identity; internal tags retain their data type and unset limits.
+Faceplate and custom-widget interface values are serialized as typed `interface` entries.
 Custom widgets export supported full properties but must already exist when importing; their
-interfaces and complex control compositions are not serialized. Inspect manifest warnings;
-the JSON export is not a complete project backup. Unsupported dynamizations, bitmask mappings,
-and tag-based limits fail explicitly.
+creation identity and complex control compositions are not serialized. Inspect manifest warnings;
+the JSON export is not a complete project backup. Tag, Expression, Script, and
+ResourceList dynamizations are serialized. Bitmask mappings preserve their unsigned
+64-bit masks and SingleBit/MultiBit mode. Script dynamizations retain code, global
+definitions, async mode and trigger settings; referenced resource lists must already
+exist on import. Unsupported dynamizations and tag-based limits fail explicitly.
+
+By default, exports also include `library/HmiAssets.zal21`: a hashed native V21 archive
+of the **complete project type library**, including faceplate/dynamic SVG definitions,
+all committed versions, and PLC type dependencies (not just types used by the selected HMI).
+The manifest records type/version GUIDs. Import restores missing definitions before
+creating instances, refuses GUID/name/version conflicts, and never saves the project.
+Dry runs retrieve and inspect a temporary read-only library without changing the project.
+Use `include_library: false` to omit the archive when the required types already exist.
+All library versions must be committed; no automatic release or replacement is performed.
+
+The supplied SVG XSDs/DTD are in [schemas/svghmi](schemas/svghmi).
+Native packaging transfers the actual library definitions;
+it does not extract/rebuild raw `.svghmi` files or render faceplate/SVG contents.
+Import standalone source SVGs through the TIA library editor first.
 
 #### Offline screen rendering for AI layout review
 
@@ -375,7 +393,7 @@ stateDiagram-v2
 | 48 | `hmi_compile` | Compilation | `target_name` | Compile WinCC Unified runtime with diagnostics. |
 | 49 | `tia_list_tag_tables` | PLC Tags | `plc_name` | List PLC tag tables. |
 | 50 | `tia_get_tags` | PLC Tags | `table_name`, `plc_name` | Read PLC tags with `%I`, `%Q`, `%M` addresses. |
-| 51 | `hmi_export_json` | HMI JSON | `output_directory`, `compact`, `script_files`, `target_name` | Export a Unified HMI target to versioned, hashed JSON files. |
+| 51 | `hmi_export_json` | HMI JSON | `output_directory`, `compact`, `script_files`, `include_library`, `target_name` | Export hashed JSON and native faceplate/SVG library definitions. |
 | 52 | `hmi_import_json` | HMI JSON | `input_directory`, `prune_items`, `dry_run`, `verify_hashes`, `target_name` | Validate and transactionally import HMI JSON; compile without saving. |
 | 53 | `hmi_patch_json` | HMI JSON | `file_path`, `dry_run`, `target_name` | Apply a guarded JSON patch to Unified HMI objects. |
 | 54 | `tia_testsuite_list_tests`| TestSuite | `plc_name` | List configured Siemens TestSuite test cases. |
@@ -479,9 +497,14 @@ Run HMI JSON regression checks after building (Debug by default):
 .\scripts\Test-HmiRenderer.ps1
 # Optional live tests: select the exact open project PID and target, and explicitly authorize temporary objects.
 .\scripts\Test-HmiJson.ps1 -TiaProcessId 12345 -TargetName HMI_RT_1 -AllowRollbackTests
+# Also authorize temporary native-library export/retrieval and rollback-only library copy tests:
+.\scripts\Test-HmiJson.ps1 -TiaProcessId 12345 -TargetName HMI_RT_1 -AllowRollbackTests -AllowLibraryTests
 ```
 The live tests clone item types, bindings/converters, and scripts into a temporary screen,
-check internal tags, and verify rollback. They never commit the test transaction or save.
+check container interface values and internal tags, and verify rollback. With
+`-AllowLibraryTests`, they additionally verify native archive export/retrieval,
+inventory/hash/path checks and library copy inside a project rollback transaction.
+They never commit the test transaction or save the project.
 
 ### 4. Siemens Openness Whitelist Authorization (One-Time Setup)
 Siemens TIA Portal requires external applications accessing its Openness API to be registered in the Windows Registry with their file path and SHA-256 hash.

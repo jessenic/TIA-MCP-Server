@@ -1,0 +1,116 @@
+<!-- Minimal local DTD stub for Siemens SVG HMI files.
+  Allows validation without requiring network access to tia.siemens.com.
+  Declares permissive element and attribute rules compatible with HMI content.
+-->
+<!ELEMENT svg ANY>
+<!ELEMENT hmi:self ANY>
+<!ELEMENT hmi:paramDef ANY>
+<!ELEMENT hmi:text ANY>
+<!ELEMENT defs ANY>
+<!ELEMENT g ANY>
+<!ELEMENT text ANY>
+<!ELEMENT circle ANY>
+<!ELEMENT line ANY>
+<!ELEMENT polygon ANY>
+<!ELEMENT path ANY>
+<!ELEMENT use ANY>
+
+<!-- SVG core attributes -->
+<!ATTLIST svg 
+  xmlns CDATA #IMPLIED
+  xmlns:xlink CDATA #IMPLIED
+  xmlns:hmi-bind--xlink CDATA #IMPLIED
+  xmlns:hmi CDATA #IMPLIED
+  xmlns:hmi-bind CDATA #IMPLIED
+  xmlns:hmi-element CDATA #IMPLIED
+  xmlns:hmi-feature CDATA #IMPLIED
+  xmlns:hmi-event CDATA #IMPLIED
+  width CDATA #IMPLIED
+  height CDATA #IMPLIED
+  viewBox CDATA #IMPLIED
+  preserveAspectRatio CDATA #IMPLIED
+>
+
+<!-- HMI custom attributes -->
+<!ATTLIST hmi:self
+  type CDATA #IMPLIED
+  displayName CDATA #IMPLIED
+  name CDATA #IMPLIED
+  version CDATA #IMPLIED
+>
+
+<!ATTLIST hmi:paramDef
+  name CDATA #IMPLIED
+  type CDATA #IMPLIED
+  default CDATA #IMPLIED
+>
+
+<!-- Common SVG attributes for all elements -->
+<!ATTLIST g
+  id CDATA #IMPLIED
+  transform CDATA #IMPLIED
+>
+
+<!ATTLIST text
+  x CDATA #IMPLIED
+  y CDATA #IMPLIED
+  text-anchor CDATA #IMPLIED
+  fill CDATA #IMPLIED
+  font-family CDATA #IMPLIED
+  font-size CDATA #IMPLIED
+  font-weight CDATA #IMPLIED
+  hmi-bind:fill CDATA #IMPLIED
+  hmi-bind:value CDATA #IMPLIED
+>
+
+<!ATTLIST circle
+  cx CDATA #IMPLIED
+  cy CDATA #IMPLIED
+  r CDATA #IMPLIED
+  fill CDATA #IMPLIED
+  stroke CDATA #IMPLIED
+  stroke-width CDATA #IMPLIED
+  hmi-bind:fill CDATA #IMPLIED
+  hmi-bind:stroke CDATA #IMPLIED
+  hmi-bind:opacity CDATA #IMPLIED
+>
+
+<!ATTLIST line
+  x1 CDATA #IMPLIED
+  y1 CDATA #IMPLIED
+  x2 CDATA #IMPLIED
+  y2 CDATA #IMPLIED
+  stroke CDATA #IMPLIED
+  stroke-width CDATA #IMPLIED
+  stroke-linecap CDATA #IMPLIED
+  hmi-bind:stroke CDATA #IMPLIED
+  hmi-bind:opacity CDATA #IMPLIED
+>
+
+<!ATTLIST polygon
+  points CDATA #IMPLIED
+  fill CDATA #IMPLIED
+  stroke CDATA #IMPLIED
+  stroke-width CDATA #IMPLIED
+  hmi-bind:fill CDATA #IMPLIED
+  hmi-bind:stroke CDATA #IMPLIED
+>
+
+<!ATTLIST path
+  d CDATA #IMPLIED
+  fill CDATA #IMPLIED
+  stroke CDATA #IMPLIED
+  stroke-width CDATA #IMPLIED
+  hmi-bind:fill CDATA #IMPLIED
+  hmi-bind:opacity CDATA #IMPLIED
+>
+
+<!ATTLIST use
+  xlink:href CDATA #IMPLIED
+  x CDATA #IMPLIED
+  y CDATA #IMPLIED
+>
+
+<!ATTLIST hmi:text
+  hmi-bind:value CDATA #IMPLIED
+>

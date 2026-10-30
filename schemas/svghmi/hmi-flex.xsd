@@ -1,0 +1,101 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright (c) Siemens AG 2017  All Rights Reserved. -->
+
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+  elementFormDefault="qualified" targetNamespace="http://svg.siemens.com/hmi/flex/"
+  xmlns:hmi="http://svg.siemens.com/hmi/"
+  xmlns:hmi-feature="http://svg.siemens.com/hmi/feature/"
+  xmlns:hmi-element="http://svg.siemens.com/hmi/element/"
+  xmlns:hmi-event="http://svg.siemens.com/hmi/event/"
+  xmlns:hmi-flex="http://svg.siemens.com/hmi/flex/"
+  xmlns:xlink="http://www.w3.org/1999/xlink"
+  xmlns:xml="http://www.w3.org/XML/1998/namespace"
+  xmlns:svg="http://www.w3.org/2000/svg"
+  xmlns:rtpu="http://svg.siemens.com/hmi/rtpu">
+
+  <xs:import namespace="http://www.w3.org/1999/xlink"
+    schemaLocation="xlink.xsd" />
+  <xs:import namespace="http://www.w3.org/XML/1998/namespace"
+    schemaLocation="xml.xsd" />
+  <xs:import namespace="http://svg.siemens.com/hmi/"
+    schemaLocation="hmi.xsd" />
+  <xs:import namespace="http://www.w3.org/2000/svg"
+    schemaLocation="svghmi.xsd" />
+  <xs:import namespace="http://svg.siemens.com/hmi/element/"
+    schemaLocation="hmi-element.xsd" />
+
+  <xs:attribute name="width" type="xs:integer" />
+  <xs:attribute name="height" type="xs:integer" />
+  <xs:attribute name="minWidth" type="xs:integer" />
+  <xs:attribute name="minHeight" type="xs:integer" />
+  <xs:attribute name="maxWidth" type="xs:integer" />
+  <xs:attribute name="maxHeight" type="xs:integer" />
+
+  <xs:attribute name="margin" type="xs:integer" />
+  <xs:attribute name="marginLeft" type="xs:integer" />
+  <xs:attribute name="marginRight" type="xs:integer" />
+  <xs:attribute name="marginTop" type="xs:integer" />
+  <xs:attribute name="marginBottom" type="xs:integer" />
+
+  <xs:attribute name="padding" type="xs:integer" />
+  <xs:attribute name="paddingLeft" type="xs:integer" />
+  <xs:attribute name="paddingRight" type="xs:integer" />
+  <xs:attribute name="paddingTop" type="xs:integer" />
+  <xs:attribute name="paddingBottom" type="xs:integer" />
+
+  <xs:attribute name="direction" rtpu:enabled="true" >
+    <xs:simpleType>
+      <xs:restriction base="xs:string">
+        <xs:enumeration value="column" />
+        <xs:enumeration value="row" />
+      </xs:restriction>
+    </xs:simpleType>
+  </xs:attribute>
+
+  <xs:attribute name="justifyContent" rtpu:enabled="true" >
+    <xs:simpleType>
+      <xs:restriction base="xs:string">
+        <xs:enumeration value="start" />
+        <xs:enumeration value="end" />
+        <xs:enumeration value="space-between" />
+        <xs:enumeration value="space-around" />
+      </xs:restriction>
+    </xs:simpleType>
+  </xs:attribute>
+
+  <xs:attribute name="alignContent" rtpu:enabled="true" >
+    <xs:simpleType>
+      <xs:restriction base="xs:string">
+        <xs:enumeration value="start" />
+        <xs:enumeration value="center" />
+        <xs:enumeration value="end" />
+        <xs:enumeration value="stretch" />
+      </xs:restriction>
+    </xs:simpleType>
+  </xs:attribute>
+
+  <xs:attribute name="alignItems" rtpu:enabled="true" >
+    <xs:simpleType>
+      <xs:restriction base="xs:string">
+        <xs:enumeration value="start" />
+        <xs:enumeration value="center" />
+        <xs:enumeration value="end" />
+        <xs:enumeration value="stretch" />
+      </xs:restriction>
+    </xs:simpleType>
+  </xs:attribute>
+
+  <xs:attribute name="alignSelf" rtpu:enabled="true" >
+    <xs:simpleType>
+      <xs:restriction base="xs:string">
+        <xs:enumeration value="start" />
+        <xs:enumeration value="center" />
+        <xs:enumeration value="end" />
+        <xs:enumeration value="stretch" />
+      </xs:restriction>
+    </xs:simpleType>
+  </xs:attribute>
+
+  <xs:attribute name="grow" type="xs:integer" />
+  <xs:attribute name="wrap" type="xs:boolean" />
+</xs:schema>

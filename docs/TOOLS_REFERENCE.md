@@ -963,19 +963,39 @@
   | `output_directory` | string | **Yes** | — | Destination directory for `manifest.json`, `screens/`, `tags/`, and `alarms/`. |
   | `compact` | boolean | No | `true` | Omit item properties equal to the TIA-created type defaults. |
   | `script_files` | boolean | No | `false` | Store event scripts as `.js` sidecar files rather than inline strings. |
+  | `include_library` | boolean | No | `true` | Include the complete project type library in `library/HmiAssets.zal21`, including faceplates, dynamic SVGs, all committed versions and PLC dependencies. |
   | `target_name` | string | No | null | Target HMI software/device selector. |
 
 **JSON fidelity:** Tag and Expression dynamizations include their value converters,
 ordered Simple/Range mapping entries, typed values, flashing settings, and raw text
 markup. Faceplates include `containedType`; compact defaults are cached per contained
-type. Internal tags include `dataType`; unset limits are null. Unsupported dynamizations,
-bitmask mappings, and tag-based limits fail explicitly rather than exporting lossy placeholders.
+type. Internal tags include `dataType`; unset limits are null. Unsupported dynamizations
+and tag-based limits fail explicitly rather than exporting lossy placeholders.
+Bitmask entries retain `bitCondition`, `relevant` (unsigned 64-bit masks), and
+`bitDynamizationType` (`SingleBit` / `MultiBit`). Script dynamizations retain code,
+global definition code, async mode and trigger type/duration/tag list. ResourceList
+dynamizations retain the resource-list name and tag; the actual text/graphic list
+must already exist in the destination (it is not embedded in this export).
+Tag tables include nested group paths; structured tags include member names/types
+for reference validation. Destination system tags are recognized without exporting
+them as user-created tags.
+Faceplates and custom widgets export typed `interface` values, including nested custom
+properties. Legacy exports without `interface` leave instance values untouched.
 Custom widgets export supported full properties (`compact: false`) and a manifest
-warning: their creation identity and interface are not serialized, so imports require
+warning: their creation identity is not serialized, so imports require
 the widget to already exist. Complex control compositions are outside this format's
 scope; this is not a complete project backup.
 Compact exports also contain a hashed `defaults.json`, referenced by manifest
 `defaultsFile`, for offline rendering. Imports continue to use destination TIA defaults.
+
+**Native definitions:** `libraryFile` references a SHA-256-hashed V21 `.zal21` archive;
+`libraryTypes` lists type names and type/version GUIDs. This transfers the actual
+faceplate/SVG library definitions, not the metadata-only XML returned by
+`LibraryTypeVersion.Export`. All project library types are included, even those used
+by other targets. Export requires committed versions and saves only the temporary
+global library, never the project. Set `include_library: false` for JSON-only exports.
+Raw `.svghmi` extraction/direct source import is not implemented; import new sources
+using TIA's library editor. Local schemas are under [schemas/svghmi](../schemas/svghmi).
 
 ---
 
@@ -989,6 +1009,13 @@ Compact exports also contain a hashed `defaults.json`, referenced by manifest
   | `dry_run` | boolean | No | `false` | Validate the files and target without making changes. |
   | `verify_hashes` | boolean | No | `true` | Verify exported hashes. Set false only for intentional edits that have not refreshed manifest hashes. |
   | `target_name` | string | No | null | Target HMI software/device selector. |
+
+When `libraryFile` is present, import retrieves a temporary read-only global library,
+validates its inventory and conflicts, and restores missing type versions inside the
+project transaction before creating faceplate instances. Existing committed versions
+with matching GUIDs are reused. Name/GUID/version conflicts fail, never overwrite.
+Dry runs inspect the package but do not copy types into the project. Legacy packages
+without a library archive require destination types to already exist.
 
 ---
 

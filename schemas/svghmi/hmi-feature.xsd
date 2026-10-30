@@ -1,0 +1,705 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright (c) Siemens AG 2017  All Rights Reserved. -->
+
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+  elementFormDefault="qualified" targetNamespace="http://svg.siemens.com/hmi/feature/"
+  xmlns:hmi="http://svg.siemens.com/hmi/" xmlns:hmi-feature="http://svg.siemens.com/hmi/feature/"
+  xmlns:hmi-element="http://svg.siemens.com/hmi/element/"
+  xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xml="http://www.w3.org/XML/1998/namespace"
+  xmlns:svg="http://www.w3.org/2000/svg"
+  xmlns:rtpu="http://svg.siemens.com/hmi/rtpu">
+
+  <xs:import namespace="http://www.w3.org/1999/xlink"
+    schemaLocation="xlink.xsd" />
+  <xs:import namespace="http://www.w3.org/XML/1998/namespace"
+    schemaLocation="xml.xsd" />
+  <xs:import namespace="http://svg.siemens.com/hmi/"
+    schemaLocation="hmi.xsd" />
+  <xs:import namespace="http://www.w3.org/2000/svg"
+    schemaLocation="svghmi.xsd" />
+  <xs:import namespace="http://svg.siemens.com/hmi/element/"
+    schemaLocation="hmi-element.xsd" />
+
+  <xs:element name="HMI.NveFeature.class" abstract="true" />
+  <!--Marker nve could not be added due to an exsisting marker element-->
+  <xs:attributeGroup name="AlignmentType">
+    <xs:annotation>
+      <xs:documentation>The following Alignment Type attributes are applied for alignment attributes</xs:documentation>
+    </xs:annotation>
+    <xs:attribute name="alignment-horizontal" use="optional" type="svg:AlignmentModeType"/>
+    <xs:attribute name="alignment-vertical" use="optional" type="svg:AlignmentModeType" />
+    <xs:attribute name="alignment" use="optional" type="svg:NumericArrayValueType" />
+  </xs:attributeGroup>
+
+  <xs:attributeGroup name="Scale-Drawing-Attributes">
+    <xs:annotation>
+      <xs:documentation>The following Scale-Drawing-Attributes attributes apply toall the child of scale</xs:documentation>
+    </xs:annotation>
+    <xs:attribute name="modulo-divisor" use="optional" type="svg:LengthType" />
+    <xs:attribute name="modulo-bias" use="optional" type="svg:LengthType" />
+    <xs:attribute name="modulo" use="optional" type="svg:NumericArrayValueType" />
+    <xs:attribute name="index-filter" use="optional" type="svg:LengthType" />
+    <xs:attribute name="threshold-index-filter" use="optional" type="svg:LengthType" />
+    <xs:attribute name="threshold-filter" use="optional">
+      <xs:simpleType>
+        <xs:restriction base="xs:token">
+          <xs:enumeration value="lower" />
+          <xs:enumeration value="upper" />
+          <xs:enumeration value="normal" />
+          <xs:enumeration value="out" />
+          <xs:enumeration value="in" />
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="position-filter" use="optional">
+      <xs:simpleType>
+        <xs:restriction base="xs:token">
+          <xs:enumeration value="regular" rtpu:value="255"/>
+          <xs:enumeration value="begin" rtpu:value="2"/>
+          <xs:enumeration value="end" rtpu:value="8"/>
+          <xs:enumeration value="inner" rtpu:value="4"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="visibility" use="optional" rtpu:attributeTypeId="visibility">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="visible"/>
+          <xs:enumeration value="hidden"/>
+          <xs:enumeration value="inherit"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+  </xs:attributeGroup>
+
+
+  <xs:complexType name="pole-marker-type">
+    <xs:attributeGroup ref="svg:stdAttrs" />
+    <xs:attribute name="condition" use="optional" rtpu:enabled="true" rtpu:attributeClass="Boolean" rtpu:attributeTypeId="hmiCondition" rtpu:symbolType="Boolean" rtpu:valueType="Boolean"/>
+    <xs:attribute name="offset" use="optional" type="svg:LengthType" rtpu:attributeTypeId="offset"/>
+    <xs:attributeGroup ref="hmi-feature:Scale-Drawing-Attributes" />
+    <xs:attributeGroup ref="hmi-feature:AlignmentType" />
+    <xs:attribute name="angle" use="optional" type="svg:AngleType" />
+    <xs:attribute name="content-width" use="required" type="svg:LengthType" />
+    <xs:attribute name="content-height" use="required" type="svg:LengthType" />
+    <xs:attribute name="origin-x" use="optional" type="svg:CoordinateType" />
+    <xs:attribute name="origin-y" use="optional" type="svg:CoordinateType" />
+  </xs:complexType>
+
+ 
+  
+  <xs:complexType name="section-marker-type">
+    <xs:complexContent>
+      <xs:extension base="hmi-feature:pole-marker-type">
+        <xs:attribute name="position" use="optional" type="svg:LengthType" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="marker-type">
+    <xs:attributeGroup ref="svg:stdAttrs" />
+    <xs:attribute name="condition" use="optional" rtpu:enabled="true" rtpu:attributeClass="Boolean" rtpu:attributeTypeId="hmiCondition" rtpu:symbolType="Boolean" rtpu:valueType="Boolean"/>
+    <xs:attribute name="value" use="required" rtpu:enabled="true" rtpu:attributeClass="Number" rtpu:attributeTypeId="hmiNumericValue" rtpu:symbolType="Number" rtpu:valueType="Numeric" />
+  </xs:complexType>
+
+
+  <xs:complexType name="measure-type">
+    <xs:attributeGroup ref="svg:stdAttrs" />
+    <xs:attribute name="condition" use="optional" rtpu:enabled="true" rtpu:attributeClass="Boolean" rtpu:attributeTypeId="hmiCondition" rtpu:symbolType="Boolean" rtpu:valueType="Boolean"/>
+    <xs:attribute name="graduation" use="required" type="svg:LengthType" />
+  </xs:complexType>
+
+  <!--TODO: PresentationAttributes-FontSpecification is added in label-type by mistake. Needs to revisit label-type as per the latest SDS-->
+  <xs:complexType name="section-label-type">
+    <xs:complexContent>
+      <xs:extension base="hmi-feature:label-type">
+        <xs:attribute name="position" use="optional" type="svg:LengthType" />
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="threshold-type">
+    <xs:attributeGroup ref="svg:stdAttrs" />
+    <xs:attribute name="condition" use="optional" rtpu:enabled="true" rtpu:attributeClass="Boolean" rtpu:attributeTypeId="hmiCondition" rtpu:symbolType="Boolean" rtpu:valueType="Boolean"/>
+    <xs:attribute name="scope" use="optional" type="hmi-feature:ScopeType" />
+  </xs:complexType>
+
+  <xs:complexType name="range-type">
+    <xs:attributeGroup ref="svg:stdAttrs" />
+    <xs:attribute name="condition" use="optional" rtpu:enabled="true" rtpu:attributeClass="Boolean" rtpu:attributeTypeId="hmiCondition" rtpu:symbolType="Boolean" rtpu:valueType="Boolean"/>
+    <xs:attribute name="begin-value" use="required" rtpu:enabled="true" rtpu:attributeClass="GeometryPosition" rtpu:attributeTypeId="hmiRangeBeginValue" rtpu:symbolType="Number" rtpu:valueType="Numeric"/>
+    <xs:attribute name="end-value" use="required" rtpu:enabled="true" rtpu:attributeClass="GeometryPosition" rtpu:attributeTypeId="hmiRangeEndValue" rtpu:symbolType="Number" rtpu:valueType="Numeric"/>
+    <xs:attribute name="visibility" use="optional" rtpu:attributeTypeId="visibility">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="visible"/>
+          <xs:enumeration value="hidden"/>
+          <xs:enumeration value="inherit"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+  </xs:complexType>
+
+  <xs:complexType name="divison-type">
+    <xs:sequence>
+      <xs:element ref="hmi-feature:ribbons"/>
+      <xs:element ref="hmi-feature:labels"/>
+      <xs:element ref="hmi-feature:ticks"/>
+    </xs:sequence>
+    <xs:attributeGroup ref="svg:stdAttrs" />
+    <xs:attribute name="condition" use="optional" rtpu:enabled="true" rtpu:attributeClass="Boolean" rtpu:attributeTypeId="hmiCondition" rtpu:symbolType="Boolean" rtpu:valueType="Boolean"/>
+    <xs:attribute name="count" use="optional" type="svg:LengthType" />
+  </xs:complexType>
+
+  <xs:complexType name="tick-type">
+    <xs:attributeGroup ref="svg:stdAttrs" />
+    <xs:attribute name="condition" use="optional" rtpu:enabled="true" rtpu:attributeClass="Boolean" rtpu:attributeTypeId="hmiCondition" rtpu:symbolType="Boolean" rtpu:valueType="Boolean"/>
+    <xs:attribute name="offset" use="optional" type="svg:LengthType" rtpu:attributeTypeId="offset"/>
+    <xs:attributeGroup ref="hmi-feature:Scale-Drawing-Attributes" />
+    <xs:attribute name="stroke-width" use="optional" type="svg:LengthType" />
+    <xs:attribute name="stroke" use="optional" type="svg:PaintType" rtpu:attributeTypeId="stroke" />
+    <xs:attribute name="length" use="optional" type="svg:LengthType" />
+  </xs:complexType>
+  <!--Whenever Scope attribute is added to any feature or element ,manually append the m_scopeAttributesToPropertiesMap in supprted.cpp-->
+  <xs:simpleType name="ScopeType" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number">
+    <xs:annotation>
+      <xs:documentation>This is HmiPart data</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string"/>
+  </xs:simpleType>
+
+  <xs:attribute name="strike-out">
+    <xs:simpleType>
+      <xs:restriction base="xs:string">
+        <xs:enumeration value="none" />
+        <xs:enumeration value="single" />
+        <xs:enumeration value="double" />
+      </xs:restriction>
+    </xs:simpleType>
+  </xs:attribute>
+
+  <xs:complexType name="label-type">
+    <xs:attributeGroup ref="svg:stdAttrs" />
+    <xs:attribute name="condition" use="optional" rtpu:enabled="true" rtpu:attributeClass="Boolean" rtpu:attributeTypeId="hmiCondition" rtpu:symbolType="Boolean" rtpu:valueType="Boolean"/>
+    <xs:attribute name="offset" use="optional" type="svg:LengthType" rtpu:attributeTypeId="offset"/>
+    <xs:attributeGroup ref="hmi-feature:Scale-Drawing-Attributes" />
+    <xs:attributeGroup ref="hmi-feature:AlignmentType" />
+    <xs:attribute name="format-pattern" use="optional" type="xs:string" />
+    <xs:attribute name="output-format" use="optional" type="xs:string" />
+    <!--type unknown need to be verified-->
+    <xs:attribute name="fill" use="optional" type="svg:PaintType" rtpu:attributeTypeId="fill" />
+    <xs:attribute name="fill-opacity" use="optional" type="svg:OpacityValueType" rtpu:attributeTypeId="fillOpacity" />
+    <xs:attribute name="angle" use="optional" type="svg:AngleType" />
+
+    <xs:attribute name="scope" use="optional" type="hmi-feature:ScopeType" />
+
+    <xs:attributeGroup ref="svg:PresentationAttributes-FontSpecification"/>
+
+    <xs:attribute name="alignment-mode" use="optional">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="regular" />
+          <xs:enumeration value="center" />
+          <xs:enumeration value="tangential" />
+          <!--TODO: Remove enum value,It is not present in sdds. enum value added to support exsisting code-->
+          <xs:enumeration value="corner" />
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute ref="hmi-feature:strike-out" use="optional"/>
+  </xs:complexType>
+
+  <xs:complexType name="ribbon-type">
+    <xs:attributeGroup ref="svg:stdAttrs" />
+    <xs:attribute name="condition" use="optional" rtpu:enabled="true" rtpu:attributeClass="Boolean" rtpu:attributeTypeId="hmiCondition" rtpu:symbolType="Boolean" rtpu:valueType="Boolean"/>
+    <xs:attribute name="offset" use="optional" type="svg:LengthType" rtpu:attributeTypeId="offset"/>
+    <xs:attributeGroup ref="hmi-feature:Scale-Drawing-Attributes" />
+    <xs:attribute name="begin-stroke-width" use="optional" type="svg:LengthType" />
+    <xs:attribute name="end-stroke-width" use="optional" type="svg:LengthType" />
+    <xs:attribute name="stroke-width" use="optional" type="svg:LengthType" />
+    <xs:attribute name="begin-stroke" use="optional" type="svg:PaintType" />
+    <xs:attribute name="end-stroke" use="optional" type="svg:PaintType" />
+    <xs:attribute name="stroke" use="optional" type="svg:PaintType" rtpu:attributeTypeId="stroke" />
+    <xs:attribute name="begin-surcharge" use="optional" type="svg:LengthType" />
+    <xs:attribute name="end-surcharge" use="optional" type="svg:LengthType" />
+    <xs:attribute name="begin-radius" use="optional" type="svg:LengthType" />
+    <xs:attribute name="end-radius" use="optional" type="svg:LengthType" />
+    <xs:attribute name="surcharge" use="optional" type="svg:LengthType" />
+  </xs:complexType>
+
+  <xs:complexType name="scale-type">
+    <xs:sequence>
+      <xs:element ref="hmi-feature:ribbons"/>
+      <xs:element ref="hmi-feature:division"/>
+      <xs:element ref="hmi-feature:range"/>
+      <xs:element ref="hmi-feature:labels"/>
+      <xs:element ref="hmi-feature:ticks"/>
+      <xs:element ref="hmi-feature:measure"/>
+      <xs:element ref="hmi-feature:threshold"/>
+      <xs:element ref="hmi-feature:sectionMarkers"/>
+      <xs:element ref="hmi-feature:sectionLabels"/>
+      <xs:element ref="hmi-feature:poleMarkers"/>
+      <xs:element ref="hmi-feature:marker"/>
+      <xs:element ref="hmi-feature:font"/>
+    </xs:sequence>
+    <xs:attributeGroup ref="svg:stdAttrs" />
+    <xs:attribute name="condition" use="optional" rtpu:enabled="true" rtpu:attributeClass="Boolean" rtpu:attributeTypeId="hmiCondition" rtpu:symbolType="Boolean" rtpu:valueType="Boolean"/>
+    <xs:attribute name="begin-value" use="required" type="svg:LengthType" rtpu:enabled="true" rtpu:attributeClass="Number" rtpu:attributeTypeId="hmiScaleBeginValue" rtpu:symbolType="Number" rtpu:valueType="Numeric" />
+    <xs:attribute name="end-value" use="required" type="svg:LengthType" rtpu:enabled="true" rtpu:attributeClass="Number" rtpu:attributeTypeId="hmiScaleEndValue" rtpu:symbolType="Number" rtpu:valueType="Numeric"/>
+    <xs:attribute name="origin" use="optional" type="svg:CoordinateType" />
+    <xs:attribute name="maximum-sections" use="optional" type="svg:LengthType" />
+    <xs:attribute name="extend" use="optional">
+      <xs:simpleType>
+        <xs:restriction base="xs:token">
+          <xs:enumeration value="none" />
+          <xs:enumeration value="begin" />
+          <xs:enumeration value="end" />
+          <xs:enumeration value="both" />
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+
+    <!--TODO: Type attribute need to be added to xsd. Currently it is not added due to conflict with LocalDef type-->
+    <xs:attribute name="auto-scale-mode" use="optional">
+      <xs:simpleType>
+        <xs:restriction base="xs:token">
+          <xs:enumeration value="decimal" />
+          <xs:enumeration value="clock-12-weeks" />
+          <xs:enumeration value="clock-24-weeks" />
+          <xs:enumeration value="clock-12-months" />
+          <xs:enumeration value="clock-24-months" />
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+  </xs:complexType>
+
+  <xs:complexType name="auto-measure-type">
+    <xs:sequence>
+      <xs:element ref="hmi-feature:labels"/>
+      <xs:element ref="hmi-feature:ticks"/>
+    </xs:sequence>
+    <xs:attributeGroup ref="svg:stdAttrs" />
+    <xs:attribute name="condition" use="optional" rtpu:enabled="true" rtpu:attributeClass="Boolean" rtpu:attributeTypeId="hmiCondition" rtpu:symbolType="Boolean" rtpu:valueType="Boolean"/>
+  </xs:complexType>
+
+  <xs:complexType name="font-type">
+    <xs:attribute name="condition" use="optional" rtpu:enabled="true" rtpu:attributeClass="Boolean" rtpu:attributeTypeId="hmiCondition" rtpu:symbolType="Boolean" rtpu:valueType="Boolean"/>
+    <xs:attribute name="name" use="optional" rtpu:enabled="true" rtpu:valueType="String" rtpu:attributeClass="String" rtpu:attributeTypeId="hmiFontName" rtpu:symbolType="String" />
+    <xs:attribute name="size" type="svg:FontSizeValueType" use="optional" rtpu:enabled="true" rtpu:attributeTypeId="hmiFontSize"/>
+    <xs:attribute name="italic" use="optional" rtpu:enabled="true" rtpu:valueType="Numeric" rtpu:attributeClass="Boolean" rtpu:symbolType="Boolean" rtpu:attributeTypeId="hmiFontItalic" />
+    <xs:attribute name="underline" use="optional" rtpu:enabled="true" rtpu:valueType="Numeric" rtpu:attributeClass="Boolean" rtpu:symbolType="Boolean" rtpu:attributeTypeId="hmiFontUnderline"/>
+    <xs:attribute ref="hmi-feature:strike-out" use="optional" />
+    <xs:attribute name="weight" use="optional" rtpu:enabled="true" rtpu:attributeTypeId="hmiFontWeight">
+      <xs:simpleType>
+        <xs:restriction base="xs:string">
+          <xs:enumeration value="none" rtpu:value="0"/>
+          <xs:enumeration value="thin" rtpu:value="100"/>
+          <xs:enumeration value="extralight" rtpu:value="200"/>
+          <xs:enumeration value="light" rtpu:value="300"/>
+          <xs:enumeration value="normal" rtpu:value="400"/>
+          <xs:enumeration value="medium" rtpu:value="500"/>
+          <xs:enumeration value="semibold" rtpu:value="600"/>
+          <xs:enumeration value="bold" rtpu:value="700"/>
+          <xs:enumeration value="extrabold" rtpu:value="800"/>
+          <xs:enumeration value="heavy" rtpu:value="900"/>
+          <xs:enumeration value="100" rtpu:value="100"/>
+          <xs:enumeration value="200" rtpu:value="200"/>
+          <xs:enumeration value="300" rtpu:value="300"/>
+          <xs:enumeration value="400" rtpu:value="400"/>
+          <xs:enumeration value="500" rtpu:value="500"/>
+          <xs:enumeration value="600" rtpu:value="600"/>
+          <xs:enumeration value="700" rtpu:value="700"/>
+          <xs:enumeration value="800" rtpu:value="800"/>
+          <xs:enumeration value="900" rtpu:value="900"/>
+        </xs:restriction>
+      </xs:simpleType>
+    </xs:attribute>
+    <xs:attribute name="scope" use="optional" type="hmi-feature:ScopeType" />
+  </xs:complexType>
+
+    <xs:complexType name="inputBehavior-type">
+        <xs:attribute name="scope" use="optional" type="hmi-feature:ScopeType" />
+        <xs:attribute name="accept-on-deactivated" use="optional" rtpu:enabled="true" rtpu:attributeClass="Boolean" rtpu:attributeTypeId="acceptOnDeactivated" rtpu:symbolType="Boolean" rtpu:valueType="Boolean"/>
+        <xs:attribute name="hidden-input" use="optional" rtpu:enabled="true" rtpu:attributeClass="Boolean" rtpu:attributeTypeId="hiddenInput" rtpu:symbolType="Boolean" rtpu:valueType="Boolean"/>
+        <xs:attribute name="clear-on-activate" use="optional" rtpu:enabled="true" rtpu:attributeClass="Boolean" rtpu:attributeTypeId="clearOnActivate" rtpu:symbolType="Boolean" rtpu:valueType="Boolean"/>
+    </xs:complexType>
+
+  <xs:element name="autoMeasure" substitutionGroup="hmi-feature:HMI.NveFeature.class" type="hmi-feature:auto-measure-type" />
+  <xs:element name="measure" substitutionGroup="hmi-feature:HMI.NveFeature.class" type="hmi-feature:measure-type" />
+  <xs:element name="sectionLabels" substitutionGroup="hmi-feature:HMI.NveFeature.class" type="hmi-feature:section-label-type" />
+  <xs:element name="threshold" substitutionGroup="hmi-feature:HMI.NveFeature.class" type="hmi-feature:threshold-type" />
+  <xs:element name="range" substitutionGroup="hmi-feature:HMI.NveFeature.class" type="hmi-feature:range-type" />
+  <xs:element name="division" substitutionGroup="hmi-feature:HMI.NveFeature.class" type="hmi-feature:divison-type" />
+  <xs:element name="ticks" substitutionGroup="hmi-feature:HMI.NveFeature.class" type="hmi-feature:tick-type" />
+  <xs:element name="labels" substitutionGroup="hmi-feature:HMI.NveFeature.class" type="hmi-feature:label-type" />
+  <xs:element name="ribbons" substitutionGroup="hmi-feature:HMI.NveFeature.class" type="hmi-feature:ribbon-type" />
+  <xs:element name="scale" substitutionGroup="hmi-feature:HMI.NveFeature.class" type="hmi-feature:scale-type" />
+  <xs:element name="sectionMarkers" substitutionGroup="hmi-feature:HMI.NveFeature.class" type="hmi-feature:section-marker-type" />
+  <xs:element name="poleMarkers" substitutionGroup="hmi-feature:HMI.NveFeature.class" type="hmi-feature:pole-marker-type" />
+  <xs:element name="marker" substitutionGroup="hmi-feature:HMI.NveFeature.class" type="hmi-feature:marker-type" />
+  <xs:element name="font" substitutionGroup="hmi-feature:HMI.NveFeature.class" type="hmi-feature:font-type" />
+  <xs:element name="inputBehavior" substitutionGroup="hmi-feature:HMI.NveFeature.class" type="hmi-feature:inputBehavior-type" />
+
+  <!-- Table NVE -->
+  <xs:element name="HMI.TableNveContent.class" abstract="true" />
+
+  <xs:element name="header" substitutionGroup="hmi-feature:HMI.TableNveContent.class">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="hmi:master-include"/>
+        <xs:element ref="hmi:master-inline"/>
+      </xs:sequence>
+      <xs:attribute name="x" type="svg:CoordinateType" use="optional" rtpu:enabled="true" rtpu:attributeClass="Number" rtpu:attributeTypeId="x" rtpu:symbolType="Number" rtpu:valueType="Numeric"/>
+      <xs:attribute name="y" type="svg:CoordinateType" use="optional" rtpu:enabled="true" rtpu:attributeClass="Number" rtpu:attributeTypeId="y" rtpu:symbolType="Number" rtpu:valueType="Numeric"/>
+      <xs:attribute name="width" type="svg:LengthType" use="optional" rtpu:enabled="true" rtpu:attributeClass="Number" rtpu:attributeTypeId="width" rtpu:symbolType="Number" rtpu:valueType="Numeric"/>
+      <xs:attribute name="height" type="svg:LengthType" use="optional" rtpu:enabled="true" rtpu:attributeClass="Number" rtpu:attributeTypeId="height" rtpu:symbolType="Number" rtpu:valueType="Numeric"/>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="recordHeader" substitutionGroup="hmi-feature:HMI.TableNveContent.class">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="hmi:master-include"/>
+        <xs:element ref="hmi:master-inline"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="dataTemplates" substitutionGroup="hmi-feature:HMI.TableNveContent.class">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="hmi:master-include"/>
+        <xs:element ref="hmi:master-inline"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="rowBackground" substitutionGroup="hmi-feature:HMI.TableNveContent.class">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="hmi:master-include"/>
+        <xs:element ref="hmi:master-inline"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="columnBackground" substitutionGroup="hmi-feature:HMI.TableNveContent.class">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="hmi:master-include"/>
+        <xs:element ref="hmi:master-inline"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="gridline" substitutionGroup="hmi-feature:HMI.TableNveContent.class">
+    <xs:complexType>
+      <xs:attribute name="stroke" use="optional" type="svg:PaintType" rtpu:attributeTypeId="stroke" />
+      <xs:attribute name="stroke-width" use="optional" type="svg:LengthType" />
+      <xs:attribute name="modulo-divisor" use="optional" type="svg:LengthType" />
+      <xs:attribute name="modulo-bias" use="optional" type="svg:LengthType" />
+      <xs:attribute name="orientation" use="optional" rtpu:enabled="true" rtpu:attributeClass="StringToNumericComposition" rtpu:attributeTypeId="hmiGridlineOrientation" rtpu:delimiter=" ">
+        <xs:simpleType>
+          <xs:restriction base="xs:token">
+            <xs:enumeration value="row" />
+            <xs:enumeration value="column" />
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute name="position-filter" use="optional" rtpu:enabled="true" rtpu:attributeClass="StringToNumericComposition" rtpu:attributeTypeId="hmiGridlinePositionFilter" rtpu:delimiter=" ">
+        <xs:simpleType>
+          <xs:restriction base="xs:token">
+            <xs:enumeration value="begin"/>
+            <xs:enumeration value="end"/>
+            <xs:enumeration value="header"/>
+            <xs:enumeration value="inner"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute name="expansion"  use="optional" rtpu:enabled="true" rtpu:attributeClass="StringToNumericComposition" rtpu:attributeTypeId="hmiGridlineExpansion" rtpu:delimiter=" ">
+        <xs:simpleType>
+          <xs:restriction base="xs:token">
+            <xs:enumeration value="header"/>
+            <xs:enumeration value="inner"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute name="layer" use="optional" rtpu:attributeTypeId="hmiGridlineLayer">
+        <xs:simpleType>
+          <xs:restriction base="xs:token">
+            <xs:enumeration value="on-top"/>
+            <xs:enumeration value="on-columns"/>
+            <xs:enumeration value="on-rows"/>
+            <xs:enumeration value="background"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="gridlines" substitutionGroup="hmi-feature:HMI.TableNveContent.class">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="hmi-feature:gridline"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="selection" substitutionGroup="hmi-feature:HMI.NveFeature.class">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="hmi:master-include"/>
+        <xs:element ref="hmi:master-inline"/>
+      </xs:sequence>
+      <xs:attribute name="layer" use="optional" rtpu:enabled="true" rtpu:attributeClass="StringToNumeric" rtpu:attributeTypeId="hmiSelectionLayer">
+        <xs:simpleType>
+          <xs:restriction base="xs:token">
+            <xs:enumeration value="on-top"/>
+            <xs:enumeration value="on-columns"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="HMI.ChartNveFeature.class" abstract="true" />
+
+  <xs:element name="axis" substitutionGroup="hmi-feature:HMI.ChartNveFeature.class">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="hmi-feature:ribbons"/>
+        <xs:element ref="hmi-feature:division"/>
+        <xs:element ref="hmi-feature:range"/>
+        <xs:element ref="hmi-feature:labels"/>
+        <xs:element ref="hmi-feature:ticks"/>
+        <xs:element ref="hmi-feature:measure"/>
+        <xs:element ref="hmi-feature:threshold"/>
+        <xs:element ref="hmi-feature:sectionMarkers"/>
+        <xs:element ref="hmi-feature:sectionLabels"/>
+        <xs:element ref="hmi-feature:poleMarkers"/>
+        <xs:element ref="hmi-feature:marker"/>
+        <xs:element ref="hmi-feature:font"/>
+        <xs:element ref="hmi-feature:areaGridlines"/>
+      </xs:sequence>
+      <xs:attribute name="position-filter" use="optional" rtpu:enabled="true" rtpu:attributeClass="StringToNumeric" rtpu:attributeTypeId="hmiAxisPositionFilter" rtpu:valueType="UInt32">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="left"/>
+            <xs:enumeration value="top"/>
+            <xs:enumeration value="right"/>
+            <xs:enumeration value="bottom"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute name="unit-filter" use="optional" rtpu:enabled="true" rtpu:valueType="String" rtpu:attributeClass="String" rtpu:attributeTypeId="hmiUnitFilter" rtpu:symbolType="String" />
+      <xs:attribute name="type-filter" use="optional" rtpu:enabled="true" rtpu:attributeClass="StringToNumeric" rtpu:attributeTypeId="hmiAxisTypeFilter">
+        <xs:simpleType>
+          <xs:restriction base="xs:token">
+            <xs:enumeration value="value"/>
+            <xs:enumeration value="time"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute name="index-filter" use="optional" type="svg:LengthType"/>
+      <xs:attribute name="area-filter" use="optional" type="svg:LengthType" rtpu:attributeTypeId="hmiAxisAreaFilter" />
+      <xs:attribute name="low-surcharge" use="optional" type="svg:LengthType" />
+      <xs:attribute name="high-surcharge" use="optional" type="svg:LengthType"/>
+      <xs:attribute name="low-extension" use="optional" type="svg:LengthType"/>
+      <xs:attribute name="high-extension" use="optional" type="svg:LengthType"/>
+      <xs:attribute name="width" use="optional" rtpu:enabled="true" rtpu:valueType="String" rtpu:attributeClass="String" rtpu:attributeTypeId="hmiAxisWidth" rtpu:symbolType="String" />
+      <xs:attribute name="always-show-recent " use="optional" rtpu:enabled="true" rtpu:attributeClass="Boolean" rtpu:attributeTypeId="hmiAxisShowRecent" rtpu:symbolType="Boolean" rtpu:valueType="Boolean"/>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="axes" substitutionGroup="hmi-feature:HMI.ChartNveFeature.class">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="hmi-feature:axis"/>
+      </xs:sequence>
+      <xs:attribute name="top-most" use="optional" rtpu:enabled="true" rtpu:attributeClass="Boolean" rtpu:attributeTypeId="hmiAxesTopMost" rtpu:symbolType="Boolean" rtpu:valueType="Boolean"/>
+      <xs:attribute name="width" use="optional" rtpu:enabled="true" rtpu:valueType="String" rtpu:attributeClass="String" rtpu:attributeTypeId="hmiAxisWidth" rtpu:symbolType="String" />
+    </xs:complexType>
+  </xs:element>
+  
+  <xs:element name="graph" substitutionGroup="hmi-feature:HMI.ChartNveFeature.class">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="hmi-feature:tooltip"/>
+        <xs:element ref="hmi-feature:graphMarker"/>
+        <xs:element ref="hmi-feature:customMarker"/>
+      </xs:sequence>
+      <xs:attribute name="unit-filter" use="optional" rtpu:enabled="true" rtpu:valueType="String" rtpu:attributeClass="String" rtpu:attributeTypeId="hmiUnitFilter" rtpu:symbolType="String" />
+      <xs:attribute name="index-filter" use="optional" type="svg:LengthType"/>
+      <xs:attribute name="low-surcharge" use="optional" type="svg:LengthType" />
+      <xs:attribute name="high-surcharge" use="optional" type="svg:LengthType"/>
+      <xs:attribute name="low-extension" use="optional" type="svg:LengthType"/>
+      <xs:attribute name="high-extension" use="optional" type="svg:LengthType"/>
+      <xs:attribute name="interpolation " use="optional" rtpu:enabled="true" rtpu:attributeClass="StringToNumeric" rtpu:attributeTypeId="hmiGraphInterpolation" rtpu:valueType="UInt32">
+        <xs:simpleType>
+          <xs:restriction base="xs:string">
+            <xs:enumeration value="none"/>
+            <xs:enumeration value="linear"/>
+            <xs:enumeration value="step"/>
+            <xs:enumeration value="stepBefore"/>
+            <xs:enumeration value="stepAfter"/>
+            <xs:enumeration value="basis"/>
+            <xs:enumeration value="cardinal"/>
+            <xs:enumeration value="monotoneX"/>
+            <xs:enumeration value="catmullRom"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute name="stroke" type="svg:PaintType" use="optional" rtpu:attributeTypeId="stroke"/>
+      <xs:attribute name="stroke-width" type="svg:StrokeWidthValueType" use="optional"/>
+      <xs:attribute name="fill" type="svg:PaintType" use="optional" rtpu:attributeTypeId="fill"/>
+    </xs:complexType>
+  </xs:element>
+  
+  <xs:element name="graphs" substitutionGroup="hmi-feature:HMI.ChartNveFeature.class">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="hmi-feature:graph"/>
+      </xs:sequence>
+      <xs:attribute name="selection"  use="optional" rtpu:enabled="true" rtpu:attributeClass="StringToNumericComposition" rtpu:attributeTypeId="hmiGraphsSelection" rtpu:delimiter=" ">
+        <xs:simpleType>
+          <xs:restriction base="xs:token">
+            <xs:enumeration value="on-top"/>
+            <xs:enumeration value="keep"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute name="aggregate" use="optional" rtpu:enabled="true" rtpu:valueType="Boolean" rtpu:attributeClass="Boolean" rtpu:attributeTypeId="hmiGraphsAggregate" rtpu:symbolType="Boolean" />
+    </xs:complexType>
+  </xs:element>
+  
+  <xs:element name="rulerIndicator" substitutionGroup="hmi-feature:HMI.ChartNveFeature.class">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="hmi:master-include"/>
+        <xs:element ref="hmi:master-inline"/>
+      </xs:sequence>
+      <xs:attribute name="ruler-filter" use="optional" rtpu:enabled="true" rtpu:attributeClass="StringToNumericComposition" rtpu:attributeTypeId="hmiRulerFilter" rtpu:delimiter=" ">
+        <xs:simpleType>
+          <xs:restriction base="xs:token">
+            <xs:enumeration value="regular"/>
+            <xs:enumeration value="min"/>
+            <xs:enumeration value="max"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute name="indicator-filter" use="optional" rtpu:enabled="true" rtpu:attributeClass="StringToNumericComposition" rtpu:attributeTypeId="hmiIndicatorFilter" rtpu:delimiter=" ">
+        <xs:simpleType>
+          <xs:restriction base="xs:token">
+            <xs:enumeration value="primary"/>
+            <xs:enumeration value="secondary"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attributeGroup ref="hmi-feature:AlignmentType" />
+      <xs:attribute name="content-width" use="required" type="svg:LengthType" />
+      <xs:attribute name="content-height" use="required" type="svg:LengthType" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="rulers" substitutionGroup="hmi-feature:HMI.ChartNveFeature.class">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="hmi-feature:rulerIndicator"/>
+      </xs:sequence>
+      <xs:attribute name="stroke" use="optional" type="svg:PaintType" rtpu:attributeTypeId="stroke" />
+      <xs:attribute name="stroke-width" use="optional" type="svg:LengthType" />
+      <xs:attribute name="low-surcharge" use="optional" type="svg:LengthType" />
+      <xs:attribute name="high-surcharge" use="optional" type="svg:LengthType" />
+      <xs:attribute name="low-extension" use="optional" type="svg:LengthType" />
+      <xs:attribute name="high-extension" use="optional" type="svg:LengthType" />
+    </xs:complexType>
+  </xs:element>
+  
+  <xs:element name="tooltip" substitutionGroup="hmi-feature:HMI.ChartNveFeature.class">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="hmi:master-include"/>
+        <xs:element ref="hmi:master-inline"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  
+  <xs:element name="graphMarker" substitutionGroup="hmi-feature:HMI.ChartNveFeature.class">
+    <xs:complexType>
+      <xs:attribute name="type" use="optional" rtpu:enabled="true" rtpu:attributeClass="StringToNumeric" rtpu:attributeTypeId="hmiGraphMarkerType">
+        <xs:simpleType>
+          <xs:restriction base="xs:token">
+            <xs:enumeration value="none"/>
+            <xs:enumeration value="point"/>
+            <xs:enumeration value="circle"/>
+            <xs:enumeration value="square"/>
+            <xs:enumeration value="graphic"/>
+            <xs:enumeration value="custom"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+      <xs:attribute name="dimension" use="optional" type="svg:LengthType"/>
+      <xs:attribute name="color" use="optional" type="svg:SVGColorType"/>
+      <xs:attribute name="position" use="optional" rtpu:enabled="true" rtpu:attributeClass="StringToNumeric" rtpu:attributeTypeId="hmiGraphMarkerPosition">
+        <xs:simpleType>
+          <xs:restriction base="xs:token">
+            <xs:enumeration value="exact"/>
+            <xs:enumeration value="interpolated"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+    </xs:complexType>
+  </xs:element>
+  
+  <xs:element name="customMarker" substitutionGroup="hmi-feature:HMI.ChartNveFeature.class">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="hmi:master-include"/>
+        <xs:element ref="hmi:master-inline"/>
+      </xs:sequence>
+      <xs:attributeGroup ref="hmi-feature:AlignmentType" />
+      <xs:attribute name="content-width" use="required" type="svg:LengthType" />
+      <xs:attribute name="content-height" use="required" type="svg:LengthType" />
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="areaGridlines" substitutionGroup="hmi-feature:HMI.ChartNveFeature.class">
+    <xs:complexType>
+      <xs:attribute name="condition" use="optional" rtpu:enabled="true" rtpu:attributeClass="Boolean" rtpu:attributeTypeId="hmiCondition" rtpu:symbolType="Boolean" rtpu:valueType="Boolean"/>
+      <xs:attributeGroup ref="hmi-feature:Scale-Drawing-Attributes" />
+      <xs:attribute name="stroke-width" use="optional" type="svg:LengthType" />
+      <xs:attribute name="stroke" use="optional" type="svg:PaintType" rtpu:attributeTypeId="stroke" />
+      <xs:attribute name="low-surcharge" use="optional" type="svg:LengthType" />
+      <xs:attribute name="high-surcharge" use="optional" type="svg:LengthType" />
+      <xs:attribute name="low-extension" use="optional" type="svg:LengthType" />
+      <xs:attribute name="high-extension" use="optional" type="svg:LengthType" />
+      <xs:attribute name="show" use="optional" rtpu:enabled="true" rtpu:attributeClass="StringToNumeric" rtpu:attributeTypeId="hmiAreaGridlinesShow" rtpu:valueType="UInt32">
+        <xs:simpleType>
+          <xs:restriction base="xs:token">
+            <xs:enumeration value="never"/>
+            <xs:enumeration value="always"/>
+            <xs:enumeration value="selected"/>
+          </xs:restriction>
+        </xs:simpleType>
+      </xs:attribute>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="HMI.ListContainerNveFeature.class" abstract="true" />
+
+  <xs:element name="select" substitutionGroup="hmi-feature:HMI.ListContainerNveFeature.class">
+    <xs:complexType>
+      <xs:attribute name="name" use="required" rtpu:enabled="true" rtpu:valueType="String" rtpu:attributeClass="String" rtpu:attributeTypeId="hmiSelectName" rtpu:symbolType="String" />
+      <xs:attribute name="as" use="optional" rtpu:enabled="true" rtpu:valueType="String" rtpu:attributeClass="String" rtpu:attributeTypeId="hmiSelectAs" rtpu:symbolType="String" />
+    </xs:complexType>
+  </xs:element>
+  
+  <xs:element name="properties" substitutionGroup="hmi-feature:HMI.ListContainerNveFeature.class">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="hmi-feature:select"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+</xs:schema>

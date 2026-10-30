@@ -73,6 +73,14 @@ Faceplate defaults and creation use the exported `containedType` as well as the 
 type. Preserve that identity, including its library version. Custom widgets export
 supported full properties with item-level `compact: false`; inspect manifest `warnings`.
 
+`include_library` defaults to true. This exports the **complete project type library**
+(including types used by other targets), with faceplate/dynamic SVG definitions,
+all committed versions, and PLC type dependencies, into a hashed native V21 `.zal21`
+archive. The manifest's `libraryFile` and `libraryTypes` record the archive and
+type/version GUID inventory. All versions must be committed; never release or discard
+in-work versions without authorization. Set `include_library: false` for JSON-only
+exports when the destination already has the required types.
+
 If default-item creation fails during a compact export, report the error and retry
 with `compact: false` into a fresh directory. Non-compact export reads the supported
 properties without creating temporary default items. Do not equate export success
@@ -93,6 +101,7 @@ An export contains:
     discrete.json
   styles.json
   defaults.json               # captured type/contained-type defaults for compact previews
+  library/HmiAssets.zal21      # native definitions when include_library is true
   scripts/                    # only when script_files is true and scripts exist
 ```
 
@@ -123,11 +132,30 @@ Conventions:
   `{ "type": "Boolean", "value": true }` (or the exported CLR primitive/color type).
   Preserve typed values and raw ProjectText markup verbatim, plus `flashing` and
   `flashingRate`. Do not replace mapping-table expressions with a guessed formula.
+- Bitmask converter entries have `type: "Bitmask"`, `bitCondition`, `relevant`
+  (unsigned 64-bit masks), and `bitDynamizationType` (`SingleBit` or `MultiBit`).
+  Preserve integer precision; do not convert masks through floating-point numbers.
+- Script dynamizations use `type: "Script"` and a `script` object with `code`,
+  `globalDefinitionCode`, `async`, `triggerType`, `customDuration`, and `tags`.
+  Code is inline even when event `script_files` are enabled. Do not execute it
+  during export or offline review.
+- ResourceList dynamizations use `type: "ResourceList"`, `tag`, and `resourceList`.
+  Referenced text/graphic lists must already exist in the destination; this export
+  records the binding, not the underlying resource-list definition.
 - Event scripts are JSON strings inline by default. With sidecars, each event has
   `scriptFile`; the manifest hashes the script file as well.
+- Faceplate/custom-widget `interface` arrays contain parameter `name`, typed `value`
+  (the same `{ "type": "Double", "value": 50 }` shape used for converters), and nested
+  `properties`. Preserve parameter types and tag-reference strings; these are instance
+  values, not interface definitions. Definitions are transferred in the native library.
+  Legacy items without `interface` leave destination interface values untouched.
 - Tags are grouped by tag table in `tags/*.json`. Discrete alarms are stored in
   `alarms/discrete.json`. Shared styles are property dictionaries in `styles.json`,
   referenced by an item's `style` name.
+- Tag files and tag entries retain nested tag-table `group` paths. Structured tags
+  include `members` with names/data types for reference validation; member layouts
+  are supplied by the destination PLC/type definitions, not independently created.
+  Destination system tags are accepted in references but not exported as user tags.
 - Internal tags use `connection: "<Internal tag>"`, an empty `plcTag`, and `dataType`.
   An unset minimum/maximum is JSON null. Array-element bindings retain bracket syntax;
   validation accepts existing member identities or indices within declared array bounds.
@@ -149,8 +177,8 @@ Conventions:
    file's SHA-256 entry in `manifest.json`; if hashes are intentionally not refreshed,
    pass `verify_hashes: false` to `hmi_import_json` and clearly disclose that
    integrity checks were bypassed. Do not change hashes for unedited files.
-6. Import supports Tag and Expression dynamizations with Simple/Range converter
-   mappings. Other dynamization/mapping kinds fail explicitly. Legacy
+6. Import supports Tag, Expression, Script, and ResourceList dynamizations, with
+   Simple/Range/Bitmask converter mappings. Other kinds fail explicitly. Legacy
    `ExpressionDynamization` placeholders lack converter data: re-export rather than
    attempting to import them.
 
@@ -222,6 +250,22 @@ delete screens or tag/alarm objects omitted from the export. For each imported i
 the supplied properties and text are applied, while `events` and `dynamizations` are
 reconciled to the supplied arrays. With compact imports, omitted item properties and
 text are reset to TIA-created type defaults. Review these effects before importing.
+
+## Native library import and SVG sources
+
+When a native library archive is present, dry runs retrieve it into a temporary,
+read-only global library and check inventory/conflicts without changing the project.
+Applying an import copies missing definitions inside the project transaction, before
+creating faceplates. Matching committed versions are reused. Name/GUID/version conflicts
+fail rather than replacing anything. Review the entire `libraryTypes` inventory, not
+just screen changes, before authorization. Legacy packages without `libraryFile`
+require the types to already exist in the destination.
+
+Raw `.svghmi` extraction/direct source import is not implemented. Local XSDs/DTD are in
+[schemas/svghmi](../../../schemas/svghmi). Import standalone sources through the TIA
+library editor first; never claim that copying source files to a package creates types.
+The native archive transfers actual faceplate and SVG definitions, not the
+metadata-only XML produced by `LibraryTypeVersion.Export`.
 
 ## Guarded patch workflow
 
@@ -303,11 +347,11 @@ patch. The patch also compiles and leaves the project unsaved.
   ambiguous types fail validation. Do not silently rewrite an unknown type.
 - A successful dry run is validation only; it does not prove that the target HMI will
   compile after an import.
-- This is not a complete project backup. Complex control compositions and custom
-  widget interfaces are not serialized. Custom widgets must already exist in the
+- This is not a complete project backup. Complex control compositions are not
+  serialized. Custom widgets must already exist in the
   destination; their creation identity is not exposed by the V21 public API.
-  Their existing interface is left untouched, not recreated from JSON.
-- Bitmask converter entries and tag-based limits are unsupported and fail explicitly.
+  Their exported interface values are applied to the existing definition.
+- Tag-based limits are unsupported and fail explicitly.
 - Preserve validation and compiler diagnostics in the final report. Never describe
   an unsuccessful compile as a verified result.
 

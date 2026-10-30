@@ -1,0 +1,36 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright (c) Siemens AG 2017  All Rights Reserved. -->
+
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+	elementFormDefault="qualified" targetNamespace="http://svg.siemens.com/hmi/event/"
+	xmlns:hmi="http://svg.siemens.com/hmi/"
+	xmlns:hmi-feature="http://svg.siemens.com/hmi/feature/"
+	xmlns:hmi-element="http://svg.siemens.com/hmi/element/"
+	xmlns:hmi-event="http://svg.siemens.com/hmi/event/"
+	xmlns:xlink="http://www.w3.org/1999/xlink"
+	xmlns:xml="http://www.w3.org/XML/1998/namespace"
+	xmlns:svg="http://www.w3.org/2000/svg"
+	xmlns:rtpu="http://svg.siemens.com/hmi/rtpu">
+
+	<xs:import namespace="http://www.w3.org/1999/xlink"
+		schemaLocation="xlink.xsd" />
+	<xs:import namespace="http://www.w3.org/XML/1998/namespace"
+		schemaLocation="xml.xsd" />
+	<xs:import namespace="http://svg.siemens.com/hmi/"
+		schemaLocation="hmi.xsd" />
+	<xs:import namespace="http://www.w3.org/2000/svg"
+		schemaLocation="svghmi.xsd" />
+	<xs:import namespace="http://svg.siemens.com/hmi/element/"
+		schemaLocation="hmi-element.xsd" />
+
+	<xs:attribute name="up" type="xs:string" />
+	<xs:attribute name="down" type="xs:string" />
+	<xs:attribute name="tapped" type="xs:string" />
+	<xs:attribute name="pan" type="xs:string" />
+	<xs:attribute name="contextTapped" type="xs:string" />
+	<xs:attribute name="mouseEnter" type="xs:string" />
+	<xs:attribute name="mouseHover" type="xs:string" />
+	<xs:attribute name="mouseLeave" type="xs:string" />
+	<xs:attribute name="wheel" type="xs:string" />
+
+</xs:schema>

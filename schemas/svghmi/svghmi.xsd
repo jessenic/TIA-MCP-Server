@@ -1,0 +1,1756 @@
+﻿<?xml version="1.0"?>
+
+<!-- 
+"Copyright © 2017 World Wide Web Consortium, (Massachusetts Institute of Technology,
+ European Research Consortium for Informatics and Mathematics, Keio University). All Rights Reserved. This
+ work is distributed under the W3C® Software License [1] in the hope that it will be useful, but WITHOUT ANY 
+ WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE"
+
+
+Modifications to the Original Work:
+ 24.03.2017 Removing element and attributes not supported by HMI Renderers
+ 11.09.2017 Added definitions for HMI RenderTemplate syntax
+-->
+
+<schema targetNamespace="http://www.w3.org/2000/svg" xmlns="http://www.w3.org/2001/XMLSchema" xmlns:svg="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" elementFormDefault="unqualified" attributeFormDefault="unqualified" xml:lang="en"
+  xmlns:hmi-element="http://svg.siemens.com/hmi/element/"
+  xmlns:hmi-bind="http://svg.siemens.com/hmi/bind/"
+  xmlns:hmi-event="http://svg.siemens.com/hmi/event/"
+  xmlns:hmi-flex="http://svg.siemens.com/hmi/flex/"
+  xmlns:xml="http://www.w3.org/XML/1998/namespace"
+  xmlns:hmi="http://svg.siemens.com/hmi/"
+  xmlns:rtpu="http://svg.siemens.com/hmi/rtpu">
+  <!-- don't declare the XML namespace; it is predeclared and redeclaring it upsets some software -->
+
+  <import namespace="http://www.w3.org/1999/xlink" schemaLocation="xlink.xsd"/>
+  <import namespace="http://www.w3.org/XML/1998/namespace" schemaLocation="xml.xsd"/>
+
+  <import namespace="http://svg.siemens.com/hmi/flex/" schemaLocation="hmi-flex.xsd" />
+  <import namespace="http://svg.siemens.com/hmi/event/"
+    schemaLocation="hmi-event.xsd" />
+  <import namespace="http://svg.siemens.com/hmi/"
+    schemaLocation="hmi.xsd" />
+  <import namespace="http://svg.siemens.com/hmi/bind/"
+    schemaLocation="hmi-bind.xsd" />
+  <import namespace="http://svg.siemens.com/hmi/element/"
+    schemaLocation="hmi-element.xsd" />
+  <import namespace="http://svg.siemens.com/hmi/types/"
+  schemaLocation="hmi-types.xsd" />
+
+  <!-- simpleTypes -->
+  <simpleType name="BaselineShiftValueType">
+    <annotation>
+      <documentation>
+        The actual definition is
+        baseline | sub | super | &lt;percentage&gt; | &lt;length&gt; | inherit
+        not sure that union can do this
+      </documentation>
+    </annotation>
+    <restriction base="string"/>
+  </simpleType>
+  <!-- SVG BooleanType not needed, already defined by XML Schema -->
+
+  <simpleType name="ClipValueType">
+    <annotation>
+      <documentation>&lt;shape&gt; | auto | inherit</documentation>
+    </annotation>
+    <restriction base="string"/>
+  </simpleType>
+  <simpleType name="ClipPathValueType" rtpu:enabled="true" rtpu:valueType="UInt64" rtpu:attributeClass="URL" rtpu:symbolType="String">
+    <annotation>
+      <documentation>&lt;uri&gt; | none | inherit</documentation>
+    </annotation>
+    <restriction base="string"/>
+  </simpleType>
+  <simpleType name="ClipFillRuleType">
+    <annotation>
+      <documentation>'clip-rule' or fill-rule property/attribute value</documentation>
+    </annotation>
+    <restriction base="string">
+      <enumeration value="evenodd"/>
+      <enumeration value="nonzero"/>
+      <enumeration value="inherit"/>
+    </restriction>
+  </simpleType>
+  <simpleType name="ContentTypeType">
+    <annotation>
+      <documentation source="http://www.ietf.org/rfc/rfc2045.txt">media type, as per [RFC2045]</documentation>
+      <documentation>media type, as per [RFC2045]</documentation>
+    </annotation>
+    <restriction base="string"/>
+  </simpleType>
+  <simpleType name="CoordinateType" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number">
+    <annotation>
+      <documentation source="http://www.w3.org/TR/SVG/types.html#DataTypeCoordinate">a &lt;co-ordinate&gt;</documentation>
+      <documentation>a coordinate, which is a number optionally followed immediately by a unit identifier. Perhaps it is possible to represent this as a union by declaring unit idenifiers as a type?</documentation>
+    </annotation>
+    <restriction base="string">
+      <pattern value="((((\+|\-)?((\d+)))|((\+|\-)?(((((\d+)?\.(\d+))|((\d+)\.))([eE](\+|\-)?(\d+))?)|((\d+)([eE](\+|\-)?(\d+))))))(em|ex|px|pt|pc|cm|mm|in|%)?)"/>
+    </restriction>
+  </simpleType>
+  <simpleType name="CoordinatesType">
+    <annotation>
+      <documentation>a space separated list of CoordinateType. Punt to 'string' for now</documentation>
+    </annotation>
+    <restriction base="string"/>
+  </simpleType>
+  <simpleType name="ColorType" rtpu:valueType="Color" rtpu:attributeClass="Color" rtpu:symbolType="String">
+    <annotation>
+      <documentation source="http://www.w3.org/TR/SVG/types.html#DataTypeColor">a CSS2 Color</documentation>
+      <documentation>Color as defined in CSS2 and XSL 1.0 plus additional recognised color keyword names (the 'X11 colors')</documentation>
+    </annotation>
+    <restriction base="string"/>
+  </simpleType>
+  <simpleType name="CursorValueType">
+    <annotation>
+      <documentation>
+        Value is an optional comma-separated list orf uri references followed by one token from an enumerated list.
+      </documentation>
+      <documentation>[ [&lt;uri&gt; ,]* [ auto | crosshair | default | pointer | move | e-resize | ne-resize | nw-resize | n-resize | se-resize | sw-resize | s-resize | w-resize| text | wait | help ] ] | inherit</documentation>
+    </annotation>
+    <restriction base="string"/>
+  </simpleType>
+  <simpleType name="EnableBackgroundValueType">
+    <annotation>
+      <documentation>accumulate | new [ &lt;x&gt; &lt;y&gt; &lt;width&gt; &lt;height&gt; ] | inherit</documentation>
+    </annotation>
+    <restriction base="string"/>
+  </simpleType>
+  <simpleType name="ExtensionListType">
+    <annotation>
+      <documentation>extension list specification</documentation>
+    </annotation>
+    <restriction base="string"/>
+  </simpleType>
+  <simpleType name="FeatureListType">
+    <annotation>
+      <documentation>feature list specification</documentation>
+    </annotation>
+    <restriction base="string"/>
+  </simpleType>
+  <simpleType name="FilterValueType" rtpu:enabled="true" rtpu:valueType="UInt64" rtpu:attributeClass="URL" rtpu:symbolType="String">
+    <annotation>
+      <documentation>
+        &lt;uri&gt; | none | inherit
+      </documentation>
+    </annotation>
+    <restriction base="string"/>
+  </simpleType>
+  <simpleType name="FontFamilyValueType" rtpu:valueType="String" rtpu:attributeClass="String" rtpu:symbolType="String">
+    <annotation>
+      <documentation>[[ &lt;family-name&gt; | &lt;generic-family&gt; ],]* [&lt;family-name&gt; | &lt;generic-family&gt;] | inherit</documentation>
+      <documentation>'font-family' property/attribute value (i.e., list of fonts)</documentation>
+    </annotation>
+    <restriction base="string"/>
+  </simpleType>
+  <simpleType name="FontSizeValueType" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number">
+    <annotation>
+      <documentation>'font-size' property/attribute value</documentation>
+      <documentation>&lt;absolute-size&gt; | &lt;relative-size&gt; | &lt;length&gt; | &lt;percentage&gt; | inherit</documentation>
+    </annotation>
+    <restriction base="string"/>
+  </simpleType>
+  <simpleType name="FontSizeAdjustValueType" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number">
+    <annotation>
+      <documentation>'font-size-adjust' property/attribute value</documentation>
+      <documentation>&lt;number&gt; | none | inherit</documentation>
+    </annotation>
+    <restriction base="string"/>
+  </simpleType>
+  <simpleType name="AngleType" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number">
+    <annotation>
+      <documentation>'angle' property/attribute value for angles</documentation>
+      <documentation>&lt;number&gt; | none | inherit</documentation>
+    </annotation>
+    <restriction base="decimal"/>
+  </simpleType>
+  <simpleType name="AlignmentModeType" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number">
+    <annotation>
+      <documentation>Valid between -1 and 1</documentation>
+    </annotation>
+    <restriction base="decimal"/>
+  </simpleType>
+
+  <simpleType name="GlyphOrientationHorizontalValueType">
+    <annotation>
+      <documentation>'glyph-orientation-horizontal' property/attribute value (e.g., &lt;angle&gt;)</documentation>
+      <documentation>&lt;angle&gt; | inherit</documentation>
+    </annotation>
+    <restriction base="string"/>
+  </simpleType>
+  <simpleType name="GlyphOrientationVerticalValueType">
+    <annotation>
+      <documentation>'glyph-orientation-vertical' property/attribute value (e.g., 'auto', &lt;angle&gt;)</documentation>
+      <documentation>auto | &lt;angle&gt; | inherit</documentation>
+    </annotation>
+    <restriction base="string"/>
+  </simpleType>
+    <simpleType name="styleType">
+    <annotation>
+      <documentation>'style property/attribute value </documentation>
+    </annotation>
+    <restriction base="string"/>
+  </simpleType>
+  <complexType name="imageType">
+    <group ref="svg:descTitleMetadata" minOccurs="0"/>
+    <attributeGroup ref="svg:stdAttrs"/>
+    <attributeGroup ref="svg:xlinkRefAttrs"/>
+    <attribute ref="xlink:href" use="optional" rtpu:enabled="true" rtpu:attributeClass="String" rtpu:attributeTypeId="xlinkHref_res" rtpu:valueType="String" rtpu:symbolType="String"/>
+    <attributeGroup ref="svg:PresentationAttributes-Color"/>
+    <attributeGroup ref="svg:langSpaceAttrs"/>
+    <attribute name="externalResourcesRequired" type="boolean" use="optional"/>
+    <attributeGroup ref="svg:PresentationAttributes-Graphics"/>
+    <attributeGroup ref="svg:PresentationAttributes-Viewports"/>
+    <attribute name="transform" type="svg:TransformListType" use="optional"/>
+    <attribute name="x" type="svg:CoordinateType" use="optional"/>
+    <attribute name="y" type="svg:CoordinateType" use="optional"/>
+    <attribute name="width" type="svg:LengthType" use="required"/>
+    <attribute name="height" type="svg:LengthType" use="required"/>
+    <attribute name="preserveAspectRatio" rtpu:enabled="true" rtpu:attributeClass="StringToNumericComposition" rtpu:delimiter=" ">
+      <simpleType>
+        <restriction base="token">
+          <enumeration value="none" />
+          <enumeration value="xMinYMin" />
+          <enumeration value="xMidYMin" />
+          <enumeration value="xMaxYMin"/>
+          <enumeration value="xMinYMid"/>
+          <enumeration value="xMidYMid"/>
+          <enumeration value="xMaxYMid"/>
+          <enumeration value="xMinYMax"/>
+          <enumeration value="xMidYMax"/>
+          <enumeration value="xMaxYMax"/>
+          <enumeration value="meet"/>
+          <enumeration value="slice"/>
+        </restriction>
+      </simpleType>
+    </attribute>
+  </complexType>
+  <!-- no need to declare IntegerType as XML Schema defines integers -->
+  <simpleType name="KerningValue">
+    <annotation>
+      <documentation>'kerning' property/attribute value (e.g., auto | &lt;length&gt;)</documentation>
+      <documentation>auto | &lt;length&gt; | inherit</documentation>
+    </annotation>
+    <restriction base="string"/>
+  </simpleType>
+  <simpleType name="LanguageCodeType">
+    <annotation>
+      <documentation>a language code, as per [RFC3066]</documentation>
+      <documentation source="http://www.ietf.org/rfc/rfc3066.txt"/>
+    </annotation>
+    <restriction base="string"/>
+  </simpleType>
+  <simpleType name="LanguageCodesType">
+    <annotation>
+      <documentation>a comma-separated list of language codes, as per [RFC3066]</documentation>
+      <documentation source="http://www.ietf.org/rfc/rfc3066.txt"/>
+    </annotation>
+    <restriction base="string"/>
+  </simpleType>
+  <simpleType name="LengthType" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:valueType="Numeric">
+    <annotation>
+      <documentation>a &lt;length&gt;</documentation>
+    </annotation>
+    <restriction base="string">
+      <pattern value="((((\+|\-)?((\d+)))|((\+|\-)?(((((\d+)?\.(\d+))|((\d+)\.))([eE](\+|\-)?(\d+))?)|((\d+)([eE](\+|\-)?(\d+))))))(em|ex|px|pt|pc|cm|mm|in|%)?)"/>
+    </restriction>
+  </simpleType>
+  <simpleType name="LengthsType">
+    <annotation>
+      <documentation>a list of &lt;length&gt;s</documentation>
+    </annotation>
+    <restriction base="string"/>
+    <!-- make a regexp for this one -->
+  </simpleType>
+  <simpleType name="LinkTargetType">
+    <annotation>
+      <documentation>link to this target</documentation>
+    </annotation>
+    <restriction base="string"/>
+  </simpleType>
+  <simpleType name="MarkerValueType">
+    <annotation>
+      <documentation>'marker' property/attribute value (e.g., 'none', %URI;)</documentation>
+    </annotation>
+    <restriction base="string"/>
+    <!-- need to check this one, its a shorthand value -->
+  </simpleType>
+  <simpleType name="MaskValueType">
+    <annotation>
+      <documentation>'mask' property/attribute value (e.g., 'none', %URI;)</documentation>
+      <documentation>&lt;uri&gt; | none | inherit</documentation>
+    </annotation>
+    <restriction base="string"/>
+  </simpleType>
+  <simpleType name="MediaDescType">
+    <annotation>
+      <documentation>comma-separated list of media descriptors.</documentation>
+    </annotation>
+    <restriction base="string"/>
+  </simpleType>
+  <!-- no need to define NumberType as XML Schema has double -->
+
+  <simpleType name="NumberOrPercentageType" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number">
+    <annotation>
+      <documentation>a &lt;number&gt; or a  &lt;percentage&gt;</documentation>
+    </annotation>
+    <restriction base="string"/>
+  </simpleType>
+
+  <simpleType name="OpacityValueType" rtpu:attributeClass="Number" rtpu:valueType="Numeric" rtpu:symbolType="Number">
+    <annotation>
+      <documentation>opacity value (e.g., &lt;number&gt;)</documentation>
+      <documentation>&lt;alphavalue&gt; | inherit</documentation>
+    </annotation>
+    <restriction base="string"/>
+  </simpleType>
+  <simpleType name="PaintType" rtpu:valueType="Paint" rtpu:attributeClass="Paint" rtpu:symbolType="String">
+    <annotation>
+      <documentation>a 'fill' or 'stroke' property/attribute value</documentation>
+    </annotation>
+    <restriction base="string"/>
+  </simpleType>
+  <simpleType name="PathDataType" rtpu:attributeClass="Path" rtpu:symbolType="Structure" rtpu:valueType="PathCollection">
+    <annotation>
+      <documentation>a path data specification</documentation>
+      <documentation source="http://www.w3.org/TR/SVG/paths.html"/>
+      <documentation>Yes, of course this was generated by a program!</documentation>
+    </annotation>
+    <restriction base="string"/>
+  </simpleType>
+  <simpleType name="PointsType" rtpu:attributeClass="Points" rtpu:symbolType="Structure" rtpu:valueType="PointCollection">
+    <annotation>
+      <documentation>a list of points</documentation>
+    </annotation>
+    <restriction base="string"/>
+  </simpleType>
+
+  <simpleType name="SpacingValueType" rtpu:enabled="true" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number">
+    <annotation>
+      <documentation>'letter-spacing' or 'word-spacing' property/attribute value (e.g., normal | &lt;length&gt;)</documentation>
+    </annotation>
+    <restriction base="string"/>
+  </simpleType>
+  <simpleType name="NumericArrayValueType" rtpu:enabled="true" rtpu:attributeClass="NumericArray" rtpu:symbolType="Structure" rtpu:valueType="NumericCollection">
+    <annotation>
+      <documentation>'alignment, stroke-dasharray' property/attribute value (e.g., 'none', list of &lt;number&gt;s)</documentation>
+    </annotation>
+    <restriction base="string"/>
+  </simpleType>
+  <simpleType name="StrokeDashOffsetValueType" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number">
+    <annotation>
+      <documentation>'stroke-dashoffset' property/attribute value (e.g., 'none', &gt;length&gt;)</documentation>
+    </annotation>
+    <restriction base="string"/>
+  </simpleType>
+  <simpleType name="StrokeMiterLimitValueType" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number">
+    <annotation>
+      <documentation>'stroke-miterlimit' property/attribute value (e.g., &lt;number&gt;)</documentation>
+    </annotation>
+    <restriction base="string"/>
+  </simpleType>
+  <simpleType name="StrokeWidthValueType" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number">
+    <annotation>
+      <documentation>'stroke-width' property/attribute value (e.g., &lt;length&gt;)</documentation>
+    </annotation>
+    <restriction base="string"/>
+  </simpleType>
+  <!-- <simpleType name="StructuredTextType" base="string"/> expanded -->
+
+  <simpleType name="SVGColorType" rtpu:valueType="Color" rtpu:attributeClass="Color" rtpu:symbolType="String">
+    <annotation>
+      <documentation>An SVG color value (sRGB plus optional ICC)</documentation>
+    </annotation>
+    <restriction base="string"/>
+  </simpleType>
+  <!-- <simpleType name="TextType" base="string"/> not necessary (string) -->
+  <simpleType name="TextDecorationValueType">
+    <annotation>
+      <documentation>'text-decoration' property/attribute value (e.g., 'none', 'underline')</documentation>
+    </annotation>
+    <restriction base="string">
+      <enumeration value="none"/>
+      <enumeration value="underline"/>
+      <enumeration value="overline"/>
+      <enumeration value="line-through"/>
+      <enumeration value="blink"/>
+      <enumeration value="inherit"/>
+    </restriction>
+  </simpleType>
+  <simpleType name="TransformListType" rtpu:attributeClass="Matrix" rtpu:symbolType="Matrix" rtpu:valueType="Matrix">
+    <annotation>
+      <documentation>Yes, of course this was generated by a program!</documentation>
+      <documentation>list of transforms</documentation>
+    </annotation>
+    <restriction base="string"/>
+  </simpleType>
+  <!-- <simpleType name="URIType" base="string"/> not necessary (use AnyURI) -->
+  <simpleType name="ViewBoxSpecType" rtpu:attributeClass="ViewBox" rtpu:symbolType="Structure" rtpu:valueType="ViewBox">
+    <annotation>
+      <documentation>'viewBox' attribute specification</documentation>
+    </annotation>
+    <restriction base="string"/>
+  </simpleType>
+  <attributeGroup name="stdAttrs">
+    <annotation>
+      <documentation>All elements have an ID</documentation>
+    </annotation>
+    <attribute name="id" type="ID" use="optional" rtpu:enabled="true" rtpu:valueType="UInt32" rtpu:attributeClass="Id" rtpu:symbolType="String" rtpu:attributeTypeId="id"/>
+    <attribute name="style" type="svg:styleType" use="optional" rtpu:enabled="true" rtpu:attributeClass="String" rtpu:symbolType="String" rtpu:valueType="String" rtpu:attributeTypeId="style"/>
+    <attribute ref="xml:base" use="optional " rtpu:enabled="false"/>
+    <attribute ref="hmi:if" use="optional" rtpu:enabled="true" rtpu:valueType="Numeric" rtpu:attributeClass="HmiIf" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiIf"/>
+    <attribute ref="hmi:focusArea" use="optional" rtpu:enabled="true" rtpu:valueType="UInt32" rtpu:attributeClass="StringToNumeric" rtpu:attributeTypeId="hmiFocusArea"/>
+    <attributeGroup ref="hmi-bind:HmiBindAttributes"/>
+    <attributeGroup ref="svg:EventTypeAttrs" />
+  </attributeGroup>
+  <attributeGroup name="langSpaceAttrs">
+    <annotation>
+      <documentation>Common attributes for elements that might contain character data content</documentation>
+    </annotation>
+    <attribute ref="xml:lang" use="optional" rtpu:enabled="false"/>
+    <attribute ref="xml:space" use="optional" rtpu:enabled="false"/>
+  </attributeGroup>
+  <attributeGroup name="xlinkRefAttrs">
+    <annotation>
+      <documentation>For most uses of URI referencing: standard XLink attributes other than xlink:href</documentation>
+    </annotation>
+    <attribute ref="xlink:type" fixed="simple" rtpu:enabled="true" rtpu:attributeClass="String" rtpu:valueType="String"/>
+    <attribute ref="xlink:role"/>
+    <attribute ref="xlink:arcrole"/>
+    <attribute ref="xlink:title"/>
+    <attribute ref="xlink:show" default="other"/>
+    <attribute ref="xlink:actuate"/>
+  </attributeGroup>
+  <attributeGroup name="xlinkRefAttrsEmbed">
+    <annotation>
+      <documentation>Standard XLink attributes for uses of URI referencing where xlink:show is 'embed'</documentation>
+    </annotation>
+    <attribute ref="xlink:type" fixed="simple" rtpu:enabled="true" rtpu:attributeClass="String" rtpu:valueType="String"/>
+    <attribute ref="xlink:role"/>
+    <attribute ref="xlink:arcrole"/>
+    <attribute ref="xlink:title"/>
+    <attribute ref="xlink:show"/>
+    <attribute ref="xlink:actuate"/>
+  </attributeGroup>
+  <attributeGroup name="EventTypeAttrs">
+    <annotation>
+      <documentation>The following are the different types of event attributes supported by RTPU</documentation>
+    </annotation>
+    <attribute ref="hmi-event:up" rtpu:valueType="UInt64" rtpu:attributeClass="URL" rtpu:symbolType="String" rtpu:attributeTypeId="hmiEventUp"/>
+    <attribute ref="hmi-event:down" rtpu:valueType="UInt64" rtpu:attributeClass="URL" rtpu:symbolType="String" rtpu:attributeTypeId="hmiEventDown"/>
+    <attribute ref="hmi-event:tapped" rtpu:valueType="UInt64" rtpu:attributeClass="URL" rtpu:symbolType="String" rtpu:attributeTypeId="hmiEventTapped"/>
+    <attribute ref="hmi-event:pan" rtpu:valueType="UInt64" rtpu:attributeClass="URL" rtpu:symbolType="String" rtpu:attributeTypeId="hmiEventPan"/>
+    <attribute ref="hmi-event:contextTapped" rtpu:valueType="UInt64" rtpu:attributeClass="URL" rtpu:symbolType="String" rtpu:attributeTypeId="hmiEventContextTapped"/>
+    <attribute ref="hmi-event:mouseEnter" rtpu:valueType="UInt64" rtpu:attributeClass="URL" rtpu:symbolType="String" rtpu:attributeTypeId="hmiEventMouseEnter"/>
+    <attribute ref="hmi-event:mouseHover" rtpu:valueType="UInt64" rtpu:attributeClass="URL" rtpu:symbolType="String" rtpu:attributeTypeId="hmiEventMouseHover"/>
+    <attribute ref="hmi-event:mouseLeave" rtpu:valueType="UInt64" rtpu:attributeClass="URL" rtpu:symbolType="String" rtpu:attributeTypeId="hmiEventMouseLeave"/>
+    <attribute ref="hmi-event:wheel" rtpu:valueType="UInt64" rtpu:attributeClass="URL" rtpu:symbolType="String" rtpu:attributeTypeId="hmiEventWheel"/>
+  </attributeGroup>
+
+  <attributeGroup name="FlexAttrs">
+    <annotation>
+      <documentation>The following are all supported attributes that can be used within the namespace hmi-flex</documentation>
+    </annotation>
+    <attribute ref="hmi-flex:width" rtpu:enabled="true" use="optional" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiFlexWidth"/>
+    <attribute ref="hmi-flex:height" rtpu:enabled="true" use="optional" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiFlexHeight"/>
+    <attribute ref="hmi-flex:minWidth" rtpu:enabled="true" use="optional" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiFlexMinWidth"/>
+    <attribute ref="hmi-flex:minHeight" rtpu:enabled="true" use="optional" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiFlexMinHeight"/>
+    <attribute ref="hmi-flex:maxWidth" rtpu:enabled="true" use="optional" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiFlexMaxWidth"/>
+    <attribute ref="hmi-flex:maxHeight" rtpu:enabled="true" use="optional" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiFlexMaxHeight"/>
+    <attribute ref="hmi-flex:direction" rtpu:enabled="true" use="optional" rtpu:valueType="String" rtpu:attributeClass="String" rtpu:symbolType="String" rtpu:attributeTypeId="hmiFlexDirection"/>
+    <attribute ref="hmi-flex:justifyContent" rtpu:enabled="true" use="optional" rtpu:valueType="String" rtpu:attributeClass="String" rtpu:symbolType="String" rtpu:attributeTypeId="hmiFlexJustifyContent"/>
+    <attribute ref="hmi-flex:alignContent" rtpu:enabled="true" use="optional" rtpu:valueType="String" rtpu:attributeClass="String" rtpu:symbolType="String" rtpu:attributeTypeId="hmiFlexAlignContent"/>
+    <attribute ref="hmi-flex:alignItems" rtpu:enabled="true" use="optional" rtpu:valueType="String" rtpu:attributeClass="String" rtpu:symbolType="String" rtpu:attributeTypeId="hmiFlexAlignItems"/>
+    <attribute ref="hmi-flex:alignSelf" rtpu:enabled="true" use="optional" rtpu:valueType="String" rtpu:attributeClass="String" rtpu:symbolType="String" rtpu:attributeTypeId="hmiFlexAlignSelf"/>
+    <attribute ref="hmi-flex:grow" rtpu:enabled="true" use="optional" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiFlexGrow"/>
+    <attribute ref="hmi-flex:wrap" rtpu:enabled="true" use="optional" rtpu:valueType="Boolean" rtpu:attributeClass="Boolean" rtpu:symbolType="Boolean" rtpu:attributeTypeId="hmiFlexWrap"/>
+    <attribute ref="hmi-flex:margin" rtpu:enabled="true" use="optional" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiFlexMargin"/>
+    <attribute ref="hmi-flex:marginLeft" rtpu:enabled="true" use="optional" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiFlexMarginLeft"/>
+    <attribute ref="hmi-flex:marginRight" rtpu:enabled="true" use="optional" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiFlexMarginRight"/>
+    <attribute ref="hmi-flex:marginTop" rtpu:enabled="true" use="optional" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiFlexMarginTop"/>
+    <attribute ref="hmi-flex:marginBottom" rtpu:enabled="true" use="optional" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiFlexMarginBottom"/>
+    <attribute ref="hmi-flex:padding" rtpu:enabled="true" use="optional" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiFlexPadding"/>
+    <attribute ref="hmi-flex:paddingLeft" rtpu:enabled="true" use="optional" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiFlexPaddingLeft"/>
+    <attribute ref="hmi-flex:paddingRight" rtpu:enabled="true" use="optional" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiFlexPaddingRight"/>
+    <attribute ref="hmi-flex:paddingTop" rtpu:enabled="true" use="optional" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiFlexPaddingTop"/>
+    <attribute ref="hmi-flex:paddingBottom" rtpu:enabled="true" use="optional" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiFlexPaddingBottom"/>
+  </attributeGroup>
+
+  <attributeGroup name="PresentationAttributes-Color">
+    <annotation>
+      <documentation>The following presentation attributes have to do with specifying color.</documentation>
+    </annotation>
+    <attribute name="color" type="svg:ColorType" use="optional"/>
+    <attribute name="color-interpolation" use="optional">
+      <simpleType>
+        <restriction base="string">
+          <enumeration value="auto"/>
+          <enumeration value="sRGB"/>
+          <enumeration value="linearRGB"/>
+          <enumeration value="inherit"/>
+        </restriction>
+      </simpleType>
+    </attribute>
+    <attribute name="color-interpolation-filters" use="optional">
+      <simpleType>
+        <restriction base="string">
+          <enumeration value="auto"/>
+          <enumeration value="sRGB"/>
+          <enumeration value="linearRGB"/>
+		  <enumeration value="inherit"/>
+        </restriction>
+      </simpleType>
+    </attribute>
+    <attribute name="color-rendering" use="optional">
+      <simpleType>
+        <restriction base="string">
+          <enumeration value="auto"/>
+          <enumeration value="optimizeSpeed"/>
+          <enumeration value="optimizeQuality"/>
+          <enumeration value="inherit"/>
+        </restriction>
+      </simpleType>
+    </attribute>
+  </attributeGroup>
+
+
+
+  <attributeGroup name="PresentationAttributes-FillStroke">
+    <annotation>
+      <documentation>The following presentation attributes apply to filling and stroking operations</documentation>
+    </annotation>
+    <attribute name="fill" type="svg:PaintType" use="optional"/>
+    <attribute name="fill-opacity" type="svg:OpacityValueType" use="optional"/>
+    <attribute name="fill-rule" type="svg:ClipFillRuleType" use="optional"/>
+    <attribute name="stroke" type="svg:PaintType" use="optional"/>
+    <attribute name="stroke-dasharray" use="optional" rtpu:valueType="String" rtpu:attributeClass="String" rtpu:symbolType="String"/>
+    <attribute name="stroke-dashoffset" type="svg:StrokeDashOffsetValueType" use="optional"/>
+    <attribute name="stroke-linecap" use="optional">
+      <simpleType>
+        <restriction base="string">
+          <enumeration value="butt"/>
+          <enumeration value="round"/>
+          <enumeration value="square"/>
+          <enumeration value="inherit"/>
+        </restriction>
+      </simpleType>
+    </attribute>
+    <attribute name="stroke-linejoin" use="optional">
+      <simpleType>
+        <restriction base="string">
+          <enumeration value="miter"/>
+          <enumeration value="round"/>
+          <enumeration value="bevel"/>
+          <enumeration value="inherit"/>
+        </restriction>
+      </simpleType>
+    </attribute>
+    <attribute name="stroke-miterlimit" type="svg:StrokeMiterLimitValueType" use="optional"/>
+    <attribute name="stroke-opacity" type="svg:OpacityValueType" use="optional"/>
+    <attribute name="stroke-width" type="svg:StrokeWidthValueType" use="optional"/>
+  </attributeGroup>
+  <attributeGroup name="PresentationAttributes-FontSpecification">
+    <annotation>
+      <documentation>The following presentation attributes have to do with selecting a font to use</documentation>
+    </annotation>
+    <attribute name="font-family" type="svg:FontFamilyValueType" use="optional" rtpu:attributeTypeId="fontFamily"/>
+    <attribute name="font-size" type="svg:FontSizeValueType" use="optional" rtpu:attributeTypeId="fontSize"/>
+    <attribute name="font-size-adjust" type="svg:FontSizeAdjustValueType" use="optional" rtpu:attributeTypeId="fontSizeAdjust"/>
+    <attribute name="font-stretch" use="optional" rtpu:attributeTypeId="fontStretch">
+      <simpleType>
+        <restriction base="string">
+          <enumeration value="normal"/>
+          <enumeration value="wider"/>
+          <enumeration value="narrower"/>
+          <enumeration value="ultra-condensed"/>
+          <enumeration value="extra-condensed"/>
+          <enumeration value="condensed"/>
+          <enumeration value="semi-condensed"/>
+          <enumeration value="semi-expanded"/>
+          <enumeration value="expanded"/>
+          <enumeration value="extra-expanded"/>
+          <enumeration value="ultra-expanded"/>
+          <enumeration value="inherit"/>
+        </restriction>
+      </simpleType>
+    </attribute>
+    <attribute name="font-style" use="optional" rtpu:attributeTypeId="fontStyle">
+      <simpleType>
+        <restriction base="string">
+          <enumeration value="normal"/>
+          <enumeration value="italic"/>
+          <enumeration value="oblique"/>
+          <enumeration value="inherit"/>
+        </restriction>
+      </simpleType>
+    </attribute>
+    <attribute name="font-variant" use="optional" rtpu:attributeTypeId="fontVariant">
+      <simpleType>
+        <restriction base="string">
+          <enumeration value="normal"/>
+          <enumeration value="small-caps"/>
+          <enumeration value="inherit"/>
+        </restriction>
+      </simpleType>
+    </attribute>
+
+    <attribute name="font-weight" use="optional" rtpu:attributeTypeId="fontWeight">
+      <simpleType>
+        <restriction base="string">
+          <enumeration value="normal" rtpu:value="400"/>
+          <enumeration value="bold" rtpu:value="700"/>
+          <enumeration value="bolder" rtpu:value="1000"/>
+          <!-- Not part of chrom -->
+          <enumeration value="lighter" rtpu:value="2000"/>
+          <!-- Not part of chrom -->
+          <enumeration value="100" rtpu:value="100"/>
+          <enumeration value="200" rtpu:value="200"/>
+          <enumeration value="300" rtpu:value="300"/>
+          <enumeration value="400" rtpu:value="400"/>
+          <enumeration value="500" rtpu:value="500"/>
+          <enumeration value="600" rtpu:value="600"/>
+          <enumeration value="700" rtpu:value="700"/>
+          <enumeration value="800" rtpu:value="800"/>
+          <enumeration value="900" rtpu:value="900"/>
+          <enumeration value="inherit" rtpu:value="3000"/>
+        </restriction>
+      </simpleType>
+    </attribute>
+  </attributeGroup>
+  <attributeGroup name="PresentationAttributes-Gradients">
+    <annotation>
+      <documentation>The following presentation attributes apply to gradient 'stop' elements</documentation>
+    </annotation>
+    <attribute name="stop-color" type="svg:SVGColorType" use="optional"/>
+    <attribute name="stop-opacity" type="svg:OpacityValueType" use="optional"/>
+  </attributeGroup>
+  <attributeGroup name="PresentationAttributes-Graphics">
+    <annotation>
+      <documentation>The following presentation attributes apply to graphics elements</documentation>
+    </annotation>
+    <attribute name="clip-path" type="svg:ClipPathValueType" use="optional"/>
+    <attribute name="clip-rule" type="svg:ClipFillRuleType" use="optional"/>
+    <attribute name="opacity" type="svg:OpacityValueType" use="optional"/>
+    <attribute name="visibility" use="optional">
+      <simpleType>
+        <restriction base="string">
+          <enumeration value="visible"/>
+          <enumeration value="hidden"/>
+          <enumeration value="inherit"/>
+        </restriction>
+      </simpleType>
+    </attribute>
+    <attribute name="filter" type="svg:FilterValueType" use="optional"/>
+    <attribute name="display" use="optional" default="inline">
+      <simpleType>
+        <restriction base="string">
+          <enumeration value="inline"/>
+          <enumeration value="block"/>
+          <enumeration value="list-item"/>
+          <enumeration value="run-in"/>
+          <enumeration value="compact"/>
+          <enumeration value="marker"/>
+          <enumeration value="table"/>
+          <enumeration value="inline-table"/>
+          <enumeration value="table-row-group"/>
+          <enumeration value="table-header-group"/>
+          <enumeration value="table-footer-group"/>
+          <enumeration value="table-row"/>
+          <enumeration value="table-column-group"/>
+          <enumeration value="table-column"/>
+          <enumeration value="table-cell"/>
+          <enumeration value="table-caption"/>
+          <enumeration value="none"/>
+          <enumeration value="inherit"/>
+        </restriction>
+      </simpleType>
+    </attribute>
+  </attributeGroup>
+
+
+  <attributeGroup name="PresentationAttributes-Markers">
+    <annotation>
+      <documentation>The following presentation attributes apply to marker operations</documentation>
+    </annotation>
+    <attribute name="marker-start" type="svg:MarkerValueType" use="optional"/>
+    <attribute name="marker-mid" type="svg:MarkerValueType" use="optional"/>
+    <attribute name="marker-end" type="svg:MarkerValueType" use="optional"/>
+  </attributeGroup>
+  <attributeGroup name="PresentationAttributes-TextContentElements">
+    <annotation>
+      <documentation>The following presentation attributes apply to text content elements</documentation>
+    </annotation>
+    <attribute name="alignment-baseline" use="optional">
+      <simpleType>
+        <restriction base="string">
+          <enumeration value="baseline"/>
+          <enumeration value="top"/>
+          <enumeration value="before-edge"/>
+          <enumeration value="text-top"/>
+          <enumeration value="text-before-edge"/>
+          <enumeration value="middle"/>
+          <enumeration value="bottom"/>
+          <enumeration value="after-edge"/>
+          <enumeration value="text-bottom"/>
+          <enumeration value="text-after-edge"/>
+          <enumeration value="ideographic"/>
+          <enumeration value="lower"/>
+          <enumeration value="hanging"/>
+          <enumeration value="mathematical"/>
+          <enumeration value="inherit"/>
+        </restriction>
+      </simpleType>
+    </attribute>
+    <attribute name="baseline-shift" type="svg:BaselineShiftValueType" use="optional"/>
+    <attribute name="direction" use="optional">
+      <simpleType>
+        <restriction base="string">
+          <enumeration value="ltr"/>
+          <enumeration value="rtl"/>
+          <enumeration value="inherit"/>
+        </restriction>
+      </simpleType>
+    </attribute>
+    <attribute name="dominant-baseline" use="optional">
+      <simpleType>
+        <restriction base="string">
+          <enumeration value="auto"/>
+          <enumeration value="use-script"/>
+          <enumeration value="no-change"/>
+          <enumeration value="reset-size"/>
+          <enumeration value="ideographic"/>
+          <enumeration value="alphabetic"/>
+          <enumeration value="hanging"/>
+          <enumeration value="mathematical"/>
+          <enumeration value="central"/>
+          <enumeration value="middle"/>
+          <enumeration value="text-after-edge"/>
+          <enumeration value="text-before-edge"/>
+          <enumeration value="inherit"/>
+        </restriction>
+      </simpleType>
+    </attribute>
+    <attribute name="glyph-orientation-horizontal" type="svg:GlyphOrientationHorizontalValueType" use="optional"/>
+    <attribute name="glyph-orientation-vertical" type="svg:GlyphOrientationVerticalValueType" use="optional"/>
+    <attribute name="letter-spacing" type="svg:SpacingValueType" use="optional"/>
+    <attribute name="text-anchor" use="optional">
+      <simpleType>
+        <restriction base="string">
+          <enumeration value="start"/>
+          <enumeration value="middle"/>
+          <enumeration value="end"/>
+          <enumeration value="inherit"/>
+        </restriction>
+      </simpleType>
+    </attribute>
+    <attribute name="text-decoration" type="svg:TextDecorationValueType" use="optional" rtpu:enabled="true" rtpu:attributeClass="StringToNumericComposition" rtpu:attributeTypeId="textDecoration" rtpu:delimiter=" "/>
+
+    <attribute name="word-spacing" type="svg:SpacingValueType" use="optional"/>
+  </attributeGroup>
+  <attributeGroup name="PresentationAttributes-Viewports">
+    <annotation>
+      <documentation>The following presentation attributes apply to elements that establish viewports</documentation>
+    </annotation>
+    <attribute name="clip" type="svg:ClipValueType" use="optional"/>
+    <attribute name="overflow" use="optional">
+      <simpleType>
+        <restriction base="string">
+          <enumeration value="visible"/>
+          <enumeration value="hidden"/>
+          <enumeration value="scroll"/>
+          <enumeration value="auto"/>
+          <enumeration value="inherit"/>
+        </restriction>
+      </simpleType>
+    </attribute>
+  </attributeGroup>
+  <attributeGroup name="PresentationAttributes-TextElements">
+    <annotation>
+      <documentation>The following presentation attributes apply to 'text' elements</documentation>
+    </annotation>
+    <attribute name="writing-mode" use="optional">
+      <simpleType>
+        <restriction base="string">
+          <enumeration value="lr-tb"/>
+          <enumeration value="rl-tb"/>
+          <enumeration value="tb-rl"/>
+          <enumeration value="lr"/>
+          <enumeration value="rl"/>
+          <enumeration value="tb"/>
+          <enumeration value="inherit"/>
+        </restriction>
+      </simpleType>
+    </attribute>
+  </attributeGroup>
+
+  <attributeGroup name="PresentationAttributes-All">
+    <annotation>
+      <documentation>The following represents the complete list of presentation attributes</documentation>
+    </annotation>
+    <attributeGroup ref="svg:PresentationAttributes-Color"/>
+    <attributeGroup ref="svg:PresentationAttributes-FillStroke"/>
+    <attributeGroup ref="svg:PresentationAttributes-FontSpecification"/>
+    <attributeGroup ref="svg:PresentationAttributes-Gradients"/>
+    <attributeGroup ref="svg:PresentationAttributes-Graphics"/>
+    <attributeGroup ref="svg:PresentationAttributes-Markers"/>
+    <attributeGroup ref="svg:PresentationAttributes-TextContentElements"/>
+    <attributeGroup ref="svg:PresentationAttributes-TextElements"/>
+    <attributeGroup ref="svg:PresentationAttributes-Viewports"/>
+  </attributeGroup>
+  <attributeGroup name="filter_primitive_attributes">
+    <attribute name="x" type="svg:CoordinateType" use="optional"/>
+    <attribute name="y" type="svg:CoordinateType" use="optional"/>
+    <attribute name="width" type="svg:LengthType" use="optional"/>
+    <attribute name="height" type="svg:LengthType" use="optional"/>
+    <attribute name="result" type="string" use="optional"/>
+  </attributeGroup>
+  <attributeGroup name="filter_primitive_attributes_with_in">
+    <attributeGroup ref="svg:filter_primitive_attributes"/>
+    <attribute name="in" use="optional">
+      <simpleType>
+        <restriction base="string">
+          <enumeration value="SourceGraphic"/>
+          <enumeration value="SourceAlpha"/>
+          <enumeration value="BackgroundImage"/>
+          <enumeration value="BackgroundAlpha"/>
+          <enumeration value="FillPaint"/>
+          <enumeration value="StrokePaint"/>
+        </restriction>
+      </simpleType>
+    </attribute>
+  </attributeGroup>
+
+  <attributeGroup name="HmiIdentifierFeature">
+    <annotation>
+      <documentation>All elements have an ID</documentation>
+    </annotation>
+    <attribute name="Type" use="optional" rtpu:enabled="true" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiTypesType"/>
+    <attribute name="ElementID" use="optional" rtpu:enabled="true" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="Number" rtpu:attributeTypeId="hmiTypesElementID"/>
+  </attributeGroup>
+
+  <group name="descTitleMetadata">
+    <annotation>
+      <documentation>A bit simpler than the DTD, but see commented-out alternative</documentation>
+    </annotation>
+    <all>
+      <element name="desc" type="svg:descType" minOccurs="0"/>
+      <element name="title" type="svg:titleType" minOccurs="0"/>
+      <element name="metadata" type="string" minOccurs="0"/>
+    </all>
+  </group>
+  <!--
+	<group name="descTitleMetadata">
+	<annotation>
+			<documentation>Captures the ordering restrictions of the DTD, but suffers from over complexity. No easy way to express this without a wrapper element.</documentation>
+		</annotation>
+		<choice minOccurs="0" maxOccurs="1">
+			<sequence>
+				<element name="desc" type="svg:descType"/>
+				<choice minOccurs="0" maxOccurs="1">
+					<sequence>
+						<element name="title" type="svg:titleType"/>
+						<element name="metadata" type="svg:metadataType" minOccurs="0" maxOccurs="1"/>
+					</sequence>
+					<sequence>
+						<element name="metadata" type="svg:metadataType"/>
+						<element name="title" type="svg:titleType" minOccurs="0" maxOccurs="1"/>
+					</sequence>
+				</choice>
+			</sequence>
+			<sequence>
+				<element name="title" type="svg:titleType"/>
+				<choice minOccurs="0" maxOccurs="1">
+					<sequence>
+						<element name="desc" type="svg:descType"/>
+						<element name="metadata" type="svg:metadataType" minOccurs="0" maxOccurs="1"/>
+					</sequence>
+					<sequence>
+						<element name="metadata" type="svg:metadataType"/>
+						<element name="desc" type="svg:descType" minOccurs="0" maxOccurs="1"/>
+					</sequence>
+				</choice>
+			</sequence>
+			<sequence>
+				<element name="metadata" type="svg:metadataType"/>
+				<choice minOccurs="0" maxOccurs="1">
+					<sequence>
+						<element name="desc" type="svg:descType"/>
+						<element name="title" type="svg:titleType" minOccurs="0" maxOccurs="1"/>
+					</sequence>
+					<sequence>
+						<element name="title" type="svg:titleType"/>
+						<element name="desc" type="svg:descType" minOccurs="0" maxOccurs="1"/>
+					</sequence>
+				</choice>
+			</sequence>
+		</choice>
+	</group>
+-->
+  <element name="svg" type="svg:svgType"/>
+  <element name="g" type="svg:gType"/>
+  <element name="defs" type="svg:defsType"/>
+  <element name="desc" type="svg:descType"/>
+  <element name="title" type="svg:titleType"/>
+  <element name="symbol" type="svg:symbolType"/>
+  <element name="use" type="svg:useType"/>
+  <element name="image" type="svg:imageType"/>
+
+  <element name="path" type="svg:pathType"/>
+  <element name="rect" type="svg:rectType"/>
+  <element name="circle" type="svg:circleType"/>
+  <element name="ellipse" type="svg:ellipseType"/>
+  <element name="line" type="svg:lineType"/>
+  <element name="polyline" type="svg:polylineType"/>
+  <element name="polygon" type="svg:polygonType"/>
+  <element name="text" type="svg:textType"/>
+  <element name="tspan" type="svg:tspanType"/>
+  <element name="tref" type="svg:trefType"/>
+
+
+
+
+
+  <element name="marker" type="svg:markerType"/>
+
+  <element name="linearGradient" type="svg:linearGradientType"/>
+  <element name="radialGradient" type="svg:radialGradientType"/>
+  <element name="stop" type="svg:stopType"/>
+  <element name="pattern" type="svg:patternType"/>
+  <element name="clipPath" type="svg:clipPathType"/>
+  <element name="mask" type="svg:maskType"/>
+  <element name="filter" type="svg:filterType"/>
+
+
+
+
+
+
+  <element name="feColorMatrix" type="svg:feColorMatrixType"/>
+
+
+
+
+
+  <element name="feComposite" type="svg:feCompositeType"/>
+  <element name="feGaussianBlur" type="svg:feGaussianBlurType"/>
+  <element name="feOffset" type="svg:feOffsetType"/>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <complexType name="svgType">
+    <choice minOccurs="0" maxOccurs="unbounded">
+      <element ref="svg:desc"/>
+      <element ref="svg:title"/>
+      <element ref="svg:defs"/>
+      <element ref="svg:path"/>
+      <element ref="svg:text"/>
+      <element ref="svg:rect"/>
+      <element ref="svg:circle"/>
+      <element ref="svg:ellipse"/>
+      <element ref="svg:line"/>
+      <element ref="svg:polyline"/>
+      <element ref="svg:polygon"/>
+      <element ref="svg:use"/>
+      <element ref="svg:image"/>
+      <element ref="svg:svg"/>
+      <element ref="svg:g"/>
+      <element ref="svg:symbol"/>
+      <element ref="svg:marker"/>
+      <element ref="svg:clipPath"/>
+      <element ref="svg:linearGradient"/>
+      <element ref="svg:radialGradient"/>
+      <element ref="hmi:HMI.Elements.class"/>
+	  <element ref="svg:pattern"/>
+      <!-- should this be done with named child element collections? Especially for modularisation. -->
+    </choice>
+    <attributeGroup ref="svg:stdAttrs"/>
+    <attributeGroup ref="svg:FlexAttrs"/>
+    <attributeGroup ref="svg:langSpaceAttrs"/>
+    <attribute name="externalResourcesRequired" type="boolean" use="optional"/>
+    <attributeGroup ref="svg:PresentationAttributes-All"/>
+    <attribute name="viewBox" type="svg:ViewBoxSpecType" use="optional"/>
+    <attribute name="transform" type="svg:TransformListType" use="optional"/>
+    <attribute name="preserveAspectRatio" rtpu:enabled="true" rtpu:attributeClass="StringToNumericComposition" rtpu:delimiter=" ">
+      <simpleType>
+        <restriction base="token">
+          <enumeration value="none" />
+          <enumeration value="xMinYMin" />
+          <enumeration value="xMidYMin" />
+          <enumeration value="xMaxYMin"/>
+          <enumeration value="xMinYMid"/>
+          <enumeration value="xMidYMid"/>
+          <enumeration value="xMaxYMid"/>
+          <enumeration value="xMinYMax"/>
+          <enumeration value="xMidYMax"/>
+          <enumeration value="xMaxYMax"/>
+          <enumeration value="meet"/>
+          <enumeration value="slice"/>
+        </restriction>
+      </simpleType>
+    </attribute>
+    <attribute name="zoomAndPan" default="magnify">
+      <simpleType>
+        <restriction base="string">
+          <enumeration value="disable"/>
+          <enumeration value="magnify"/>
+          <enumeration value="zoom"/>
+        </restriction>
+      </simpleType>
+    </attribute>
+    <attribute name="x" type="svg:CoordinateType" use="optional"/>
+    <attribute name="y" type="svg:CoordinateType" use="optional"/>
+    <attribute name="width" type="svg:LengthType" use="optional"/>
+    <attribute name="height" type="svg:LengthType" use="optional"/>
+    <attribute name="contentScriptType" type="svg:ContentTypeType" default="text/ecmascript"/>
+    <attribute name="contentStyleType" type="svg:ContentTypeType" default="text/css"/>
+    <attribute name="baseProfile" type="string" use="optional"/>
+    <attribute name="version" type="string" use="optional" default="1.1" />
+  </complexType>
+  <complexType name="gType">
+    <choice minOccurs="0" maxOccurs="unbounded">
+      <element ref="svg:desc"/>
+      <element ref="svg:title"/>
+      <element ref="svg:defs"/>
+      <element ref="svg:path"/>
+      <element ref="svg:text"/>
+      <element ref="svg:rect"/>
+      <element ref="svg:circle"/>
+      <element ref="svg:ellipse"/>
+      <element ref="svg:line"/>
+      <element ref="svg:polyline"/>
+      <element ref="svg:polygon"/>
+      <element ref="svg:use"/>
+      <element ref="svg:image"/>
+      <element ref="svg:svg"/>
+      <element ref="svg:g"/>
+      <element ref="svg:symbol"/>
+      <element ref="svg:marker"/>
+      <element ref="svg:clipPath"/>
+      <element ref="svg:linearGradient"/>
+      <element ref="svg:radialGradient"/>
+      <element ref="hmi:HMI.Elements.class"/>
+	  <element ref="svg:pattern"/>
+    </choice>
+    <attributeGroup ref="svg:stdAttrs"/>
+    <attributeGroup ref="svg:FlexAttrs" />
+    <attributeGroup ref="svg:langSpaceAttrs"/>
+    <attribute name="externalResourcesRequired" type="boolean" use="optional"/>
+    <attributeGroup ref="svg:PresentationAttributes-All"/>
+    <attribute name="transform" type="svg:TransformListType" use="optional"/>
+    <!-- as per SDS_CHROM_31_Screens_RenderingTemplate hmi:changes is only applicable for group elements-->
+    <attribute ref="hmi:changes" use="optional" rtpu:attributeTypeId="hmiChanges"/>
+  </complexType>
+  <complexType name="defsType">
+    <choice minOccurs="0" maxOccurs="unbounded">
+      <element ref="svg:desc"/>
+      <element ref="svg:title"/>
+      <element ref="svg:defs"/>
+      <element ref="svg:path"/>
+      <element ref="svg:text"/>
+      <element ref="svg:rect"/>
+      <element ref="svg:circle"/>
+      <element ref="svg:ellipse"/>
+      <element ref="svg:line"/>
+      <element ref="svg:polyline"/>
+      <element ref="svg:polygon"/>
+      <element ref="svg:use"/>
+      <element ref="svg:image"/>
+      <element ref="svg:svg"/>
+      <element ref="svg:g"/>
+      <element ref="svg:symbol"/>
+      <element ref="svg:marker"/>
+      <element ref="svg:clipPath"/>
+      <element ref="svg:linearGradient"/>
+      <element ref="svg:radialGradient"/>
+      <element ref="svg:filter"/>
+      <element ref="hmi:HMI.Def.class"/>
+      <element ref="svg:pattern"/>
+    </choice>
+    <attributeGroup ref="svg:stdAttrs"/>
+    <attributeGroup ref="svg:langSpaceAttrs"/>
+    <attribute name="externalResourcesRequired" type="boolean" use="optional"/>
+    <attributeGroup ref="svg:PresentationAttributes-All"/>
+    <attribute name="transform" type="svg:TransformListType" use="optional"/>
+  </complexType>
+  <complexType name="descType" mixed="true">
+    <attributeGroup ref="svg:stdAttrs"/>
+    <attributeGroup ref="svg:langSpaceAttrs"/>
+    <attribute name="content" type="string" fixed="structured text"/>
+  </complexType>
+  <complexType name="titleType" mixed="true">
+    <attributeGroup ref="svg:stdAttrs"/>
+    <attributeGroup ref="svg:langSpaceAttrs"/>
+    <attribute name="content" type="string" fixed="structured text"/>
+  </complexType>
+  <complexType name="symbolType">
+    <choice minOccurs="0" maxOccurs="unbounded">
+      <element ref="svg:desc"/>
+      <element ref="svg:title"/>
+      <element ref="svg:defs"/>
+      <element ref="svg:path"/>
+      <element ref="svg:text"/>
+      <element ref="svg:rect"/>
+      <element ref="svg:circle"/>
+      <element ref="svg:ellipse"/>
+      <element ref="svg:line"/>
+      <element ref="svg:polyline"/>
+      <element ref="svg:polygon"/>
+      <element ref="svg:use"/>
+      <element ref="svg:image"/>
+      <element ref="svg:svg"/>
+      <element ref="svg:g"/>
+      <element ref="svg:symbol"/>
+      <element ref="svg:marker"/>
+      <element ref="svg:clipPath"/>
+      <element ref="svg:linearGradient"/>
+      <element ref="svg:radialGradient"/>
+	  <element ref="svg:pattern"/>
+    </choice>
+    <attributeGroup ref="svg:stdAttrs"/>
+    <attributeGroup ref="svg:langSpaceAttrs"/>
+    <attribute name="externalResourcesRequired" type="boolean" use="optional"/>
+    <attributeGroup ref="svg:PresentationAttributes-All"/>
+    <attribute name="viewBox" type="svg:ViewBoxSpecType" use="optional"/>
+    <attribute name="preserveAspectRatio" rtpu:enabled="true" rtpu:attributeClass="StringToNumericComposition" rtpu:delimiter=" " rtpu:valueType="UInt32">
+      <simpleType>
+        <restriction base="token">
+          <enumeration value="none" />
+          <enumeration value="xMinYMin" />
+          <enumeration value="xMidYMin" />
+          <enumeration value="xMaxYMin"/>
+          <enumeration value="xMinYMid"/>
+          <enumeration value="xMidYMid"/>
+          <enumeration value="xMaxYMid"/>
+          <enumeration value="xMinYMax"/>
+          <enumeration value="xMidYMax"/>
+          <enumeration value="xMaxYMax"/>
+          <enumeration value="meet"/>
+          <enumeration value="slice"/>
+        </restriction>
+      </simpleType>
+    </attribute>
+
+  </complexType>
+  <complexType name="useType">
+    <attributeGroup ref="svg:stdAttrs"/>
+    <attributeGroup ref="svg:xlinkRefAttrsEmbed"/>
+    <attribute ref="xlink:href" use="required" rtpu:enabled="true" rtpu:attributeClass="Iri" rtpu:attributeTypeId="xlinkHref_ref" rtpu:valueType="UInt64" rtpu:symbolType="String"/>
+    <attributeGroup ref="svg:langSpaceAttrs"/>
+    <attribute name="externalResourcesRequired" type="boolean" use="optional"/>
+    <attributeGroup ref="svg:PresentationAttributes-All"/>
+    <attribute name="transform" type="svg:TransformListType" use="optional"/>
+    <attribute name="x" type="svg:CoordinateType" use="optional"/>
+    <attribute name="y" type="svg:CoordinateType" use="optional"/>
+    <attribute name="width" type="svg:LengthType" use="optional"/>
+    <attribute name="height" type="svg:LengthType" use="optional"/>
+  </complexType>
+
+
+
+  <complexType name="pathType">
+    <attributeGroup ref="svg:stdAttrs"/>
+    <attributeGroup ref="svg:langSpaceAttrs"/>
+    <attribute name="externalResourcesRequired" type="boolean" use="optional"/>
+    <attributeGroup ref="svg:PresentationAttributes-Color"/>
+    <attributeGroup ref="svg:PresentationAttributes-FillStroke"/>
+    <attributeGroup ref="svg:PresentationAttributes-Graphics"/>
+    <attributeGroup ref="svg:PresentationAttributes-Markers"/>
+    <attribute name="transform" type="svg:TransformListType" use="optional"/>
+    <attribute name="d" type="svg:PathDataType" use="required"/>
+    <attribute name="pathLength" type="double" use="optional"/>
+  </complexType>
+  <complexType name="rectType">
+    <attributeGroup ref="svg:stdAttrs"/>
+    <attributeGroup ref="svg:langSpaceAttrs"/>
+    <attribute name="externalResourcesRequired" type="boolean" use="optional"/>
+    <attributeGroup ref="svg:PresentationAttributes-Color"/>
+    <attributeGroup ref="svg:PresentationAttributes-FillStroke"/>
+    <attributeGroup ref="svg:PresentationAttributes-Graphics"/>
+    <attribute name="transform" type="svg:TransformListType" use="optional"/>
+    <attribute name="x" type="svg:CoordinateType" use="optional"/>
+    <attribute name="y" type="svg:CoordinateType" use="optional"/>
+    <attribute name="width" type="svg:LengthType" use="required"/>
+    <attribute name="height" type="svg:LengthType" use="required"/>
+    <attribute name="rx" type="svg:LengthType" use="optional"/>
+    <attribute name="ry" type="svg:LengthType" use="optional"/>
+  </complexType>
+  <complexType name="circleType">
+    <attributeGroup ref="svg:stdAttrs"/>
+    <attributeGroup ref="svg:langSpaceAttrs"/>
+    <attribute name="externalResourcesRequired" type="boolean" use="optional"/>
+    <attributeGroup ref="svg:PresentationAttributes-Color"/>
+    <attributeGroup ref="svg:PresentationAttributes-FillStroke"/>
+    <attributeGroup ref="svg:PresentationAttributes-Graphics"/>
+    <attribute name="transform" type="svg:TransformListType" use="optional"/>
+    <attribute name="cx" type="svg:CoordinateType" use="optional"/>
+    <attribute name="cy" type="svg:CoordinateType" use="optional"/>
+    <attribute name="r" type="svg:LengthType" use="required"/>
+  </complexType>
+  <complexType name="ellipseType">
+    <attributeGroup ref="svg:stdAttrs"/>
+    <attributeGroup ref="svg:langSpaceAttrs"/>
+    <attribute name="externalResourcesRequired" type="boolean" use="optional"/>
+    <attributeGroup ref="svg:PresentationAttributes-Color"/>
+    <attributeGroup ref="svg:PresentationAttributes-FillStroke"/>
+    <attributeGroup ref="svg:PresentationAttributes-Graphics"/>
+    <attribute name="transform" type="svg:TransformListType" use="optional"/>
+    <attribute name="cx" type="svg:CoordinateType" use="optional"/>
+    <attribute name="cy" type="svg:CoordinateType" use="optional"/>
+    <attribute name="rx" type="svg:LengthType" use="required"/>
+    <attribute name="ry" type="svg:LengthType" use="required"/>
+  </complexType>
+  <complexType name="lineType">
+    <attributeGroup ref="svg:stdAttrs"/>
+    <attributeGroup ref="svg:langSpaceAttrs"/>
+    <attribute name="externalResourcesRequired" type="boolean" use="optional"/>
+    <attributeGroup ref="svg:PresentationAttributes-Color"/>
+    <attributeGroup ref="svg:PresentationAttributes-FillStroke"/>
+    <attributeGroup ref="svg:PresentationAttributes-Graphics"/>
+    <attributeGroup ref="svg:PresentationAttributes-Markers"/>
+    <attribute name="transform" type="svg:TransformListType" use="optional"/>
+    <attribute name="x1" type="svg:CoordinateType" use="optional"/>
+    <attribute name="y1" type="svg:CoordinateType" use="optional"/>
+    <attribute name="x2" type="svg:CoordinateType" use="optional"/>
+    <attribute name="y2" type="svg:CoordinateType" use="optional"/>
+  </complexType>
+  <complexType name="polylineType">
+    <attributeGroup ref="svg:stdAttrs"/>
+    <attributeGroup ref="svg:langSpaceAttrs"/>
+    <attribute name="externalResourcesRequired" type="boolean" use="optional"/>
+    <attributeGroup ref="svg:PresentationAttributes-Color"/>
+    <attributeGroup ref="svg:PresentationAttributes-FillStroke"/>
+    <attributeGroup ref="svg:PresentationAttributes-Graphics"/>
+    <attributeGroup ref="svg:PresentationAttributes-Markers"/>
+    <attribute name="transform" type="svg:TransformListType" use="optional"/>
+    <attribute name="points" type="svg:PointsType" use="required"/>
+  </complexType>
+  <complexType name="polygonType">
+    <attributeGroup ref="svg:stdAttrs"/>
+    <attributeGroup ref="svg:langSpaceAttrs"/>
+    <attribute name="externalResourcesRequired" type="boolean" use="optional"/>
+    <attributeGroup ref="svg:PresentationAttributes-Color"/>
+    <attributeGroup ref="svg:PresentationAttributes-FillStroke"/>
+    <attributeGroup ref="svg:PresentationAttributes-Graphics"/>
+    <attributeGroup ref="svg:PresentationAttributes-Markers"/>
+    <attribute name="transform" type="svg:TransformListType" use="optional"/>
+    <attribute name="points" type="svg:PointsType" use="required"/>
+  </complexType>
+  <complexType name="textType" mixed="true">
+    <choice minOccurs="0" maxOccurs="unbounded">
+      <element ref="svg:desc"/>
+      <element ref="svg:title"/>
+      <element ref="svg:tspan"/>
+      <element ref="svg:tref"/>
+      <element ref="hmi:text"/>
+    </choice>
+    <attributeGroup ref="svg:stdAttrs"/>
+    <attributeGroup ref="svg:langSpaceAttrs"/>
+    <attribute name="externalResourcesRequired" type="boolean" use="optional"/>
+    <attributeGroup ref="svg:PresentationAttributes-Color"/>
+    <attributeGroup ref="svg:PresentationAttributes-FillStroke"/>
+    <attributeGroup ref="svg:PresentationAttributes-FontSpecification"/>
+    <attributeGroup ref="svg:PresentationAttributes-Graphics"/>
+    <attributeGroup ref="svg:PresentationAttributes-TextContentElements"/>
+    <attributeGroup ref="svg:PresentationAttributes-TextElements"/>
+    <attribute name="transform" type="svg:TransformListType" use="optional"/>
+    <attribute name="x" type="svg:CoordinateType" use="optional"/>
+    <attribute name="y" type="svg:CoordinateType" use="optional"/>
+    <attribute name="textLength" type="svg:LengthType" use="optional"/>
+    <attribute name="lengthAdjust" use="optional">
+      <simpleType>
+        <restriction base="string">
+          <enumeration value="spacing"/>
+          <enumeration value="spacingAndGlyphs"/>
+        </restriction>
+      </simpleType>
+    </attribute>
+  </complexType>
+  <complexType name="tspanType" mixed="true">
+    <choice minOccurs="0" maxOccurs="unbounded">
+      <element ref="svg:desc"/>
+      <element ref="svg:title"/>
+      <element ref="svg:tspan"/>
+      <element ref="svg:tref"/>
+    </choice>
+    <attributeGroup ref="svg:stdAttrs"/>
+    <attributeGroup ref="svg:langSpaceAttrs"/>
+    <attribute name="externalResourcesRequired" type="boolean" use="optional"/>
+    <attributeGroup ref="svg:PresentationAttributes-Color"/>
+    <attributeGroup ref="svg:PresentationAttributes-FillStroke"/>
+    <attributeGroup ref="svg:PresentationAttributes-FontSpecification"/>
+    <attributeGroup ref="svg:PresentationAttributes-Graphics"/>
+    <attributeGroup ref="svg:PresentationAttributes-TextContentElements"/>
+    <attribute name="x" rtpu:valueType="String" rtpu:attributeClass="String" rtpu:symbolType="String" use="optional" rtpu:attributeTypeId="hmiTspanX"/>
+    <attribute name="y" rtpu:valueType="String" rtpu:attributeClass="String" rtpu:symbolType="String" use="optional" rtpu:attributeTypeId="hmiTspanY"/>
+    <!-- HMIDISABLED: <attribute name="dx" type="svg:LengthsType" use="optional"/>  -->
+    <!-- HMIDISABLED: <attribute name="dy" type="svg:LengthsType" use="optional"/>  -->
+    <attribute name="rotate" type="string" use="optional"/>
+    <attribute name="textLength" type="svg:LengthType" use="optional"/>
+    <attribute name="lengthAdjust" use="optional">
+      <simpleType>
+        <restriction base="string">
+          <enumeration value="spacing"/>
+          <enumeration value="spacingAndGlyphs"/>
+        </restriction>
+      </simpleType>
+    </attribute>
+  </complexType>
+  <complexType name="trefType">
+    <choice minOccurs="0" maxOccurs="unbounded">
+      <element ref="svg:desc"/>
+      <element ref="svg:title"/>
+    </choice>
+    <attributeGroup ref="svg:stdAttrs"/>
+    <attributeGroup ref="svg:xlinkRefAttrs"/>
+    <attribute ref="xlink:href" use="optional" rtpu:enabled="true" rtpu:attributeClass="Iri" rtpu:attributeTypeId="xlinkHref_ref" rtpu:valueType="UInt64" rtpu:symbolType="String"/>
+    <attributeGroup ref="svg:langSpaceAttrs"/>
+    <attribute name="externalResourcesRequired" type="boolean" use="optional"/>
+    <attributeGroup ref="svg:PresentationAttributes-Color"/>
+    <attributeGroup ref="svg:PresentationAttributes-FillStroke"/>
+    <attributeGroup ref="svg:PresentationAttributes-FontSpecification"/>
+    <attributeGroup ref="svg:PresentationAttributes-Graphics"/>
+    <attributeGroup ref="svg:PresentationAttributes-TextContentElements"/>
+    <attribute name="x" type="svg:CoordinatesType" use="optional"/>
+    <attribute name="y" type="svg:CoordinatesType" use="optional"/>
+    <!-- HMIDISABLED:   <attribute name="dx" type="svg:LengthsType" use="optional"/> -->
+    <!-- HMIDISABLED:   <attribute name="dy" type="svg:LengthsType" use="optional"/> -->
+    <attribute name="rotate" type="string" use="optional"/>
+    <attribute name="textLength" type="svg:LengthType" use="optional"/>
+    <attribute name="lengthAdjust" use="optional">
+      <simpleType>
+        <restriction base="string">
+          <enumeration value="spacing"/>
+          <enumeration value="spacingAndGlyphs"/>
+        </restriction>
+      </simpleType>
+    </attribute>
+  </complexType>
+
+
+
+
+
+  <complexType name="markerType">
+    <choice minOccurs="0" maxOccurs="unbounded">
+      <element ref="svg:desc"/>
+      <element ref="svg:title"/>
+      <element ref="svg:defs"/>
+      <element ref="svg:path"/>
+      <element ref="svg:text"/>
+      <element ref="svg:rect"/>
+      <element ref="svg:circle"/>
+      <element ref="svg:ellipse"/>
+      <element ref="svg:line"/>
+      <element ref="svg:polyline"/>
+      <element ref="svg:polygon"/>
+      <element ref="svg:use"/>
+      <element ref="svg:image"/>
+      <element ref="svg:svg"/>
+      <element ref="svg:g"/>
+      <element ref="svg:symbol"/>
+      <element ref="svg:marker"/>
+      <element ref="svg:clipPath"/>
+      <element ref="svg:linearGradient"/>
+      <element ref="svg:radialGradient"/>
+	  <element ref="svg:pattern"/>
+    </choice>
+    <attributeGroup ref="svg:stdAttrs"/>
+    <attributeGroup ref="svg:langSpaceAttrs"/>
+    <attribute name="externalResourcesRequired" type="boolean" use="optional"/>
+    <attributeGroup ref="svg:PresentationAttributes-All"/>
+    <attribute name="viewBox" type="svg:ViewBoxSpecType" use="optional"/>
+    <attribute name="preserveAspectRatio" rtpu:enabled="true" rtpu:attributeClass="StringToNumericComposition" rtpu:delimiter=" ">
+      <simpleType>
+        <restriction base="token">
+          <enumeration value="none" />
+          <enumeration value="xMinYMin" />
+          <enumeration value="xMidYMin" />
+          <enumeration value="xMaxYMin"/>
+          <enumeration value="xMinYMid"/>
+          <enumeration value="xMidYMid"/>
+          <enumeration value="xMaxYMid"/>
+          <enumeration value="xMinYMax"/>
+          <enumeration value="xMidYMax"/>
+          <enumeration value="xMaxYMax"/>
+          <enumeration value="meet"/>
+          <enumeration value="slice"/>
+        </restriction>
+      </simpleType>
+    </attribute>
+
+    <attribute name="refX" type="svg:CoordinateType" use="optional"/>
+    <attribute name="refY" type="svg:CoordinateType" use="optional"/>
+    <attribute name="markerUnits" use="optional">
+      <simpleType>
+        <restriction base="string">
+          <enumeration value="strokeWidth"/>
+          <enumeration value="userSpaceOnUse"/>
+          <enumeration value="userSpace"/>
+        </restriction>
+      </simpleType>
+    </attribute>
+    <attribute name="markerWidth" type="svg:LengthType" use="optional"/>
+    <attribute name="markerHeight" type="svg:LengthType" use="optional"/>
+    <attribute name="orient" type="string" use="optional"/>
+  </complexType>
+
+  <complexType name="linearGradientType">
+    <sequence>
+      <choice minOccurs="0" maxOccurs="unbounded">
+        <element ref="svg:stop"/>
+      </choice>
+    </sequence>
+    <attributeGroup ref="svg:stdAttrs"/>
+    <attributeGroup ref="svg:xlinkRefAttrs"/>
+    <attributeGroup ref="svg:PresentationAttributes-All"/>
+    <attribute ref="xlink:href" use="optional" rtpu:enabled="true" rtpu:attributeClass="Iri" rtpu:attributeTypeId="xlinkHref_ref" rtpu:valueType="UInt64" rtpu:symbolType="String"/>
+    <attribute name="externalResourcesRequired" type="boolean" use="optional"/>
+    <attribute name="gradientUnits" use="optional">
+      <!-- @@ need to add more attributes here @@ -->
+      <simpleType>
+        <restriction base="string">
+          <enumeration value="userSpaceOnUse"/>
+          <enumeration value="userSpace"/>
+          <enumeration value="objectBoundingBox"/>
+        </restriction>
+      </simpleType>
+    </attribute>
+    <attribute name="gradientTransform" type="svg:TransformListType" use="optional"/>
+    <attribute name="x1" rtpu:attributeTypeId="gradX1" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="String" use="optional"/>
+    <attribute name="y1" rtpu:attributeTypeId="gradY1" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="String" use="optional"/>
+    <attribute name="x2" rtpu:attributeTypeId="gradX2" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="String" use="optional"/>
+    <attribute name="y2" rtpu:attributeTypeId="gradY2" rtpu:valueType="Numeric" rtpu:attributeClass="Number" rtpu:symbolType="String" use="optional"/>
+    <attribute name="spreadMethod" default="pad">
+      <simpleType>
+        <restriction base="string">
+          <enumeration value="pad"/>
+          <enumeration value="reflect"/>
+          <enumeration value="repeat"/>
+        </restriction>
+      </simpleType>
+    </attribute>
+  </complexType>
+  <complexType name="radialGradientType">
+    <sequence>
+      <choice minOccurs="0" maxOccurs="unbounded">
+        <element ref="svg:stop"/>
+      </choice>
+    </sequence>
+    <attributeGroup ref="svg:stdAttrs"/>
+    <attributeGroup ref="svg:xlinkRefAttrs"/>
+    <attributeGroup ref="svg:PresentationAttributes-All"/>
+    <attribute ref="xlink:href" use="optional" rtpu:enabled="true" rtpu:attributeClass="Iri" rtpu:attributeTypeId="xlinkHref_ref" rtpu:valueType="UInt64" rtpu:symbolType="String"/>
+    <attribute name="externalResourcesRequired" type="boolean" use="optional"/>
+    <attribute name="gradientUnits" use="optional">
+      <simpleType>
+        <restriction base="string">
+          <enumeration value="userSpaceOnUse"/>
+          <enumeration value="userSpace"/>
+          <enumeration value="objectBoundingBox"/>
+        </restriction>
+      </simpleType>
+    </attribute>
+    <attribute name="gradientTransform" type="svg:TransformListType" use="optional"/>
+    <attribute name="cx" type="svg:CoordinateType" use="optional"/>
+    <attribute name="cy" type="svg:CoordinateType" use="optional"/>
+    <attribute name="r" type="svg:LengthType" use="optional"/>
+    <attribute name="fx" type="svg:CoordinateType" use="optional"/>
+    <attribute name="fy" type="svg:CoordinateType" use="optional"/>
+    <attribute name="spreadMethod" default="pad">
+      <simpleType>
+        <restriction base="string">
+          <enumeration value="pad"/>
+          <enumeration value="reflect"/>
+          <enumeration value="repeat"/>
+        </restriction>
+      </simpleType>
+    </attribute>
+  </complexType>
+  <complexType name="stopType">
+    <attributeGroup ref="svg:stdAttrs"/>
+    <attributeGroup ref="svg:PresentationAttributes-Gradients"/>
+    <attribute name="offset" type="svg:LengthType" use="optional"/>
+  </complexType>
+  <complexType name="patternType">
+    <choice minOccurs="0" maxOccurs="unbounded">
+      <element ref="svg:desc"/>
+      <element ref="svg:title"/>
+      <element ref="svg:defs"/>
+      <element ref="svg:path"/>
+      <element ref="svg:text"/>
+      <element ref="svg:rect"/>
+      <element ref="svg:circle"/>
+      <element ref="svg:ellipse"/>
+      <element ref="svg:line"/>
+      <element ref="svg:polyline"/>
+      <element ref="svg:polygon"/>
+      <element ref="svg:use"/>
+      <element ref="svg:image"/>
+      <element ref="svg:svg"/>
+      <element ref="svg:g"/>
+      <element ref="svg:symbol"/>
+      <element ref="svg:marker"/>
+      <element ref="svg:clipPath"/>
+      <element ref="svg:mask"/>
+      <element ref="svg:linearGradient"/>
+      <element ref="svg:radialGradient"/>
+      <element ref="svg:pattern"/>
+      <element ref="svg:filter"/>
+    </choice>
+    <attributeGroup ref="svg:stdAttrs"/>
+    <attributeGroup ref="svg:xlinkRefAttrs"/>
+    <attribute ref="xlink:href" use="optional" rtpu:enabled="true" rtpu:attributeClass="Iri" rtpu:attributeTypeId="xlinkHref_ref" rtpu:valueType="UInt64" rtpu:symbolType="String"/>
+    <attributeGroup ref="svg:langSpaceAttrs"/>
+    <attribute name="externalResourcesRequired" type="boolean" use="optional"/>
+    <attributeGroup ref="svg:PresentationAttributes-All"/>
+    <attribute name="viewBox" type="svg:ViewBoxSpecType" use="optional"/>
+    <attribute name="preserveAspectRatio" rtpu:enabled="true" rtpu:attributeClass="StringToNumericComposition" rtpu:delimiter=" ">
+      <simpleType>
+        <restriction base="token">
+          <enumeration value="none" />
+          <enumeration value="xMinYMin" />
+          <enumeration value="xMidYMin" />
+          <enumeration value="xMaxYMin"/>
+          <enumeration value="xMinYMid"/>
+          <enumeration value="xMidYMid"/>
+          <enumeration value="xMaxYMid"/>
+          <enumeration value="xMinYMax"/>
+          <enumeration value="xMidYMax"/>
+          <enumeration value="xMaxYMax"/>
+          <enumeration value="meet"/>
+          <enumeration value="slice"/>
+        </restriction>
+      </simpleType>
+    </attribute>
+
+    <attribute name="patternUnits" use="optional">
+      <simpleType>
+        <restriction base="string">
+          <enumeration value="userSpaceOnUse"/>
+          <enumeration value="userSpace"/>
+          <enumeration value="objectBoundingBox"/>
+        </restriction>
+      </simpleType>
+    </attribute>
+    <attribute name="patternContentUnits" use="optional">
+      <simpleType>
+        <restriction base="string">
+          <enumeration value="userSpaceOnUse"/>
+          <enumeration value="objectBoundingBox"/>
+        </restriction>
+      </simpleType>
+    </attribute>
+    <attribute name="patternTransform" type="svg:TransformListType" use="optional"/>
+    <attribute name="x" type="svg:CoordinateType" use="optional"/>
+    <attribute name="y" type="svg:CoordinateType" use="optional"/>
+    <attribute name="width" type="svg:LengthType" use="required"/>
+    <attribute name="height" type="svg:LengthType" use="required"/>
+  </complexType>
+  <complexType name="clipPathType">
+    <sequence>
+      <choice minOccurs="0" maxOccurs="unbounded">
+        <element ref="svg:path"/>
+        <element ref="svg:text"/>
+        <element ref="svg:rect"/>
+        <element ref="svg:circle"/>
+        <element ref="svg:ellipse"/>
+        <element ref="svg:line"/>
+        <element ref="svg:polyline"/>
+        <element ref="svg:polygon"/>
+        <element ref="svg:use"/>
+      </choice>
+    </sequence>
+    <attributeGroup ref="svg:stdAttrs"/>
+    <attributeGroup ref="svg:langSpaceAttrs"/>
+    <attribute name="externalResourcesRequired" type="boolean" use="optional"/>
+    <attributeGroup ref="svg:PresentationAttributes-FillStroke"/>
+    <attributeGroup ref="svg:PresentationAttributes-FontSpecification"/>
+    <attributeGroup ref="svg:PresentationAttributes-Graphics"/>
+    <attributeGroup ref="svg:PresentationAttributes-TextContentElements"/>
+    <attributeGroup ref="svg:PresentationAttributes-TextElements"/>
+    <attribute name="transform" type="svg:TransformListType" use="optional"/>
+    <attribute name="clipPathUnits" use="optional">
+      <simpleType>
+        <restriction base="string">
+          <enumeration value="userSpaceOnUse"/>
+          <enumeration value="userSpace"/>
+          <enumeration value="objectBoundingBox"/>
+        </restriction>
+      </simpleType>
+    </attribute>
+  </complexType>
+  <complexType name="maskType">
+    <sequence>
+      <choice minOccurs="0" maxOccurs="unbounded">
+        <element ref="svg:desc"/>
+        <element ref="svg:title"/>
+        <element ref="svg:defs"/>
+        <element ref="svg:path"/>
+        <element ref="svg:text"/>
+        <element ref="svg:rect"/>
+        <element ref="svg:circle"/>
+        <element ref="svg:ellipse"/>
+        <element ref="svg:line"/>
+        <element ref="svg:polyline"/>
+        <element ref="svg:polygon"/>
+        <element ref="svg:use"/>
+        <element ref="svg:image"/>
+        <element ref="svg:svg"/>
+        <element ref="svg:g"/>
+        <element ref="svg:symbol"/>
+        <element ref="svg:marker"/>
+        <element ref="svg:clipPath"/>
+        <element ref="svg:mask"/>
+        <element ref="svg:linearGradient"/>
+        <element ref="svg:radialGradient"/>
+        <element ref="svg:pattern"/>
+        <element ref="svg:filter"/>
+      </choice>
+    </sequence>
+    <attributeGroup ref="svg:stdAttrs"/>
+    <attributeGroup ref="svg:langSpaceAttrs"/>
+    <attribute name="externalResourcesRequired" type="boolean" use="optional"/>
+    <attributeGroup ref="svg:PresentationAttributes-All"/>
+    <attribute name="transform" type="svg:TransformListType" use="optional"/>
+    <attribute name="maskUnits" use="optional">
+      <simpleType>
+        <restriction base="string">
+          <enumeration value="userSpaceOnUse"/>
+          <enumeration value="userSpace"/>
+          <enumeration value="objectBoundingBox"/>
+        </restriction>
+      </simpleType>
+    </attribute>
+    <attribute name="x" type="svg:CoordinateType" use="optional"/>
+    <attribute name="y" type="svg:CoordinateType" use="optional"/>
+    <attribute name="width" type="svg:LengthType" use="optional"/>
+    <attribute name="height" type="svg:LengthType" use="optional"/>
+  </complexType>
+  <complexType name="filterType">
+    <sequence>
+      <choice minOccurs="0" maxOccurs="unbounded">
+        <element ref="svg:feColorMatrix"/>
+        <element ref="svg:feComposite"/>
+        <element ref="svg:feGaussianBlur"/>
+        <element ref="svg:feOffset"/>
+      </choice>
+    </sequence>
+    <attributeGroup ref="svg:stdAttrs"/>
+    <attributeGroup ref="svg:xlinkRefAttrs"/>
+    <attribute ref="xlink:href" use="optional" rtpu:enabled="true" rtpu:attributeClass="Iri" rtpu:attributeTypeId="xlinkHref_ref" rtpu:valueType="UInt64" rtpu:symbolType="String"/>
+    <attributeGroup ref="svg:langSpaceAttrs"/>
+    <attribute name="externalResourcesRequired" type="boolean" use="optional"/>
+    <attributeGroup ref="svg:PresentationAttributes-All"/>
+    <attribute name="filterUnits" use="optional">
+      <simpleType>
+        <restriction base="string">
+          <enumeration value="userSpaceOnUse"/>
+          <enumeration value="userSpace"/>
+          <enumeration value="objectBoundingBox"/>
+        </restriction>
+      </simpleType>
+    </attribute>
+    <attribute name="primitiveUnits" use="optional">
+      <simpleType>
+        <restriction base="string">
+          <enumeration value="userSpaceOnUse"/>
+          <enumeration value="userSpace"/>
+          <enumeration value="objectBoundingBox"/>
+        </restriction>
+      </simpleType>
+    </attribute>
+    <attribute name="x" type="svg:CoordinateType" use="optional"/>
+    <attribute name="y" type="svg:CoordinateType" use="optional"/>
+    <attribute name="width" type="svg:LengthType" use="optional"/>
+    <attribute name="height" type="svg:LengthType" use="optional"/>
+    <attribute name="filterRes" type="string" use="optional"/>
+  </complexType>
+  <complexType name="feColorMatrixType">
+    <attributeGroup ref="svg:stdAttrs"/>
+    <attributeGroup ref="svg:filter_primitive_attributes_with_in"/>
+    <attributeGroup ref="svg:PresentationAttributes-All"/>
+    <attribute name="type" default="matrix" rtpu:enabled="true" rtpu:attributeClass="StringToNumeric" rtpu:attributeTypeId="feColorMatrixType" rtpu:valueType="UInt32">
+      <simpleType>
+        <restriction base="string">
+          <enumeration value="matrix"/>
+          <enumeration value="saturate"/>
+          <enumeration value="hueRotate"/>
+          <enumeration value="luminanceToAlpha"/>
+        </restriction>
+      </simpleType>
+    </attribute>
+    <attribute name="values" type="string" use="optional"/>
+  </complexType>
+  <complexType name="feCompositeType">
+    <choice minOccurs="0" maxOccurs="unbounded">
+    </choice>
+    <attributeGroup ref="svg:stdAttrs"/>
+    <attributeGroup ref="svg:filter_primitive_attributes_with_in"/>
+    <attribute name="in2" type="string" use="required"/>
+    <attribute name="operator" default="over">
+      <simpleType>
+        <restriction base="string">
+          <enumeration value="over"/>
+          <enumeration value="in"/>
+          <enumeration value="out"/>
+          <enumeration value="atop"/>
+          <enumeration value="xor"/>
+          <enumeration value="arithmetic"/>
+        </restriction>
+      </simpleType>
+    </attribute>
+    <attribute name="k1" type="double" use="optional"/>
+    <attribute name="k2" type="double" use="optional"/>
+    <attribute name="k3" type="double" use="optional"/>
+    <attribute name="k4" type="double" use="optional"/>
+  </complexType>
+  <complexType name="feGaussianBlurType">
+    <choice minOccurs="0" maxOccurs="unbounded">
+    </choice>
+    <attributeGroup ref="svg:stdAttrs"/>
+    <attributeGroup ref="svg:filter_primitive_attributes_with_in"/>
+    <attribute name="stdDeviation" type="string" use="optional"/>
+  </complexType>
+  <complexType name="feOffsetType">
+    <choice minOccurs="0" maxOccurs="unbounded">
+    </choice>
+    <attributeGroup ref="svg:stdAttrs"/>
+    <attributeGroup ref="svg:filter_primitive_attributes_with_in"/>
+    <attribute name="dx" type="svg:LengthType" use="optional"/>
+    <attribute name="dy" type="svg:LengthType" use="optional"/>
+  </complexType>
+</schema>
