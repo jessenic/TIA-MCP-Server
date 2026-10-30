@@ -8,6 +8,10 @@
         "description": "Omit item properties equal to their TIA-created type defaults (default: true).",
         "type": "boolean"
       },
+      "include_library": {
+        "description": "Package the complete project type library, including faceplates, dynamic SVG definitions and PLC type dependencies, in a hashed V21 .zal21 archive (default: true). Requires committed library versions.",
+        "type": "boolean"
+      },
       "output_directory": {
         "description": "Directory to write the hmi/<Target> JSON export.",
         "type": "string"

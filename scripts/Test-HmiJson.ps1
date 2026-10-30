@@ -3,7 +3,8 @@ param(
     [string]$ApiDirectory = 'C:\Program Files\Siemens\Automation\Portal V21\PublicAPI\V21\net48',
     [int]$TiaProcessId,
     [string]$TargetName,
-    [switch]$AllowRollbackTests
+    [switch]$AllowRollbackTests,
+    [switch]$AllowLibraryTests
 )
 
 $ErrorActionPreference = 'Stop'
@@ -12,6 +13,9 @@ if ($AllowRollbackTests -and (-not $TiaProcessId -or -not $TargetName)) {
 }
 if ($TiaProcessId -and -not $AllowRollbackTests) {
     throw 'Live tests require -AllowRollbackTests (temporary objects, never committed or saved).'
+}
+if ($AllowLibraryTests -and -not $AllowRollbackTests) {
+    throw 'Library tests require -AllowRollbackTests and explicit live project selection.'
 }
 $ExecutablePath = (Resolve-Path -LiteralPath $ExecutablePath).Path
 $binaryDirectory = Split-Path $ExecutablePath
@@ -32,7 +36,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "Test harness compilation failed: $LASTEXITCODE" }
     Copy-Item -LiteralPath ($ExecutablePath + '.config') -Destination ($testExe + '.config')
     $testArgs = @($binaryDirectory, $ApiDirectory)
-    if ($AllowRollbackTests) { $testArgs += @("$TiaProcessId", $TargetName) }
+    if ($AllowRollbackTests) { $testArgs += @("$TiaProcessId", $TargetName, "$AllowLibraryTests") }
     & $testExe @testArgs
     if ($LASTEXITCODE -ne 0) { throw "HMI JSON regression tests failed: $LASTEXITCODE" }
 }

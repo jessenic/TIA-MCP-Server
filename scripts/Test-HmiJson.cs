@@ -55,6 +55,12 @@ class HmiJsonTests
         return Activator.CreateInstance(typeof(TiaManager).GetNestedType(name, BindingFlags.NonPublic), true);
     }
 
+    static object InstanceInvoke(object target, string name, params object[] args)
+    {
+        try { return target.GetType().GetMethod(name, BindingFlags.NonPublic | BindingFlags.Instance).Invoke(target, args); }
+        catch (TargetInvocationException error) { throw error.InnerException; }
+    }
+
     static void Set(object target, string name, object value)
     {
         target.GetType().GetProperty(name).SetValue(target, value, null);
@@ -109,6 +115,7 @@ class HmiJsonTests
         var arrayTags = new Dictionary<string, string> { { "Values", "Array [0..2] of Real" } };
         Check((bool)Invoke("ContainsTagReference", arrayTags, "Values[0]"), "array element reference");
         Check(!(bool)Invoke("ContainsTagReference", arrayTags, "Values[3]"), "out-of-range array reference rejected");
+        NewDynamizationTests();
         object first = Document("HmiJsonItem");
         object second = Document("HmiJsonItem");
         Set(first, "Type", "HmiFaceplateContainer");
@@ -117,12 +124,103 @@ class HmiJsonTests
         Set(second, "ContainedType", "V2\\Second");
         Check(!Equals(Invoke("GetItemIdentityKey", first), Invoke("GetItemIdentityKey", second)),
             "contained type separates default cache entries");
+        var properties = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(
+            typeof(TiaManager).GetNestedType("HmiJsonInterfaceProperty", BindingFlags.NonPublic)));
+        object parameter = Document("HmiJsonInterfaceProperty");
+        Set(parameter, "Name", "LevelPercent");
+        Set(parameter, "Value", Invoke("CreateMappingValue", 60.25d));
+        properties.Add(parameter);
+        Invoke("ValidateInterfaceDocument", properties, 0);
+        Check(true, "typed container interface accepted");
+        properties.Add(parameter);
+        Reject(() => Invoke("ValidateInterfaceDocument", properties, 0), "duplicate interface parameter");
+        properties.RemoveAt(1);
+        Reject(() => Invoke("ValidateInterfaceDocument", properties, 17), "interface nesting limit");
+        Set(parameter, "Value", invalid);
+        Reject(() => Invoke("ValidateInterfaceDocument", properties, 0), "unsupported interface value type");
+        var inventory = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(
+            typeof(TiaManager).GetNestedType("HmiJsonLibraryType", BindingFlags.NonPublic)));
+        object type = Document("HmiJsonLibraryType");
+        Set(type, "Name", "IndicatorLight");
+        Set(type, "Guid", Guid.NewGuid());
+        object version = Document("HmiJsonLibraryVersion");
+        Set(version, "Version", "0.0.7");
+        Set(version, "Guid", Guid.NewGuid());
+        ((IList)Get(type, "Versions")).Add(version);
+        inventory.Add(type);
+        Check((bool)Invoke("SameLibraryInventory", inventory, inventory), "library GUID inventory matches itself");
+        var empty = (IList)Activator.CreateInstance(inventory.GetType());
+        Check(!(bool)Invoke("SameLibraryInventory", inventory, empty), "missing library definition rejected");
         if (args.Length > 2)
-            Live(int.Parse(args[2]), args[3]);
+            Live(int.Parse(args[2]), args[3], args.Length > 4 && bool.Parse(args[4]));
         Console.WriteLine("PASS: " + checks + " HMI JSON regression checks.");
     }
 
-    static void Live(int pid, string target)
+    static void NewDynamizationTests()
+    {
+        var converter = Document("HmiJsonValueConverter");
+        Set(converter, "ConditionType", "Bitmask");
+        var entries = (IList)Get(converter, "Entries");
+        var entry = Document("HmiJsonMappingEntry");
+        Set(entry, "Type", "Bitmask");
+        Set(entry, "BitCondition", ulong.MaxValue);
+        Set(entry, "Relevant", 1UL << 63);
+        Set(entry, "BitDynamizationType", "MultiBit");
+        entries.Add(entry);
+        Invoke("ValidateValueConverter", converter);
+        Check(Json(entry).Contains("18446744073709551615") && Json(entry).Contains("9223372036854775808"),
+            "64-bit bitmask values serialize without precision loss");
+        Set(entry, "Relevant", null);
+        Reject(() => Invoke("ValidateValueConverter", converter), "missing relevant mask");
+        Set(entry, "Relevant", 1UL << 63);
+        Set(entry, "BitDynamizationType", "InvalidMode");
+        Reject(() => Invoke("ValidateValueConverter", converter), "invalid bitmask mode");
+        Set(entry, "BitDynamizationType", "SingleBit");
+        Invoke("ValidateValueConverter", converter);
+        Check(true, "single-bit mapping accepted");
+
+        var tags = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var memberList = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(
+            typeof(TiaManager).GetNestedType("HmiJsonTagMember", BindingFlags.NonPublic)));
+        var member = Document("HmiJsonTagMember");
+        Set(member, "Name", "Fault");
+        Set(member, "DataType", "Bool");
+        memberList.Add(member);
+        Invoke("AddTagMembers", tags, "Conveyor{0}", memberList, 0);
+        Check((bool)Invoke("ContainsTagReference", tags, "Conveyor[0].Fault"), "structured member bracket lookup");
+        Check(!(bool)Invoke("ContainsTagReference", tags, "Conveyor[0].Missing"), "unknown member rejected");
+        Reject(() => Invoke("AddTagMembers", tags, "Conveyor", memberList, 33), "tag nesting limit");
+
+        var script = Document("HmiJsonScriptDynamization");
+        Set(script, "Code", "return 42;");
+        Set(script, "GlobalDefinitionCode", "const value = 42;");
+        Set(script, "TriggerType", "Tags");
+        ((IList)Get(script, "Tags")).Add("Conveyor{0}.Fault");
+        var dynamization = Document("HmiJsonDynamization");
+        Set(dynamization, "Type", "Script");
+        Set(dynamization, "Property", "Enabled");
+        Set(dynamization, "Script", script);
+        var buttonType = typeof(Siemens.Engineering.HmiUnified.UI.Widgets.HmiButton);
+        Invoke("ValidateDynamizationDocument", buttonType, dynamization, tags);
+        Check(true, "script trigger and code accepted");
+        ((IList)Get(script, "Tags")).Add("Missing");
+        Reject(() => Invoke("ValidateDynamizationDocument", buttonType, dynamization, tags), "unknown trigger tag");
+        ((IList)Get(script, "Tags")).Remove("Missing");
+        Set(script, "TriggerType", "InvalidCycle");
+        Reject(() => Invoke("ValidateDynamizationDocument", buttonType, dynamization, tags), "invalid script cycle");
+        Set(dynamization, "Script", null);
+        Reject(() => Invoke("ValidateDynamizationDocument", buttonType, dynamization, tags), "missing script configuration");
+
+        Set(dynamization, "Type", "ResourceList");
+        Set(dynamization, "Tag", "Conveyor{0}.Fault");
+        Set(dynamization, "ResourceList", "StatusGraphics");
+        Invoke("ValidateDynamizationDocument", buttonType, dynamization, tags);
+        Check(true, "resource-list binding accepted");
+        Set(dynamization, "ResourceList", null);
+        Reject(() => Invoke("ValidateDynamizationDocument", buttonType, dynamization, tags), "missing resource-list name");
+    }
+
+    static void Live(int pid, string target, bool libraryTests)
     {
         var manager = TiaManager.Instance;
         var connected = manager.Connect(pid);
@@ -136,6 +234,7 @@ class HmiJsonTests
         var allItems = screens.SelectMany(s => s.ScreenItems).ToList();
         try
         {
+            if (libraryTests) LibraryTests(manager, portal, target);
             using (var access = portal.ExclusiveAccess("HMI JSON rollback-only regression tests"))
             using (var transaction = access.Transaction(manager.CurrentProject, "HMI JSON regression tests - rollback"))
             {
@@ -148,6 +247,13 @@ class HmiJsonTests
                     var item = (HmiScreenItemBase)Invoke("CreateScreenItem", temporary, "Item_" + index++,
                         source.GetType(), contained);
                     Check(item.GetType() == source.GetType(), "create " + source.GetType().Name);
+                    object sourceInterface = Invoke("CreateInterfaceDocument", source);
+                    if (sourceInterface != null)
+                    {
+                        Invoke("ApplyInterfaceDocument", item, sourceInterface);
+                        Check(Json(sourceInterface) == Json(Invoke("CreateInterfaceDocument", item)),
+                            "faceplate instance interface read-back");
+                    }
                     var documents = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(
                         typeof(TiaManager).GetNestedType("HmiJsonDynamization", BindingFlags.NonPublic)));
                     foreach (var dynamization in source.Dynamizations)
@@ -196,11 +302,69 @@ class HmiJsonTests
                     Check(Json(Invoke("CreateLimitDocument", actual.InitialMinValue) ?? new object()) ==
                         Json(Invoke("CreateLimitDocument", tag.InitialMinValue) ?? new object()), "unset tag limit");
                 }
+                foreach (var widget in allItems.OfType<HmiCustomWidgetContainer>())
+                {
+                    object expected = Invoke("CreateInterfaceDocument", widget);
+                    Invoke("ApplyInterfaceDocument", widget, expected);
+                    Check(Json(expected) == Json(Invoke("CreateInterfaceDocument", widget)), "SVG interface read-back");
+                }
                 // Deliberately never commit: every test object is rolled back.
             }
             Check(hmi.Screens.Count == screenCount && hmi.Screens.Find(name) == null, "temporary screen rolled back");
             Check(hmi.Tags.All(t => !t.Name.StartsWith("__JsonTag_", StringComparison.Ordinal)), "temporary tags rolled back");
         }
         finally { manager.Disconnect(); }
+    }
+
+    static void LibraryTests(TiaManager manager, TiaPortal portal, string target)
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "tia-library-tests-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            var exported = manager.ExportHmiJson(directory, false, false, target);
+            Check((int)exported["libraryTypeCount"] > 0, "native library definitions exported");
+            Check(File.Exists(Path.Combine(directory, (string)exported["libraryFile"])), "native archive exists");
+            string screenPath = Directory.GetFiles(Path.Combine(directory, "screens")).FirstOrDefault();
+            if (screenPath != null)
+            {
+                byte[] original = File.ReadAllBytes(screenPath);
+                File.AppendAllText(screenPath, " ");
+                string edited = File.ReadAllText(screenPath);
+                bool rejected = false;
+                try { manager.ExportHmiJson(directory, false, false, target); }
+                catch (IOException) { rejected = true; }
+                Check(rejected && File.ReadAllText(screenPath) == edited, "existing library archive rejected before overwriting JSON");
+                File.WriteAllBytes(screenPath, original);
+            }
+            Check((bool)manager.ImportHmiJson(directory, false, true, target)["dryRun"], "native archive dry-run accepted");
+            object plan = InstanceInvoke(manager, "ReadHmiJsonImportPlan", directory, true);
+            object package = InstanceInvoke(manager, "OpenHmiLibrary", plan);
+            string originalLibrary = Json(Invoke("DescribeLibraryTypes", manager.CurrentProject.ProjectLibrary.TypeFolder));
+            using ((IDisposable)package)
+            using (var access = portal.ExclusiveAccess("HMI library rollback-only regression"))
+            using (var transaction = access.Transaction(manager.CurrentProject, "HMI library regression - rollback"))
+            {
+                var library = Get(package, "Library");
+                var folder = Get(library, "TypeFolder");
+                var types = (IEnumerable)Invoke("EnumerateLibraryTypes", folder);
+                var missing = (IList)Get(package, "MissingTypes");
+                Check(missing.Count == 0, "matching versions do not need replacement");
+                var source = (Siemens.Engineering.Library.UserGlobalLibrary)library;
+                source.UpdateLibrary(types.Cast<Siemens.Engineering.Library.Types.ILibraryTypeOrFolderSelection>(),
+                    manager.CurrentProject.ProjectLibrary);
+                InstanceInvoke(manager, "ApplyHmiLibrary", package);
+                Check(true, "native library copy is supported inside project rollback transaction");
+            }
+            Check(originalLibrary == Json(Invoke("DescribeLibraryTypes", manager.CurrentProject.ProjectLibrary.TypeFolder)),
+                "project type/version inventory unchanged after rollback");
+            string archive = Path.Combine(directory, (string)exported["libraryFile"]);
+            File.AppendAllText(archive, "tampered");
+            Reject(() => InstanceInvoke(manager, "ReadHmiJsonImportPlan", directory, true), "tampered native archive hash");
+            object manifest = Get(plan, "Manifest");
+            Set(manifest, "LibraryFile", "..\\escape.zal21");
+            Reject(() => InstanceInvoke(manager, "OpenHmiLibrary", plan), "library archive traversal");
+        }
+        finally { Directory.Delete(directory, true); }
     }
 }

@@ -19,6 +19,7 @@ using Siemens.Engineering.HmiUnified.HmiTags;
 using Siemens.Engineering.HmiUnified.UI.Base;
 using Siemens.Engineering.HmiUnified.UI.Dynamization;
 using Siemens.Engineering.HmiUnified.UI.Dynamization.Tag;
+using Siemens.Engineering.HmiUnified.UI.Dynamization.Script;
 using Siemens.Engineering.HmiUnified.UI.Screens;
 using Siemens.Engineering.HmiUnified.UI.ScreenGroup;
 using Siemens.Engineering.HmiUnified.UI.Shapes;
@@ -57,7 +58,8 @@ namespace TiaOpennessMcp.Tia
             string directory,
             bool compact = true,
             bool scriptFiles = false,
-            string? targetName = null)
+            string? targetName = null,
+            bool includeLibrary = true)
         {
             EnsureProjectOpen();
             if (string.IsNullOrWhiteSpace(directory))
@@ -65,6 +67,8 @@ namespace TiaOpennessMcp.Tia
 
             var hmi = FindHmiSoftware(targetName);
             string root = Path.GetFullPath(directory);
+            if (includeLibrary && File.Exists(Path.Combine(root, "library", "HmiAssets.zal21")))
+                throw new IOException("The output library archive already exists. Export into a fresh directory.");
             string screensDirectory = Path.Combine(root, "screens");
             Directory.CreateDirectory(screensDirectory);
             List<string> languages = GetHmiLanguages(hmi);
@@ -72,7 +76,7 @@ namespace TiaOpennessMcp.Tia
                 .SelectMany(location => location.Screen.ScreenItems
                     .OfType<HmiCustomWidgetContainer>()
                     .Select(item => $"Custom widget '{location.Screen.Name}/{item.Name}' is exported without default omission; " +
-                        "its creation type is not exposed by V21. Import requires the existing widget and preserves its custom interface."))
+                        "its creation type is not exposed by V21. Import requires the existing widget; interface values are serialized."))
                 .ToList();
             var defaults = new Dictionary<string, HmiJsonItem>(StringComparer.Ordinal);
             if (compact)
@@ -111,8 +115,10 @@ namespace TiaOpennessMcp.Tia
 
             var tagFiles = new List<string>();
             int tableIndex = 0;
-            foreach (HmiTagTable table in hmi.TagTables)
+            int exportedTagCount = 0;
+            foreach (var location in EnumerateHmiTagTables(hmi.TagTables, hmi.TagTableGroups, null))
             {
+                HmiTagTable table = location.Table;
                 tableIndex++;
                 string relativeFile = NormalizeManifestPath(Path.Combine(
                     "tags", tableIndex.ToString("D4", CultureInfo.InvariantCulture) + "-" +
@@ -122,11 +128,22 @@ namespace TiaOpennessMcp.Tia
                 {
                     Format = "tia-mcp-hmi/1",
                     Table = table.Name,
-                    Tags = table.Tags.Select(CreateTagDocument).ToList()
+                    Group = location.Group,
+                    Tags = table.Tags.Select(tag =>
+                    {
+                        HmiJsonTag document = CreateTagDocument(tag);
+                        document.Table = table.Name;
+                        document.Group = location.Group;
+                        return document;
+                    }).ToList()
                 });
                 fileHashes[relativeFile] = ComputeFileHash(fullPath);
                 tagFiles.Add(relativeFile);
+                exportedTagCount += table.Tags.Count;
             }
+            if (exportedTagCount != hmi.Tags.Count)
+                throw new InvalidDataException(
+                    $"Tag table traversal exported {exportedTagCount} tags, but the target contains {hmi.Tags.Count}.");
 
             const string alarmFile = "alarms/discrete.json";
             string alarmPath = ResolveManifestPathForWrite(root, alarmFile);
@@ -161,6 +178,17 @@ namespace TiaOpennessMcp.Tia
                 fileHashes[defaultsFile] = ComputeFileHash(defaultsPath);
             }
 
+            string? libraryFile = null;
+            var libraryTypes = new List<HmiJsonLibraryType>();
+            if (includeLibrary)
+            {
+                libraryFile = "library/HmiAssets.zal21";
+                libraryTypes = ExportHmiLibrary(root, libraryFile);
+                fileHashes[libraryFile] = ComputeFileHash(ResolveManifestPath(root, libraryFile));
+            }
+            else
+                warnings.Add("Project library definitions are omitted. Faceplate and dynamic SVG types must already exist at import.");
+
             WriteJsonFile(Path.Combine(root, "manifest.json"), new HmiJsonManifest
             {
                 Format = "tia-mcp-hmi/1",
@@ -170,6 +198,8 @@ namespace TiaOpennessMcp.Tia
                 DiscreteAlarmFile = alarmFile,
                 StylesFile = stylesFile,
                 DefaultsFile = defaultsFile,
+                LibraryFile = libraryFile,
+                LibraryTypes = libraryTypes,
                 Compact = compact,
                 TiaVersion = typeof(TiaPortal).Assembly.GetName().Version?.ToString() ?? "unknown",
                 Languages = languages,
@@ -187,6 +217,8 @@ namespace TiaOpennessMcp.Tia
                 ["discreteAlarmCount"] = hmi.DiscreteAlarms.Count,
                 ["screenFiles"] = screenFiles.Select(f => f.Path).ToList(),
                 ["fileHashes"] = fileHashes,
+                ["libraryFile"] = libraryFile ?? "",
+                ["libraryTypeCount"] = libraryTypes.Count,
                 ["warnings"] = warnings
             };
         }
@@ -201,6 +233,7 @@ namespace TiaOpennessMcp.Tia
             EnsureProjectOpen();
             var hmi = FindHmiSoftware(targetName);
             HmiJsonImportPlan plan = ReadHmiJsonImportPlan(directory, verifyHashes);
+            using HmiLibraryPackage? library = OpenHmiLibrary(plan);
             ValidateHmiImportPlan(hmi, plan);
             ValidateHmiRequirements(hmi, plan.Manifest.Require);
 
@@ -210,6 +243,7 @@ namespace TiaOpennessMcp.Tia
             using (ExclusiveAccess access = _tiaPortal!.ExclusiveAccess("Import Unified HMI JSON"))
             using (Transaction transaction = access.Transaction(_project!, "Import Unified HMI JSON"))
             {
+                ApplyHmiLibrary(library);
                 var itemTypes = plan.Screens.SelectMany(s => s.Items).ToList();
                 Dictionary<string, HmiJsonItem> defaults = plan.Manifest.Compact
                     ? CreateDefaultItems(hmi, itemTypes, plan.Manifest.Languages)
@@ -391,6 +425,7 @@ namespace TiaOpennessMcp.Tia
                 Type = item.GetType().Name,
                 ContainedType = (item as HmiContainerBase)?.ContainedType,
                 Compact = item is HmiCustomWidgetContainer ? false : (bool?)null,
+                Interface = CreateInterfaceDocument(item),
                 Props = new Dictionary<string, JsonElement>(StringComparer.Ordinal),
                 Text = new Dictionary<string, JsonElement>(StringComparer.Ordinal),
                 Dynamizations = new List<HmiJsonDynamization>(),
@@ -578,6 +613,7 @@ namespace TiaOpennessMcp.Tia
                 Connection = tag.Connection,
                 PlcTag = tag.PlcTag,
                 DataType = tag.DataType,
+                Members = tag.Members.Any() ? tag.Members.Select(CreateTagMemberDocument).ToList() : null,
                 Min = CreateLimitDocument(tag.InitialMinValue),
                 Max = CreateLimitDocument(tag.InitialMaxValue)
             };
@@ -617,6 +653,44 @@ namespace TiaOpennessMcp.Tia
                 yield return tag;
         }
 
+        private static HmiJsonTagMember CreateTagMemberDocument(HmiTag tag) => new HmiJsonTagMember
+        {
+            Name = tag.Name,
+            DataType = tag.DataType,
+            Members = tag.Members.Select(CreateTagMemberDocument).ToList()
+        };
+
+        private static IEnumerable<(HmiTagTable Table, string? Group)> EnumerateHmiTagTables(
+            HmiTagTableComposition tables, HmiTagTableGroupComposition groups, string? path)
+        {
+            foreach (HmiTagTable table in tables)
+                yield return (table, path);
+            foreach (HmiTagTableGroup group in groups)
+                foreach (var location in EnumerateHmiTagTables(group.TagTables, group.Groups,
+                    path == null ? group.Name : path + "/" + group.Name))
+                    yield return location;
+        }
+
+        private static void AddTagMembers(Dictionary<string, string> tags, string parent,
+            IEnumerable<HmiJsonTagMember> members, int depth = 0)
+        {
+            if (depth > 32)
+                throw new InvalidDataException("Tag member nesting exceeds 32 levels.");
+            foreach (HmiJsonTagMember member in members)
+            {
+                if (string.IsNullOrWhiteSpace(member.Name))
+                    throw new InvalidDataException("Tag members require a name.");
+                string path = parent + "." + member.Name;
+                tags[path] = member.DataType;
+                AddTagMembers(tags, path, member.Members, depth + 1);
+            }
+        }
+
+        private static HmiTagTable? FindHmiTagTable(HmiSoftware hmi, string? table, string? group) =>
+            EnumerateHmiTagTables(hmi.TagTables, hmi.TagTableGroups, null)
+                .Where(location => location.Table.Name == table && location.Group == group)
+                .Select(location => location.Table).FirstOrDefault();
+
         private static string GetTagLookupName(string reference) =>
             System.Text.RegularExpressions.Regex.Replace(reference, @"\[(-?\d+(?:,\s*-?\d+)*)\]", "{$1}");
 
@@ -647,6 +721,18 @@ namespace TiaOpennessMcp.Tia
         {
             HmiTag? tag = hmi.Tags.Find(reference) ?? hmi.Tags.Find(GetTagLookupName(reference));
             if (tag != null) return tag;
+            string lookup = GetTagLookupName(reference);
+            for (int separator = lookup.IndexOf('.'); separator >= 0; separator = lookup.IndexOf('.', separator + 1))
+            {
+                HmiTag? parent = hmi.Tags.Find(lookup.Substring(0, separator));
+                if (parent == null) continue;
+                foreach (string part in lookup.Substring(separator + 1).Split('.'))
+                {
+                    parent = parent.Members.Find(part);
+                    if (parent == null) break;
+                }
+                if (parent != null) return parent;
+            }
             string? root = GetArrayTagRoot(reference, name => hmi.Tags.Find(name)?.DataType);
             return root == null ? null : hmi.Tags.Find(root);
         }
@@ -748,6 +834,8 @@ namespace TiaOpennessMcp.Tia
                 {
                     if (string.IsNullOrWhiteSpace(tag.Table))
                         tag.Table = file.Table;
+                    if (tag.Group == null)
+                        tag.Group = file.Group;
                     plan.Tags.Add(tag);
                 }
             }
@@ -774,6 +862,14 @@ namespace TiaOpennessMcp.Tia
                 if (verifyHashes)
                     VerifyManifestHash(root, manifest, manifest.DefaultsFile!, defaultsPath);
             }
+            if (!string.IsNullOrWhiteSpace(manifest.LibraryFile))
+            {
+                string libraryPath = ResolveManifestPath(root, manifest.LibraryFile!);
+                if (verifyHashes)
+                    VerifyManifestHash(root, manifest, manifest.LibraryFile!, libraryPath);
+            }
+            else if (manifest.LibraryTypes.Count != 0)
+                throw new InvalidDataException("libraryTypes requires a libraryFile archive.");
             ValidateUniqueNames(plan);
             return plan;
         }
@@ -810,15 +906,27 @@ namespace TiaOpennessMcp.Tia
                     throw new InvalidDataException($"Internal HMI tag '{tag.Name}' requires dataType.");
                 if (string.IsNullOrWhiteSpace(tag.Table))
                     throw new InvalidDataException($"HMI tag '{tag.Name}' requires a tag table.");
+                if (tag.Group != null && tag.Group.Split('/').Any(string.IsNullOrWhiteSpace))
+                    throw new InvalidDataException($"Tag '{tag.Name}' has an invalid tag-table group path.");
+                HmiTag? existing = hmi.Tags.Find(tag.Name);
+                if (existing != null && FindHmiTagTable(hmi, tag.Table, tag.Group)?.Tags.Find(tag.Name) == null)
+                    throw new InvalidDataException($"HMI tag '{tag.Name}' already exists in another tag table or group.");
                 ValidateLimitValue(tag.Min, tag.Name + ".min");
                 ValidateLimitValue(tag.Max, tag.Name + ".max");
             }
 
             var suppliedTags = EnumerateHmiTags(hmi).ToDictionary(t => t.Name, t => t.DataType,
                 StringComparer.OrdinalIgnoreCase);
+            foreach (HmiTag tag in EnumerateHmiTags(hmi))
+                AddTagMembers(suppliedTags, tag.Name, tag.Members.Select(CreateTagMemberDocument));
+            foreach (var tag in hmi.SystemTags)
+                suppliedTags[tag.Name] = "";
             foreach (HmiJsonTag tag in plan.Tags)
+            {
                 suppliedTags[tag.Name] = tag.DataType ??
                     (suppliedTags.TryGetValue(tag.Name, out string? existingType) ? existingType : "");
+                AddTagMembers(suppliedTags, tag.Name, tag.Members ?? Enumerable.Empty<HmiJsonTagMember>());
+            }
             foreach (HmiJsonAlarm alarm in plan.Alarms)
             {
                 if (string.IsNullOrWhiteSpace(alarm.AlarmClass) || hmi.AlarmClasses.Find(alarm.AlarmClass) == null)
@@ -860,6 +968,9 @@ namespace TiaOpennessMcp.Tia
                         throw new InvalidDataException($"Item '{screenDocument.Name}/{itemDocument.Name}' has too many properties.");
                     ValidateProperties(itemType, itemDocument.Props);
                     ValidateTexts(itemType, itemDocument.Text);
+                    if (itemDocument.Interface != null && FindOptionalProperty(itemType, "Interface") == null)
+                        throw new InvalidDataException($"Item type '{itemType.Name}' does not expose a container interface.");
+                    ValidateInterfaceDocument(itemDocument.Interface);
                     var effectiveProperties = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
                     if (itemDocument.Style != null && !string.IsNullOrWhiteSpace(itemDocument.Style))
                     {
@@ -1040,6 +1151,7 @@ namespace TiaOpennessMcp.Tia
                     var mergedProperties = ResolveStyleProperties(plan.Styles, itemDocument);
                     ApplyObjectProperties(item, mergedProperties);
                     ApplyTexts(item, itemDocument.Text, plan.Manifest.Languages);
+                    ApplyInterfaceDocument(item, itemDocument.Interface);
                     ApplyDynamizations(hmi, item, itemDocument.Dynamizations);
                     ApplyItemEvents(item, itemDocument.Events);
                 }
@@ -1072,11 +1184,22 @@ namespace TiaOpennessMcp.Tia
 
         private static void ApplyTagDocument(HmiSoftware hmi, HmiJsonTag document)
         {
+            HmiTagTableComposition tables = hmi.TagTables;
+            HmiTagTableGroupComposition groups = hmi.TagTableGroups;
+            if (!string.IsNullOrEmpty(document.Group))
+                foreach (string part in document.Group!.Split('/'))
+                {
+                    if (string.IsNullOrWhiteSpace(part))
+                        throw new InvalidDataException("Tag table group contains an empty path segment.");
+                    HmiTagTableGroup group = groups.Find(part) ?? groups.Create(part);
+                    tables = group.TagTables;
+                    groups = group.Groups;
+                }
             HmiTagTable table = string.IsNullOrWhiteSpace(document.Table)
-                ? (hmi.TagTables.Find("Default tag table") ?? hmi.TagTables.FirstOrDefault() ?? hmi.TagTables.Create("Default tag table"))
-                : (hmi.TagTables.Find(document.Table) ?? hmi.TagTables.Create(document.Table));
+                ? (tables.Find("Default tag table") ?? tables.FirstOrDefault() ?? tables.Create("Default tag table"))
+                : (tables.Find(document.Table) ?? tables.Create(document.Table));
             HmiTag tag = hmi.Tags.Find(document.Name) ?? table.Tags.Create(document.Name);
-            if (tag.TagTableName != table.Name)
+            if (!table.Tags.Any(t => t.Name == tag.Name))
                 throw new InvalidDataException(
                     $"HMI tag '{document.Name}' already exists in table '{tag.TagTableName}', not '{table.Name}'.");
             tag.Connection = document.Connection;
@@ -1489,6 +1612,27 @@ namespace TiaOpennessMcp.Tia
                 document.Type = "Expression";
                 document.ValueConverter = CreateValueConverterDocument(expression.ValueConverter);
             }
+            else if (dynamization is ScriptDynamization script)
+            {
+                document.Type = "Script";
+                if (script.Trigger.Tags is not IEnumerable<string> tags)
+                    throw new InvalidDataException($"Unsupported script trigger tag value on '{script.PropertyName}'.");
+                document.Script = new HmiJsonScriptDynamization
+                {
+                    Code = script.ScriptCode,
+                    GlobalDefinitionCode = script.GlobalDefinitionAreaScriptCode,
+                    Async = script.Async,
+                    TriggerType = script.Trigger.Type.ToString(),
+                    CustomDuration = script.Trigger.CustomDuration,
+                    Tags = tags.ToList()
+                };
+            }
+            else if (dynamization is ResourceListDynamization resource)
+            {
+                document.Type = "ResourceList";
+                document.Tag = resource.Tag;
+                document.ResourceList = resource.ResourceList;
+            }
             else
                 throw new InvalidDataException(
                     $"Cannot export unsupported dynamization '{dynamization.GetType().Name}' on '{dynamization.PropertyName}' without losing data.");
@@ -1521,6 +1665,13 @@ namespace TiaOpennessMcp.Tia
                         document.Type = "Range";
                         document.From = CreateMappingValue(range.From);
                         document.To = CreateMappingValue(range.To);
+                    }
+                    else if (entry is MappingTableEntryBitmask bitmask)
+                    {
+                        document.Type = "Bitmask";
+                        document.BitCondition = bitmask.Condition;
+                        document.Relevant = bitmask.Relevant;
+                        document.BitDynamizationType = bitmask.BitDynamizationType.ToString();
                     }
                     else
                         throw new InvalidDataException($"Unsupported mapping entry '{entry.GetType().Name}'.");
@@ -1566,17 +1717,31 @@ namespace TiaOpennessMcp.Tia
         private static void ValidateDynamizationDocument(Type itemType, HmiJsonDynamization document,
             Dictionary<string, string> suppliedTags)
         {
-            if (document.Type != "Tag" && document.Type != "Expression")
+            if (document.Type != "Tag" && document.Type != "Expression" && document.Type != "Script" &&
+                document.Type != "ResourceList")
                 throw new InvalidDataException($"Unsupported dynamization '{document.Type}'. Re-export legacy expression placeholders.");
             if (string.IsNullOrWhiteSpace(document.Property))
                 throw new InvalidDataException("Dynamization requires a property.");
             Type propertyType = FindProperty(itemType, document.Property).PropertyType;
             if (!IsSupportedValue(propertyType) && !IsMultilingualText(propertyType))
                 throw new InvalidDataException($"Unsupported dynamization property '{document.Property}' on '{itemType.Name}'.");
-            if (document.Type == "Tag" && !ContainsTagReference(suppliedTags, document.Tag))
+            if ((document.Type == "Tag" || document.Type == "ResourceList") && !ContainsTagReference(suppliedTags, document.Tag))
                 throw new InvalidDataException($"Dynamization references missing HMI tag '{document.Tag}'.");
+            if (document.Type == "ResourceList" && string.IsNullOrWhiteSpace(document.ResourceList))
+                throw new InvalidDataException("ResourceList dynamization requires a resourceList name.");
             if (document.Type == "Expression" && document.ValueConverter == null)
                 throw new InvalidDataException("Expression dynamization requires valueConverter, not a legacy export placeholder.");
+            if (document.Type == "Script")
+            {
+                HmiJsonScriptDynamization script = document.Script ??
+                    throw new InvalidDataException("Script dynamization requires script configuration.");
+                if (script.Code == null || script.GlobalDefinitionCode == null || script.CustomDuration == null ||
+                    script.Tags == null || script.Tags.Any(t => t == null))
+                    throw new InvalidDataException("Script dynamization requires code, globalDefinitionCode, customDuration and tags.");
+                var trigger = (TriggerType)ParseEnumValue(typeof(TriggerType), script.TriggerType, "script trigger type");
+                if (trigger == TriggerType.Tags && script.Tags.Any(t => !ContainsTagReference(suppliedTags, t)))
+                    throw new InvalidDataException("Script trigger references a missing HMI tag.");
+            }
             if (document.OnConflict != "fail" && document.OnConflict != "replace")
                 throw new InvalidDataException($"Unsupported onConflict '{document.OnConflict}'.");
             if (document.ValueConverter != null)
@@ -1599,6 +1764,12 @@ namespace TiaOpennessMcp.Tia
                 {
                     if (entry.From == null || entry.To == null)
                         throw new InvalidDataException("Range mapping entries require from and to values.");
+                }
+                else if (entry.Type == "Bitmask")
+                {
+                    if (!entry.BitCondition.HasValue || !entry.Relevant.HasValue)
+                        throw new InvalidDataException("Bitmask mapping entries require bitCondition and relevant unsigned 64-bit masks.");
+                    ParseEnumValue(typeof(BitDynamizationType), entry.BitDynamizationType ?? "", "bit dynamization type");
                 }
                 else
                     throw new InvalidDataException($"Unsupported mapping entry type '{entry.Type}'.");
@@ -1624,6 +1795,7 @@ namespace TiaOpennessMcp.Tia
                 entry.Delete();
             table.ConditionType = (ConditionType)ParseEnumValue(typeof(ConditionType),
                 document.ConditionType, "mapping condition type");
+            var bitmaskEntries = new Dictionary<BitDynamizationType, List<MappingTableEntryBitmask>>();
             foreach (HmiJsonMappingEntry entry in document.Entries)
             {
                 MappingTableEntryBase actual;
@@ -1640,6 +1812,22 @@ namespace TiaOpennessMcp.Tia
                     range.To = ReadMappingValue(entry.To);
                     actual = range;
                 }
+                else if (entry.Type == "Bitmask")
+                {
+                    var mode = (BitDynamizationType)ParseEnumValue(typeof(BitDynamizationType),
+                        entry.BitDynamizationType ?? "", "bit dynamization type");
+                    if (!bitmaskEntries.TryGetValue(mode, out List<MappingTableEntryBitmask>? entries))
+                    {
+                        entries = table.Entries.Create(mode).ToList();
+                        bitmaskEntries.Add(mode, entries);
+                    }
+                    var bitmask = entries.FirstOrDefault(e => e.Relevant == entry.Relevant) ??
+                        throw new InvalidDataException($"No {mode} mapping slot exists for relevant mask '{entry.Relevant}'.");
+                    entries.Remove(bitmask);
+                    bitmask.Condition = entry.BitCondition ??
+                        throw new InvalidDataException("Bitmask mapping entries require bitCondition.");
+                    actual = bitmask;
+                }
                 else
                     throw new InvalidDataException($"Unsupported mapping entry type '{entry.Type}'.");
                 if (entry.Value != null)
@@ -1651,6 +1839,8 @@ namespace TiaOpennessMcp.Tia
                     ParseEnumValue(typeof(Siemens.Engineering.HmiUnified.UI.Dynamization.Flashing.FlashingRate),
                         entry.FlashingRate, "mapping flashing rate");
             }
+            foreach (MappingTableEntryBitmask unused in bitmaskEntries.Values.SelectMany(entries => entries))
+                unused.Delete();
         }
 
         private static void ApplyDynamizations(
@@ -1668,11 +1858,14 @@ namespace TiaOpennessMcp.Tia
 
             foreach (HmiJsonDynamization document in dynamizations)
             {
-                if (document.Type != "Tag" && document.Type != "Expression")
+                if (document.Type != "Tag" && document.Type != "Expression" && document.Type != "Script" &&
+                    document.Type != "ResourceList")
                     throw new InvalidDataException($"Unsupported dynamization '{document.Type}'.");
                 DynamizationBase? existing = item.Dynamizations.Find(document.Property);
                 bool expression = document.Type == "Expression";
-                Type desiredType = expression ? typeof(ExpressionDynamization) : typeof(TagDynamization);
+                Type desiredType = document.Type == "Script" ? typeof(ScriptDynamization) :
+                    document.Type == "ResourceList" ? typeof(ResourceListDynamization) :
+                    expression ? typeof(ExpressionDynamization) : typeof(TagDynamization);
                 if (existing != null && existing.GetType() != desiredType)
                 {
                     if (!string.Equals(document.OnConflict, "replace", StringComparison.OrdinalIgnoreCase))
@@ -1680,6 +1873,32 @@ namespace TiaOpennessMcp.Tia
                             $"Refusing to replace '{existing.GetType().Name}' dynamization on '{item.Name}.{document.Property}'.");
                     existing.Delete();
                     existing = null;
+                }
+                if (document.Type == "ResourceList")
+                {
+                    var dynamization = existing as ResourceListDynamization ??
+                        item.Dynamizations.Create<ResourceListDynamization>(document.Property);
+                    dynamization.ResourceList = document.ResourceList;
+                    dynamization.Tag = document.Tag;
+                    continue;
+                }
+                if (document.Type == "Script")
+                {
+                    var dynamization = existing as ScriptDynamization ??
+                        item.Dynamizations.Create<ScriptDynamization>(document.Property);
+                    HmiJsonScriptDynamization script = document.Script ??
+                        throw new InvalidDataException("Script dynamization requires script configuration.");
+                    dynamization.Async = script.Async;
+                    dynamization.GlobalDefinitionAreaScriptCode = script.GlobalDefinitionCode;
+                    dynamization.ScriptCode = script.Code;
+                    dynamization.Trigger.Type = (TriggerType)ParseEnumValue(typeof(TriggerType),
+                        script.TriggerType, "script trigger type");
+                    if (dynamization.Trigger.CustomDuration != script.CustomDuration)
+                        dynamization.Trigger.CustomDuration = script.CustomDuration;
+                    if (dynamization.Trigger.Tags is not IEnumerable<string> existingTags ||
+                        !existingTags.SequenceEqual(script.Tags))
+                        dynamization.Trigger.Tags = script.Tags;
+                    continue;
                 }
                 ValueConverter converter;
                 if (expression)
@@ -1692,7 +1911,7 @@ namespace TiaOpennessMcp.Tia
                 {
                     TagDynamization tagDynamization = existing as TagDynamization ??
                         item.Dynamizations.Create<TagDynamization>(document.Property);
-                    if (FindReferencedTag(hmi, document.Tag) == null)
+                    if (FindReferencedTag(hmi, document.Tag) == null && !hmi.SystemTags.Any(t => t.Name == document.Tag))
                         throw new InvalidDataException($"HMI tag '{document.Tag}' does not exist.");
                     if (tagDynamization.Tag != document.Tag)
                         tagDynamization.Tag = document.Tag;
@@ -1731,6 +1950,10 @@ namespace TiaOpennessMcp.Tia
                         throw new InvalidOperationException($"Container '{screen.Name}/{itemDocument.Name}' failed contained type verification.");
                     VerifyObjectProperties(item, ResolveStyleProperties(plan.Styles, itemDocument));
                     VerifyTexts(item, itemDocument.Text, plan.Manifest.Languages);
+                    if (itemDocument.Interface != null)
+                        VerifyInterfaceProperties(CreateInterfaceDocument(item) ??
+                            throw new InvalidOperationException($"Item '{item.Name}' is missing its interface."),
+                            itemDocument.Interface, item.Name);
                     foreach (HmiJsonDynamization dynamization in itemDocument.Dynamizations)
                     {
                         var actual = item.Dynamizations.Find(dynamization.Property);
@@ -1757,12 +1980,16 @@ namespace TiaOpennessMcp.Tia
             foreach (HmiJsonTag expected in plan.Tags)
             {
                 HmiTag? actual = hmi.Tags.Find(expected.Name);
-                if (actual == null || actual.TagTableName != expected.Table ||
+                if (actual == null || FindHmiTagTable(hmi, expected.Table, expected.Group)?.Tags.Find(expected.Name) == null ||
                     actual.Connection != expected.Connection || actual.PlcTag != expected.PlcTag ||
                     expected.DataType != null && actual.DataType != expected.DataType ||
                     !AreNullableJsonValuesEqual(CreateLimitDocument(actual.InitialMinValue), expected.Min) ||
                     !AreNullableJsonValuesEqual(CreateLimitDocument(actual.InitialMaxValue), expected.Max))
                     throw new InvalidOperationException($"HMI tag '{expected.Name}' failed read-back verification.");
+                if (expected.Members != null && !AreJsonValuesEqual(
+                    JsonSerializer.SerializeToElement(actual.Members.Select(CreateTagMemberDocument).ToList(), HmiJsonOptions),
+                    JsonSerializer.SerializeToElement(expected.Members, HmiJsonOptions)))
+                    throw new InvalidOperationException($"HMI tag '{expected.Name}' failed structured member verification.");
             }
             foreach (HmiJsonAlarm expected in plan.Alarms)
             {
@@ -2024,6 +2251,8 @@ namespace TiaOpennessMcp.Tia
                 ["itemCount"] = plan.Screens.Sum(s => s.Items.Count),
                 ["tagCount"] = plan.Tags.Count,
                 ["discreteAlarmCount"] = plan.Alarms.Count,
+                ["libraryTypeCount"] = plan.Manifest.LibraryTypes.Count,
+                ["libraryVersionCount"] = plan.Manifest.LibraryTypes.Sum(t => t.Versions.Count),
                 ["saved"] = false
             };
             if (compilation != null)
@@ -2192,6 +2421,8 @@ namespace TiaOpennessMcp.Tia
             public string DiscreteAlarmFile { get; set; } = "alarms/discrete.json";
             public string? StylesFile { get; set; }
             public string? DefaultsFile { get; set; }
+            public string? LibraryFile { get; set; }
+            public List<HmiJsonLibraryType> LibraryTypes { get; set; } = new List<HmiJsonLibraryType>();
             public bool Compact { get; set; } = true;
             public SortedDictionary<string, string> FileHashes { get; set; } =
                 new SortedDictionary<string, string>(StringComparer.Ordinal);
@@ -2233,6 +2464,7 @@ namespace TiaOpennessMcp.Tia
             public string Name { get; set; } = "";
             public string Type { get; set; } = "";
             public string? ContainedType { get; set; }
+            public List<HmiJsonInterfaceProperty>? Interface { get; set; }
             public bool? Compact { get; set; }
             public string? Style { get; set; }
             public Dictionary<string, JsonElement> Props { get; set; } =
@@ -2247,6 +2479,7 @@ namespace TiaOpennessMcp.Tia
         {
             public string Format { get; set; } = "";
             public string Table { get; set; } = "";
+            public string? Group { get; set; }
             public List<HmiJsonTag> Tags { get; set; } = new List<HmiJsonTag>();
         }
 
@@ -2254,6 +2487,8 @@ namespace TiaOpennessMcp.Tia
         {
             public string Name { get; set; } = "";
             public string? Table { get; set; }
+            public string? Group { get; set; }
+            public List<HmiJsonTagMember>? Members { get; set; }
             public string? Connection { get; set; }
             public string? PlcTag { get; set; }
             public string? DataType { get; set; }
@@ -2261,6 +2496,13 @@ namespace TiaOpennessMcp.Tia
             public JsonElement? Min { get; set; }
             [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
             public JsonElement? Max { get; set; }
+        }
+
+        private sealed class HmiJsonTagMember
+        {
+            public string Name { get; set; } = "";
+            public string DataType { get; set; } = "";
+            public List<HmiJsonTagMember> Members { get; set; } = new List<HmiJsonTagMember>();
         }
 
         private sealed class HmiJsonAlarmFile
@@ -2289,6 +2531,18 @@ namespace TiaOpennessMcp.Tia
             public bool UseIndirectAddressing { get; set; }
             public string? OnConflict { get; set; } = "fail";
             public HmiJsonValueConverter? ValueConverter { get; set; }
+            public HmiJsonScriptDynamization? Script { get; set; }
+            public string? ResourceList { get; set; }
+        }
+
+        private sealed class HmiJsonScriptDynamization
+        {
+            public string Code { get; set; } = "";
+            public string GlobalDefinitionCode { get; set; } = "";
+            public bool Async { get; set; }
+            public string TriggerType { get; set; } = "";
+            public string CustomDuration { get; set; } = "";
+            public List<string> Tags { get; set; } = new List<string>();
         }
 
         private sealed class HmiJsonValueConverter
@@ -2302,6 +2556,9 @@ namespace TiaOpennessMcp.Tia
         private sealed class HmiJsonMappingEntry
         {
             public string Type { get; set; } = "";
+            public ulong? BitCondition { get; set; }
+            public ulong? Relevant { get; set; }
+            public string? BitDynamizationType { get; set; }
             public string? Condition { get; set; }
             public HmiJsonMappingValue? From { get; set; }
             public HmiJsonMappingValue? To { get; set; }

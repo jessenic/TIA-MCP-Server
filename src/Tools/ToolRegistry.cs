@@ -495,6 +495,7 @@ namespace TiaOpennessMcp.Tools
                     schema.Properties["output_directory"] = new ToolProperty { Type = "string", Description = "Directory to write the hmi/<Target> JSON export." };
                     schema.Properties["compact"] = new ToolProperty { Type = "boolean", Description = "Omit item properties equal to their TIA-created type defaults (default: true)." };
                     schema.Properties["script_files"] = new ToolProperty { Type = "boolean", Description = "Write event scripts into .js sidecar files instead of inline JSON strings (default: false)." };
+                    schema.Properties["include_library"] = new ToolProperty { Type = "boolean", Description = "Package the complete project type library, including faceplates, dynamic SVG definitions and PLC type dependencies, in a hashed V21 .zal21 archive (default: true). Requires committed library versions." };
                     schema.Properties["target_name"] = new ToolProperty { Type = "string", Description = "Target HMI software/device selector (optional when only one target exists)." };
                     schema.Required = new List<string> { "output_directory" };
                 },
@@ -504,7 +505,8 @@ namespace TiaOpennessMcp.Tools
                     bool compact = GetBoolProp(args, "compact", true);
                     bool scriptFiles = GetBoolProp(args, "script_files", false);
                     string? target = GetStringProp(args, "target_name");
-                    return CallToolResult.Json(TiaManager.Instance.ExportHmiJson(directory, compact, scriptFiles, target));
+                    return CallToolResult.Json(TiaManager.Instance.ExportHmiJson(directory, compact, scriptFiles, target,
+                        GetBoolProp(args, "include_library", true)));
                 });
 
             Register("hmi_render_json", "Render exported Unified HMI JSON offline to lossless PNG previews, numbered layout overlays and geometry/warnings reports. Resolves static nested screen windows; never connects to TIA or executes scripts. Complex controls use explicit placeholders.",
