@@ -1,0 +1,30 @@
+{
+  "name": "hmi_read_export_file",
+  "description": "Read a staged HMI JSON export file in bounded Base64 chunks.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "chunk_bytes": {
+        "description": "Maximum bytes to return (default: 262144; maximum: 524288).",
+        "type": "integer"
+      },
+      "offset": {
+        "description": "Byte offset; use nextOffset from the previous response.",
+        "type": "integer"
+      },
+      "relative_path": {
+        "description": "Relative export file path, such as manifest.json or screens/0001-Main.json.",
+        "type": "string"
+      },
+      "transfer_id": {
+        "description": "Transfer ID returned by hmi_export_json.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "transfer_id",
+      "relative_path"
+    ],
+    "type": "object"
+  }
+}

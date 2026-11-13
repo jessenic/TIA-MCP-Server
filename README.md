@@ -4,13 +4,13 @@
 [![Simulation](https://img.shields.io/badge/Simulation-S7--PLCSIM%20Advanced%20V8.0-008080.svg)](https://support.industry.siemens.com)
 [![Protocol](https://img.shields.io/badge/MCP-2024--11--05-blue.svg)](https://modelcontextprotocol.io)
 [![Runtime](https://img.shields.io/badge/.NET%20Framework-4.8%20x64-512BD4.svg)](https://dotnet.microsoft.com)
-[![Version](https://img.shields.io/badge/Version-v0.0.2-blue.svg)](release/release0.0.2.zip)
-[![Tools](https://img.shields.io/badge/Tools-68%20Registered-brightgreen.svg)](#complete-tools-reference-dictionary-68-tools)
+[![Version](https://img.shields.io/badge/Version-v2.4.0-blue.svg)](#version-history--bug-fixes)
+[![Tools](https://img.shields.io/badge/Tools-81%20Registered-brightgreen.svg)](#complete-tools-reference-dictionary-81-tools)
 [![License](https://img.shields.io/badge/License-MIT-orange.svg)](LICENSE)
 
 A high-performance, persistent **Model Context Protocol (MCP)** server providing AI coding agents (such as **Google Antigravity**, **Claude Desktop**, **Cursor**, and **VS Code**) with direct programmatic control over **Siemens TIA Portal V21** and **S7-PLCSIM Advanced V8.0**.
 
-Equipped with **68 specialized industrial automation tools**, this server bridges generative AI with deterministic industrial hardware and software—enabling automated PLC logic authoring, model-based architecture ingestion (Draw.io / PlantUML / Mermaid), automated design-to-HMI pipelines (Figma to WinCC Unified), live simulation memory I/O, and automated Hardware-in-the-Loop (HIL) sequence verification with telemetry report generation.
+Equipped with **81 specialized industrial automation tools**, this server bridges generative AI with deterministic industrial hardware and software—enabling automated PLC logic authoring, model-based architecture ingestion (Draw.io / PlantUML / Mermaid), automated design-to-HMI pipelines (Figma to WinCC Unified), live simulation memory I/O, and automated Hardware-in-the-Loop (HIL) sequence verification with telemetry report generation.
 
 ---
 
@@ -69,7 +69,7 @@ flowchart TD
     subgraph SERVER["⚡ TiaOpennessMcp Server (Persistent Daemon)"]
         TransportStdio["MCP stdio Handler<br/>Framing & JSON-RPC"]
         TransportHttp["HTTP / SSE Engine<br/>Port 5001"]
-        ToolRegistry["Tool Registry<br/>68 Industrial Automation Tools"]
+        ToolRegistry["Tool Registry<br/>80 Industrial Automation Tools"]
         TiaMgr["TiaManager (Singleton)<br/>Openness COM Bridge"]
         PlcSimMgr["PlcSimManager (Singleton)<br/>PLCSIM API V8.0 Bridge"]
     end
@@ -109,33 +109,35 @@ flowchart TD
     PlcSimMgr --> SIM
 ```
 
-### 1. TIA Portal Core & PLC Engineering (19 Tools)
+### 1. TIA Portal Core & PLC Engineering (20 Tools)
 - **Lifecycle & Instances**: Discover running PIDs (`tia_list_processes`), attach silently (`tia_connect`), open projects headless or with GUI (`tia_open_project`), save (`tia_save_project`), and close (`tia_close_project`).
 - **Hardware Topology**: Inspect racks, subnets, slots, CPU modules, and distributed I/O stations (`tia_list_devices`, `tia_get_device_tree`).
-- **Software Logic & Blocks**: Enumerate blocks with language and consistency state (`tia_list_blocks`), export block code as SimaticML XML with extracted SCL (`tia_get_block_code`), import/overwrite logic (`tia_import_block`), and delete obsolete blocks (`tia_delete_block`).
+- **Software Logic & Blocks**: Enumerate blocks with language and consistency state (`tia_list_blocks`), export block code as SimaticML XML with extracted SCL (`tia_get_block_code`), import/overwrite SimaticML (`tia_import_block`), import complete SCL source (`tia_import_scl_block`), and delete obsolete blocks (`tia_delete_block`). SCL replacement backs up and deletes the old block before importing; failed imports attempt restoration, while compile errors are reported without rollback.
 - **Data Types & Tags**: Author User Data Types (`tia_list_plc_types`, `tia_import_plc_type`) and manage tag tables (`tia_list_tag_tables`, `tia_get_tags`).
 - **Native Diagnostics**: Compile software containers via `ICompilable` and return exact error messages, line numbers, and warnings (`tia_compile`).
 
-### 2. WinCC Unified HMI Engineering (35 Tools)
+### 2. WinCC Unified HMI Engineering (37 Tools)
 - **Screen Management**: Create and delete Unified screens, and list or target screens recursively through nested screen groups (`hmi_list_screens`, `hmi_create_screen`, `hmi_delete_screen`).
 - **Widgets & UI Elements**: Programmatically position labels with HTML typography (`hmi_add_label`), pushbuttons (`hmi_add_button`), tag-bound toggle switches (`hmi_add_toggle_switch`), geometric shapes (`hmi_add_shape`), and process I/O fields (`hmi_add_io_field`).
 - **Discrete Alarms**: Create or update discrete alarms with validated trigger tags, alarm classes, trigger modes, and multilingual event text (`hmi_create_discrete_alarm`).
 - **Range Dynamization**: Dynamize properties (e.g. `BackColor`, font color) to integer/real tags using `ConditionType.Range` (`hmi_set_tag_dynamization`).
+- **Mapping Entry Updates**: Update an existing tag or expression dynamization entry's value, alternate value, or flashing settings in place (`hmi_update_dynamization_entry`).
+- **Expression Condition Rows**: Replace ordered Expressions-tab conditions and their typed property values in place (`hmi_set_expression_dynamization_entries`).
 - **In-Place Script Updates**: Safely update button JavaScript handlers in-place without deleting or disrupting layout coordinates (`hmi_update_button_scripts`).
-- **JSON-Based HMI Engineering**: Export, import, and patch screens, tags, and discrete alarms using versioned `tia-mcp-hmi/1` JSON files (`hmi_export_json`, `hmi_import_json`, `hmi_patch_json`). Imports are transactional, verified, compiled, and never save the project.
+- **JSON-Based HMI Engineering**: Export, import, and patch screens, tags, and discrete alarms using versioned `tia-mcp-hmi/1` JSON files (`hmi_export_json`, `hmi_read_export_file`, `hmi_begin_import`, `hmi_upload_import_file`, `hmi_import_json`, `hmi_patch_json`). Remote clients can transfer files through bounded Base64 chunks. Imports are transactional, verified, compiled, and never save the project.
 - **Communication & Text Lists**: Create device-level text lists (`hmi_create_text_list`), export text lists (`hmi_export_text_lists`), and establish HMI-to-PLC communication links (`hmi_create_connection`).
 - **Compile Diagnostics**: Full Unified runtime compilation diagnostics with item-level error reporting (`hmi_compile`).
 
 HMI JSON exports are organized as `manifest.json`, `screens/`, `tags/`, `alarms/discrete.json`, and optional shared `styles.json`. File hashes are verified by default on import; use `verify_hashes: false` only when intentionally editing exported files without updating their manifest hashes. Imports support a dry run and optional item pruning; patch files support guarded set/bind/delete operations and verification requirements.
 
-Tag and Expression dynamizations preserve value converters and typed Simple/Range mappings.
+Tag and Expression dynamizations preserve value converters and typed Simple/Range/Bitmask mappings.
 Faceplates retain their contained-type identity; internal tags retain their data type and unset limits.
 Faceplate and custom-widget interface values are serialized as typed `interface` entries.
 Custom widgets export supported full properties but must already exist when importing; their
 creation identity and complex control compositions are not serialized. Inspect manifest warnings;
 the JSON export is not a complete project backup. Tag, Expression, Script, and
 ResourceList dynamizations are serialized. Bitmask mappings preserve their unsigned
-64-bit masks and SingleBit/MultiBit mode. Script dynamizations retain code, global
+64-bit `condition`/`relevant` masks and SingleBit/MultiBit mode. Script dynamizations retain code, global
 definitions, async mode and trigger settings; referenced resource lists must already
 exist on import. Unsupported dynamizations and tag-based limits fail explicitly.
 
@@ -339,7 +341,7 @@ stateDiagram-v2
 
 ---
 
-## Complete Tools Reference Dictionary (68 Tools)
+## Complete Tools Reference Dictionary (81 Tools)
 
 | # | Tool Name | Category | Primary Parameters | Description |
 |:---:|:---|:---:|:---|:---|
@@ -357,6 +359,7 @@ stateDiagram-v2
 | 12 | `tia_list_blocks` | PLC Logic | `plc_name`, `block_type`, `folder` | Enumerate OB, FB, FC, and DB blocks with language & status. |
 | 13 | `tia_get_block_code` | PLC Logic | `block_name`, `plc_name` | Export block as SimaticML XML & extract SCL. |
 | 14 | `tia_import_block` | PLC Logic | `xml_content`, `plc_name`, `overwrite` | Import or update block logic via SimaticML XML. |
+| 14a | `tia_import_scl_block` | PLC Logic | `scl_code`, `plc_name`, `folder`, `compile_after_import`, `open_after_import` | Import a complete SCL block; replacement uses backup/delete/reimport with restore on import failure. |
 | 15 | `tia_delete_block` | PLC Logic | `block_name`, `plc_name` | Delete a PLC program block. |
 | 16 | `tia_list_plc_types` | Data Types | `plc_name` | List all User Data Types (UDTs). |
 | 17 | `tia_get_plc_type` | Data Types | `type_name`, `plc_name` | Export UDT definition as SimaticML XML. |
@@ -374,43 +377,54 @@ stateDiagram-v2
 | 29 | `hmi_add_shape` | HMI Widget | `screen_name`, `type`, `width`, `height` | Add rectangle or circle with border and fill styling. |
 | 30 | `hmi_add_io_field` | HMI Widget | `screen_name`, `name`, `process_value_tag` | Add numeric/string Input-Output field bound to tag. |
 | 31 | `hmi_set_tag_dynamization`| HMI Logic | `screen_name`, `item_name`, `ranges` | Bind property (e.g. `BackColor`) to tag using Range entries. |
-| 32 | `hmi_update_button_scripts`| HMI Logic | `screen_name`, `button_name`, `script` | Update existing button scripts **in-place** with JS validation. |
-| 33 | `hmi_list_tag_tables` | HMI Tags | `target_name` (opt) | List HMI tag tables. |
-| 34 | `hmi_list_tags` | HMI Tags | `table_name` | List HMI tags with data types and connection bindings. |
-| 35 | `hmi_create_tag` | HMI Tags | `table_name`, `tag_name`, `connection` | Create HMI tag mapped to PLC address. |
-| 36 | `hmi_create_discrete_alarm` | HMI Alarms | `alarm_name`, `alarm_class`, `raised_state_tag`, `text` | Create a discrete alarm from an existing HMI trigger tag. |
-| 37 | `hmi_update_tag_acquisition_cycles` | HMI Tags | `tags` | Configure acquisition cycle rate (e.g. 100ms, 1s). |
-| 38 | `hmi_set_tag_range` | HMI Tags | `table_name`, `tag_name`, `min`, `max` | Configure linear limits and scaling. |
-| 39 | `hmi_create_data_log` | HMI Logging | `log_name`, `max_size_mb` | Create historical circular data log. |
-| 40 | `hmi_assign_logging_tags` | HMI Logging | `log_name`, `tag_names` | Assign process tags to historical archive. |
-| 41 | `hmi_list_connections` | HMI Comm | `device_name` (opt) | Enumerate all configured HMI communication links. |
-| 42 | `hmi_create_connection` | HMI Comm | `connection_name`, `plc_device_name` | Create a communication link between HMI and PLC. |
-| 43 | `hmi_delete_connection` | HMI Comm | `connection_name` | Remove an HMI communication link. |
-| 44 | `hmi_list_text_lists` | HMI Text | `device_name` (opt) | Enumerate all text and graphic lists. |
-| 45 | `hmi_create_text_list` | HMI Text | `name`, `list_type`, `entries` | Create value or range text list (e.g. status decoders). |
-| 46 | `hmi_delete_text_list` | HMI Text | `name` | Remove a text list. |
-| 47 | `hmi_export_text_lists` | HMI Text | `destination_folder`, `base_filename`| Export text lists to `.hmi.yml` files. |
-| 48 | `hmi_compile` | Compilation | `target_name` | Compile WinCC Unified runtime with diagnostics. |
-| 49 | `tia_list_tag_tables` | PLC Tags | `plc_name` | List PLC tag tables. |
-| 50 | `tia_get_tags` | PLC Tags | `table_name`, `plc_name` | Read PLC tags with `%I`, `%Q`, `%M` addresses. |
-| 51 | `hmi_export_json` | HMI JSON | `output_directory`, `compact`, `script_files`, `include_library`, `target_name` | Export hashed JSON and native faceplate/SVG library definitions. |
-| 52 | `hmi_import_json` | HMI JSON | `input_directory`, `prune_items`, `dry_run`, `verify_hashes`, `target_name` | Validate and transactionally import HMI JSON; compile without saving. |
-| 53 | `hmi_patch_json` | HMI JSON | `file_path`, `dry_run`, `target_name` | Apply a guarded JSON patch to Unified HMI objects. |
-| 54 | `tia_testsuite_list_tests`| TestSuite | `plc_name` | List configured Siemens TestSuite test cases. |
-| 55 | `tia_testsuite_load_test` | TestSuite | `file_path` | Import or reload `.tat` rule file with override. |
-| 56 | `plcsim_list_instances` | Simulation | *(none)* | List all registered S7-PLCSIM Advanced instances. |
-| 57 | `plcsim_connect` | Simulation | `instance_name` (default `"PLC_1"`) | Connect to S7-PLCSIM Advanced and cache symbolic tags. |
-| 58 | `plcsim_disconnect` | Simulation | *(none)* | Detach from active PLCSIM instance. |
-| 59 | `plcsim_get_status` | Simulation | *(none)* | Real-time status (Run/Stop, scale factor, tag counts). |
-| 60 | `plcsim_set_operating_state` | Simulation | `state` (`"Run"`, `"Stop"`, `"MemoryReset"`) | Switch virtual controller operating state. |
-| 61 | `plcsim_set_scale_factor` | Simulation | `scale_factor` (e.g. `2.0`) | Scale simulation clock to speed up execution. |
-| 62 | `plcsim_read_tag` | Live I/O | `tag_name` | Read live DB, I, Q, or M variable by symbolic name. |
-| 63 | `plcsim_write_tag` | Live I/O | `tag_name`, `value` | Write live value to variable in virtual PLC memory. |
-| 64 | `plcsim_read_tags` | Live I/O | `tag_names` | Bulk read multiple variables in a single call. |
-| 65 | `plcsim_write_tags` | Live I/O | `tags` (key-value object) | Bulk write multiple variables in a single call. |
-| 66 | `plcsim_run_sequence` | Verification | `start_command_tag`, `step_number_tag`, `done_tag`, ... | Universal automated sequence testing for any state machine. |
-| 67 | `plcsim_run_mixing_sequence`| Verification | Recipe parameters, `scale_factor` | Automated multi-parameter batch testing runner. |
-| 68 | `hmi_render_json` | HMI Preview | `input_directory`, `output_directory`, `screen_name`, `language`, `scale` | Offline PNGs, numbered overlays, and layout reports with nested screens. |
+| 32 | `hmi_update_dynamization_entry` | HMI Logic | `screen_name`, `item_name`, `property_name`, `entry_index` | Update selected mapping-entry values or flashing settings in place. |
+| 33 | `hmi_update_button_scripts`| HMI Logic | `screen_name`, `button_name`, `script` | Update existing button scripts **in-place** with JS validation. |
+| 34 | `hmi_list_tag_tables` | HMI Tags | `target_name` (opt) | List HMI tag tables. |
+| 35 | `hmi_list_tags` | HMI Tags | `table_name` | List HMI tags with data types and connection bindings. |
+| 36 | `hmi_create_tag` | HMI Tags | `table_name`, `tag_name`, `connection` | Create HMI tag mapped to PLC address. |
+| 37 | `hmi_create_discrete_alarm` | HMI Alarms | `alarm_name`, `alarm_class`, `raised_state_tag`, `text` | Create a discrete alarm from an existing HMI trigger tag. |
+| 38 | `hmi_update_tag_acquisition_cycles` | HMI Tags | `tags` | Configure acquisition cycle rate (e.g. 100ms, 1s). |
+| 39 | `hmi_set_tag_range` | HMI Tags | `table_name`, `tag_name`, `min`, `max` | Configure linear limits and scaling. |
+| 40 | `hmi_create_data_log` | HMI Logging | `log_name`, `max_size_mb` | Create historical circular data log. |
+| 41 | `hmi_assign_logging_tags` | HMI Logging | `log_name`, `tag_names` | Assign process tags to historical archive. |
+| 42 | `hmi_list_connections` | HMI Comm | `device_name` (opt) | Enumerate all configured HMI communication links. |
+| 43 | `hmi_create_connection` | HMI Comm | `connection_name`, `plc_device_name` | Create a communication link between HMI and PLC. |
+| 44 | `hmi_delete_connection` | HMI Comm | `connection_name` | Remove an HMI communication link. |
+| 45 | `hmi_list_text_lists` | HMI Text | `device_name` (opt) | Enumerate all text and graphic lists. |
+| 46 | `hmi_create_text_list` | HMI Text | `name`, `list_type`, `entries` | Create value or range text list (e.g. status decoders). |
+| 47 | `hmi_delete_text_list` | HMI Text | `name` | Remove a text list. |
+| 48 | `hmi_export_text_lists` | HMI Text | `destination_folder`, `base_filename`| Export text lists to `.hmi.yml` files. |
+| 49 | `hmi_compile` | Compilation | `target_name` | Compile WinCC Unified runtime with diagnostics. |
+| 50 | `tia_list_tag_tables` | PLC Tags | `plc_name` | List PLC tag tables. |
+| 51 | `tia_get_tags` | PLC Tags | `table_name`, `plc_name` | Read PLC tags with `%I`, `%Q`, `%M` addresses. |
+| 52 | `hmi_export_json` | HMI JSON | `output_directory` (optional), `compact`, `script_files`, `include_library`, `target_name` | Export hashed JSON and native faceplate/SVG library definitions; omit destination for remote transfer. |
+| — | `hmi_read_export_file` | HMI JSON | `transfer_id`, `relative_path`, `offset`, `chunk_bytes` | Fetch a staged export file in bounded Base64 chunks. |
+| — | `hmi_begin_import` | HMI JSON | *(none)* | Create a staged remote HMI JSON import. |
+| — | `hmi_upload_import_file` | HMI JSON | `transfer_id`, `relative_path`, `content_base64`, `offset`, `total_bytes` | Upload a file in bounded sequential Base64 chunks. |
+| 53 | `hmi_import_json` | HMI JSON | `input_directory` or `transfer_id`, `prune_items`, `dry_run`, `verify_hashes`, `target_name` | Validate and transactionally import HMI JSON; compile without saving. |
+| 54 | `hmi_patch_json` | HMI JSON | `file_path`, `dry_run`, `target_name` | Apply a guarded JSON patch to Unified HMI objects. |
+| 55 | `tia_testsuite_list_tests`| TestSuite | `plc_name` | List configured Siemens TestSuite test cases. |
+| 56 | `tia_testsuite_load_test`| TestSuite | `file_path` | Import or reload `.tat` rule file with override. |
+| 57 | `plcsim_list_instances` | Simulation | *(none)* | List all registered S7-PLCSIM Advanced instances. |
+| 58 | `plcsim_connect` | Simulation | `instance_name` (default `"PLC_1"`) | Connect to S7-PLCSIM Advanced and cache symbolic tags. |
+| 59 | `plcsim_disconnect` | Simulation | *(none)* | Detach from active PLCSIM instance. |
+| 60 | `plcsim_get_status` | Simulation | *(none)* | Real-time status (Run/Stop, scale factor, tag counts). |
+| 61 | `plcsim_set_operating_state` | Simulation | `state` (`"Run"`, `"Stop"`, `"MemoryReset"`) | Switch virtual controller operating state. |
+| 62 | `plcsim_set_scale_factor` | Simulation | `scale_factor` (e.g. `2.0`) | Scale simulation clock to speed up execution. |
+| 63 | `plcsim_read_tag` | Live I/O | `tag_name` | Read live DB, I, Q, or M variable by symbolic name. |
+| 64 | `plcsim_write_tag` | Live I/O | `tag_name`, `value` | Write live value to variable in virtual PLC memory. |
+| 65 | `plcsim_read_tags` | Live I/O | `tag_names` | Bulk read multiple variables in a single call. |
+| 66 | `plcsim_write_tags` | Live I/O | `tags` (key-value object) | Bulk write multiple variables in a single call. |
+| 67 | `plcsim_run_sequence` | Verification | `start_command_tag`, `step_number_tag`, `done_tag`, ... | Universal automated sequence testing for any state machine. |
+| 68 | `plcsim_run_mixing_sequence`| Verification | Recipe parameters, `scale_factor` | Automated multi-parameter batch testing runner. |
+| 69 | `hmi_render_json` | HMI Preview | `input_directory`, `output_directory`, `screen_name`, `language`, `scale` | Offline PNGs, numbered overlays, and layout reports with nested screens. |
+| 73 | `hmi_get_screen_item` | HMI Screen | `screen_name`, `item_name` | Read all supported properties, event scripts, and full dynamization state for one item. |
+| 74 | `hmi_update_screen_item` | HMI Screen | `screen_name`, `item_name`, `item_properties` | Update allowlisted item properties in place and verify readback. |
+| 75 | `hmi_read_event_scripts` | HMI Logic | `screen_name`, `item_name` (opt) | Read screen or item event scripts and supported event names. |
+| 76 | `hmi_set_event_script` | HMI Logic | `screen_name`, `event_type`, `script`, `item_name` (opt) | Create or update one screen/item event script in place. |
+| 77 | `hmi_set_expression_dynamization` | HMI Logic | `screen_name`, `item_name`, `property_name`, `expression`, `result_type` | Set an expression formula while preserving existing mappings and other dynamizations. |
+| 78 | `hmi_get_js_type_definitions` | HMI Logic | *(none)* | Return the server-bundled, documented subset of WinCC Unified JavaScript declarations. |
+| 79 | `hmi_set_expression_dynamization_entries` | HMI Logic | `screen_name`, `item_name`, `property_name`, `entries` | Replace ordered condition/value rows for one expression dynamization. |
 
 ---
 
@@ -577,7 +591,7 @@ Open or create your Antigravity MCP configuration file at:
 *(Replace `C:\\path\\to\\TIA-MCP-Server\\release` with your actual absolute path using escaped backslashes `\\`)*.
 
 #### B. Tool Schema Registration (Lazy Loading)
-To enable Antigravity to lazy-load all 68 tools on demand, copy the JSON schemas from the repository's `schemas/` folder into your Antigravity MCP directory:
+To enable Antigravity to lazy-load all 78 tools on demand, copy the JSON schemas from the repository's `schemas/` folder into your Antigravity MCP directory:
 ```powershell
 New-Item -ItemType Directory -Path "$env:USERPROFILE\.gemini\antigravity\mcp\tia-portal-v21" -Force
 Copy-Item -Path ".\schemas\*.json" -Destination "$env:USERPROFILE\.gemini\antigravity\mcp\tia-portal-v21\" -Force
@@ -625,7 +639,7 @@ Launch Claude Code and check registered tools:
 claude
 > /mcp
 ```
-All 68 tools (`tia_*`, `hmi_*`, `plcsim_*`) will appear in the active MCP tools list. You can immediately ask:
+All 78 tools (`tia_*`, `hmi_*`, `plcsim_*`) will appear in the active MCP tools list. You can immediately ask:
 > *"Inspect the device tree of the active PLC and compile the software."*
 
 ---
@@ -643,7 +657,7 @@ All 68 tools (`tia_*`, `hmi_*`, `plcsim_*`) will appear in the active MCP tools 
   }
 }
 ```
-Restart Claude Desktop. The hammer icon (🛠️) in the input bar will display all 68 tools.
+Restart Claude Desktop. The hammer icon (🛠️) in the input bar will display all 78 tools.
 
 ---
 
@@ -682,6 +696,7 @@ To run the server as a persistent HTTP/SSE service accessible across multiple ag
 - **MCP Endpoint**: `POST http://localhost:5001/mcp`
 - **Server-Sent Events (SSE)**: `GET http://localhost:5001/sse`
 - **Health & Telemetry**: `GET http://localhost:5001/status`
+- **Console diagnostics**: HTTP method/path, response status and duration, JSON-RPC methods, and tool execution progress are logged to stderr. Timeouts and request/tool errors are logged as they occur. Query strings and request bodies are omitted by default; to log them, set `"logHttpRequestDetails": true` in the `server` section of `config.json`. This can expose session IDs, credentials, PLC values, and project data in console logs.
 
 ---
 
@@ -712,7 +727,7 @@ Options:
   --pid <pid>                            Attach to specific TIA Portal process ID
   --config <path>, -c <path>             Load specific config.json file
   --test                                 Execute rapid TIA Portal connectivity test
-  --export-schemas [dir]                 Export all 68 MCP tool JSON schemas
+  --export-schemas [dir]                 Export all 80 MCP tool JSON schemas
   --render-hmi INPUT --output OUTPUT     Offline PNG/overlay/layout JSON rendering
     [--screen GROUP/NAME] [--language en-US] [--scale 2]
   --register-whitelist                   Register SHA-256 hash in Siemens AllowList
@@ -735,6 +750,33 @@ This repository includes 3 turnkey agent skills located in `.agents/skills/`:
 ---
 
 ## Version History & Bug Fixes
+
+### [v2.4.0] - 2026-11-13
+* Added `hmi_set_expression_dynamization_entries` for replacing ordered WinCC Unified condition/value rows in place with typed values, conflict checks, and read-back verification.
+* Updated the reported MCP server version and assembly metadata to v2.4.0.
+
+### [v2.3.0] - 2026-11-13
+* Added `tia_import_scl_block` for importing complete SCL source strings, with backup and restore around same-name block replacement plus optional compilation and editor opening.
+* Updated the reported MCP server version and assembly metadata to v2.3.0.
+
+### [v2.2.0] - 2026-11-12
+* Added direct, in-place HMI item property read/update tools with allowlisting and readback verification.
+* Added generic screen/item event-script read/write tools and an expression dynamization formula update tool that preserves unrelated entries.
+* Updated the reported MCP server version and assembly metadata to v2.2.0.
+
+### [v2.0.1] - 2026-11-11
+* Reuse TIA-generated Singlebit mapping entries when Openness reports they already exist during entry creation.
+* Updated the reported MCP server version and assembly metadata to v2.0.1.
+
+### [v0.0.4] - 2026-11-10
+* Added lossless HMI JSON export/import for bitmask converter entries, including the TIA-generated relevant masks.
+* Updated the reported MCP server version and assembly metadata to v0.0.4.
+* Fixed HMI JSON validation and application of dotted UDT member tag references.
+* Reused TIA-generated Singlebit mapping entries to avoid duplicate-entry errors.
+
+### [v0.0.3] - 2026-11-10
+* Added screen, item, and property context to HMI JSON export errors for unsupported dynamizations and mapping entries.
+* Updated the reported MCP server version and assembly metadata to v0.0.3.
 
 ### [v0.0.2] - 2026-10-03
 * **Fixed CI / GitHub Actions Missing Siemens Assemblies**: Resolved `The type or namespace name 'Siemens' could not be found` build failure on CI/CD runners and machines without Siemens TIA Portal pre-installed. Added reference assemblies to `src/lib/` with automatic fallback in `TiaOpennessMcp.csproj`, ensuring clean compilation on any standard Windows machine.

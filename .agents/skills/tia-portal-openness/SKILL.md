@@ -52,6 +52,7 @@ The TIA Openness MCP server operates as a persistent daemon process maintaining 
   ```json
   { "xml_content": "<Document>...", "overwrite": true }
   ```
+- **`tia_import_scl_block`**: Import a complete `FUNCTION`, `FUNCTION_BLOCK`, `ORGANIZATION_BLOCK`, or `DATA_BLOCK` from `scl_code`. Same-name blocks are replaced as whole blocks using backup/delete/reimport; import failures attempt to restore the backup. Compilation is enabled by default, and compile errors do not roll back the imported block.
 - **`tia_compile`**: Always compile after modifying PLC blocks or UDTs:
   ```json
   { "plc_name": "PLC_1" }
@@ -70,6 +71,7 @@ The TIA Openness MCP server operates as a persistent daemon process maintaining 
   { "screen_name": "Screen_2", "width": 1920, "height": 1080 }
   ```
 - **`hmi_get_screen_items`**: Inspect all widgets, shapes, text, scripts, and dynamizations on a screen.
+- **`hmi_get_js_type_definitions`**: Get the server-bundled TypeScript declaration subset for runtime APIs documented by this server. It is not the complete Siemens V21 API; see `tia://docs/hmi-javascript-type-definitions`.
 
 ### Creating Widgets & Controls
 - **`hmi_add_label`**: Add a text label or banner (text is HTML-escaped and wrapped automatically):
@@ -126,21 +128,76 @@ The TIA Openness MCP server operates as a persistent daemon process maintaining 
   ```
 
 ### Dynamization & Color Mapping
-Use **single-object dynamization** with `ConditionType.Range` instead of dual overlaid objects with visibility toggles:
-- **`hmi_set_tag_dynamization`**:
+Use **single-object dynamization** instead of dual overlaid objects with visibility toggles. Use `ConditionType.Singlebit` for Boolean tags and `ConditionType.Range` for numeric range mappings:
+- **`hmi_set_tag_dynamization`**, Boolean example:
   ```json
   {
     "screen_name": "Screen_2",
     "item_name": "circ_M101",
     "property_name": "BackColor",
     "tag_name": "HMI_MotorInfeed_RunFb",
-    "condition_type": "Range",
+    "condition_type": "Singlebit",
     "ranges": [
       { "from": 0, "to": 0, "value": "gray" },
       { "from": 1, "to": 1, "value": "green" }
     ]
   }
   ```
+
+`hmi_set_tag_dynamization` creates or replaces the whole mapping. For an existing
+dynamization where only one entry changes, use **`hmi_update_dynamization_entry`**;
+its `entry_index` is zero-based, supplied value types must match the existing entry,
+and unspecified fields and entries are preserved. Do not use the setter as a
+single-entry editor.
+```json
+{
+  "screen_name": "Screen_2",
+  "item_name": "circ_M101",
+  "property_name": "BackColor",
+  "entry_index": 1,
+  "new_value": { "type": "Color", "value": "#E80000" }
+}
+```
+
+For WinCC Unified Expressions-tab condition/value tables, use
+**`hmi_set_expression_dynamization_entries`**. Supply the complete ordered row
+list; each row contains a non-empty `condition` expression and a typed `value`
+whose type matches the target property. This replaces all rows for that
+property, so use `on_conflict: "replace"` if any dynamization already exists
+there. The tool preserves the property's default value and all unrelated
+dynamizations, then verifies the ordered readback. TIA expression syntax is not
+validated by the MCP tool, and it does not save or compile the project.
+```json
+{
+  "screen_name": "Screen_2",
+  "item_name": "btn_Position",
+  "property_name": "Top",
+  "entries": [
+    { "condition": "AND32('StatusWord', 1) != 0", "value": { "type": "Int32", "value": "500" } },
+    { "condition": "AND32('StatusWord', 2) != 0", "value": { "type": "Int32", "value": "400" } }
+  ]
+}
+```
+
+To remove only one item's dynamization for a property, use
+**`hmi_delete_dynamization`** with the screen, item, property, and optional HMI
+target. It preserves the item and all unrelated dynamizations, verifies that the
+selected dynamization is gone, and does not save the project. Do not use
+`hmi_set_tag_dynamization` with `condition_type: "None"` as a reset.
+
+For a direct dynamization edit, check `tia_get_status` and identify the HMI target
+first. Read the screen with `hmi_get_screen_items` before editing, verify the item,
+property, existing tag, condition type, and mapping entry index, then apply the
+appropriate direct tool. Do not use HMI JSON export/import for this direct workflow.
+Read the screen again to verify the resulting tag dynamization and compile with
+`hmi_compile`, passing the HMI device name as `target_device` (not the software
+target name). For detailed arguments and response shapes, read the MCP resource
+`tia://docs/tools-reference`; prefer the live tool schemas when available.
+
+For JavaScript API references, use `hmi_get_js_type_definitions` or read
+`tia://docs/hmi-javascript-type-definitions`. The bundled declarations are a
+documented subset, not the complete Siemens V21 runtime API. Do not infer
+support for APIs absent from that subset.
 
 ### In-Place Button Script Updating
 When modifying existing button functions (e.g. changing `SetBitInTag` to `InvertBitInTag` or changing target tags), **do NOT delete and recreate screen items**. Modifying items in-place preserves layouts, object order, and styles:
@@ -348,7 +405,7 @@ To get the highest quality results when prompting agents equipped with this skil
 1. **Specify Exact Target & Scope**: Include HMI software name (`HMI_RT_1`), Screen (`Screen_2`), and CPU (`PLC_1`).
 2. **State & Action Clarity**: Differentiate between toggle (`InvertBitInTag`), momentary set (`SetBitInTag`), or value writing (`SetTagValue`).
 3. **Preserve Over Recreate**: For modifications, explicitly instruct: *"Modify existing items in-place using `hmi_update_button_scripts`; do not delete screen items."*
-4. **Single-Object Dynamization**: Always specify single-object range dynamization (`ConditionType.Range`) on `BackColor` rather than overlapping visibility objects.
+4. **Single-Object Dynamization**: Use `ConditionType.Singlebit` for Boolean status tags and `ConditionType.Range` for numeric ranges on `BackColor`, rather than overlapping visibility objects.
 5. **Always Enforce Verification**: Instruct the agent to run `hmi_compile` or `tia_compile` and verify that the operation finishes with 0 errors.
 
 ---
@@ -365,5 +422,4 @@ The MCP server integrates directly with **Siemens S7-PLCSIM Advanced API V8.0** 
 
 ### 7.2 Dedicated Verification Skill
 For executing automated multi-parameter batch testing, recipe matrix comparison, and verification report artifact generation, use the companion skill:
-👉 [`.agents/skills/plcsim-sequence-tester/SKILL.md`](file:///d:/TIA_Project/_AEs/TestMCP-DDup/UserFiles/AI/.agents/skills/plcsim-sequence-tester/SKILL.md)
-
+👉 [`plcsim-sequence-tester` skill](../plcsim-sequence-tester/SKILL.md)

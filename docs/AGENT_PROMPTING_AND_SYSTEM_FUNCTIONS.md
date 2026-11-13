@@ -103,7 +103,7 @@ To maximize tool effectiveness, use the **P.A.C.T.S. Framework**:
   1. Create a background card rectangle 'rect_M101' at left: 40, top: 120, width: 340, height: 260 with back_color: '#1E293B', border_color: '#334155'.
   2. Add a title label 'lbl_M101_Title' with text 'M101 - INFEED CONVEYOR', font_size: 14, is_bold: true, fore_color: 'white'.
   3. Add a single status circle 'circ_M101_Status' at center_x: 100, center_y: 200, radius: 22.
-  4. Dynamize circ_M101_Status.BackColor using single-object range dynamization bound to tag 'HMI_MotorInfeed_RunFb' (from 0 to 0 = '#64748B' gray, from 1 to 1 = '#22C55E' green). Do not create overlapping objects.
+  4. Dynamize circ_M101_Status.BackColor using single-object Singlebit dynamization bound to Boolean tag 'HMI_MotorInfeed_RunFb' (state 0 = '#64748B' gray, state 1 = '#22C55E' green). Do not create overlapping objects.
   5. Add an InvertBit button 'btn_M101_Toggle' at left: 160, top: 185, width: 100, height: 34 calling Tags.SysFct.InvertBitInTag("HMI_MotorInfeed_Start", 0).
   6. Compile the HMI and confirm 0 errors.
   ```

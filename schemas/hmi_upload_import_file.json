@@ -1,0 +1,37 @@
+{
+  "name": "hmi_upload_import_file",
+  "description": "Upload a file to a staged HMI JSON import using sequential Base64 chunks.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {
+      "content_base64": {
+        "description": "Base64-encoded bytes for this chunk; chunks are limited to 512 KiB decoded.",
+        "type": "string"
+      },
+      "offset": {
+        "description": "Byte offset of this chunk; start at zero and use receivedBytes from the previous response.",
+        "type": "integer"
+      },
+      "relative_path": {
+        "description": "Relative file path, such as manifest.json or screens/0001-Main.json.",
+        "type": "string"
+      },
+      "total_bytes": {
+        "description": "Total decoded file size in bytes, no more than 10 MiB.",
+        "type": "integer"
+      },
+      "transfer_id": {
+        "description": "Import transfer ID returned by hmi_begin_import.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "transfer_id",
+      "relative_path",
+      "content_base64",
+      "offset",
+      "total_bytes"
+    ],
+    "type": "object"
+  }
+}

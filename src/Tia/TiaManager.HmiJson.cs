@@ -54,6 +54,360 @@ namespace TiaOpennessMcp.Tia
                 ["HmiToggleSwitch"] = typeof(HmiToggleSwitch)
             };
 
+        private static readonly HashSet<string> HmiItemPropertyUpdateAllowlist =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "Visible",
+                "Left",
+                "Top",
+                "Width",
+                "Height",
+                "CenterX",
+                "CenterY",
+                "Radius",
+                "BackColor",
+                "ForeColor",
+                "BorderColor",
+                "BorderWidth"
+            };
+
+        public object GetHmiScreenItem(string screenName, string itemName, string? targetName = null)
+        {
+            var hmi = FindHmiSoftware(targetName);
+            var screen = FindHmiScreen(hmi, screenName);
+            if (screen == null)
+                throw new InvalidOperationException($"Screen '{screenName}' not found.");
+            HmiScreenItemBase item = screen.ScreenItems.Find(itemName)
+                ?? throw new InvalidOperationException($"Item '{itemName}' not found on screen '{screenName}'.");
+
+            return JsonSerializer.SerializeToElement(
+                CreateItemDocument(item, GetHmiLanguages(hmi), screenPath: screen.Name),
+                HmiJsonOptions);
+        }
+
+        public object UpdateHmiScreenItemProperties(
+            string screenName,
+            string itemName,
+            JsonElement properties,
+            string? targetName = null)
+        {
+            if (properties.ValueKind != JsonValueKind.Object)
+                throw new InvalidDataException("item_properties must be a JSON object.");
+
+            var updates = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+            var seenProperties = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (JsonProperty update in properties.EnumerateObject())
+            {
+                if (!seenProperties.Add(update.Name))
+                    throw new InvalidDataException($"item_properties contains duplicate property '{update.Name}'.");
+                if (!HmiItemPropertyUpdateAllowlist.Contains(update.Name))
+                    throw new InvalidDataException(
+                        $"Unsupported item property '{update.Name}'. Allowed properties: " +
+                        string.Join(", ", HmiItemPropertyUpdateAllowlist.OrderBy(name => name, StringComparer.Ordinal)) + ".");
+                updates.Add(update.Name, update.Value.Clone());
+            }
+            if (updates.Count == 0)
+                throw new InvalidDataException("item_properties must contain at least one supported property.");
+
+            var hmi = FindHmiSoftware(targetName);
+            var screen = FindHmiScreen(hmi, screenName);
+            if (screen == null)
+                throw new InvalidOperationException($"Screen '{screenName}' not found.");
+            HmiScreenItemBase item = screen.ScreenItems.Find(itemName)
+                ?? throw new InvalidOperationException($"Item '{itemName}' not found on screen '{screenName}'.");
+
+            foreach (KeyValuePair<string, JsonElement> update in updates)
+            {
+                PropertyInfo property = FindProperty(item.GetType(), update.Key);
+                if (property.SetMethod?.IsPublic != true)
+                    throw new InvalidDataException($"Property '{update.Key}' is read-only on '{item.GetType().Name}'.");
+                ValidatePatchProperty(item.GetType(), update.Key, update.Value);
+            }
+
+            using (ExclusiveAccess access = _tiaPortal!.ExclusiveAccess("Update Unified HMI screen item properties"))
+            using (Transaction transaction = access.Transaction(_project!, "Update Unified HMI screen item properties"))
+            {
+                foreach (KeyValuePair<string, JsonElement> update in updates)
+                {
+                    PropertyInfo property = FindProperty(item.GetType(), update.Key);
+                    SetPropertyValue(item, property, update.Value);
+                }
+
+                VerifyObjectProperties(item, updates);
+                transaction.CommitOnDispose();
+            }
+
+            return JsonSerializer.SerializeToElement(
+                CreateItemDocument(item, GetHmiLanguages(hmi), screenPath: screen.Name),
+                HmiJsonOptions);
+        }
+
+        public object SetExpressionDynamization(
+            string screenName,
+            string itemName,
+            string propertyName,
+            string expression,
+            string resultType,
+            string onConflict = "fail",
+            string? targetName = null)
+        {
+            if (string.IsNullOrWhiteSpace(expression))
+                throw new ArgumentException("expression must not be empty.", nameof(expression));
+            if (!string.Equals(onConflict, "fail", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(onConflict, "replace", StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException("on_conflict must be 'fail' or 'replace'.", nameof(onConflict));
+
+            Type resultClrType = GetExpressionResultType(resultType);
+            var hmi = FindHmiSoftware(targetName);
+            var screen = FindHmiScreen(hmi, screenName);
+            if (screen == null)
+                throw new InvalidOperationException($"Screen '{screenName}' not found.");
+            HmiScreenItemBase item = screen.ScreenItems.Find(itemName)
+                ?? throw new InvalidOperationException($"Item '{itemName}' not found on screen '{screenName}'.");
+
+            PropertyInfo targetProperty = FindProperty(item.GetType(), propertyName);
+            propertyName = targetProperty.Name;
+            Type propertyType = Nullable.GetUnderlyingType(targetProperty.PropertyType) ?? targetProperty.PropertyType;
+            if (propertyType != resultClrType)
+                throw new InvalidDataException(
+                    $"Expression result type '{resultType}' does not match target property '{propertyName}' " +
+                    $"of type '{propertyType.Name}'.");
+            if (!IsSupportedValue(propertyType))
+                throw new InvalidDataException(
+                    $"Expression dynamization is not supported for property '{propertyName}' on '{item.GetType().Name}'.");
+
+            DynamizationBase? existing = item.Dynamizations.Find(propertyName);
+            if (existing != null && !(existing is ExpressionDynamization) &&
+                !string.Equals(onConflict, "replace", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException(
+                    $"Refusing to replace '{existing.GetType().Name}' dynamization on '{item.Name}.{propertyName}'.");
+
+            HmiJsonDynamization? expectedExistingExpression = existing is ExpressionDynamization
+                ? CreateDynamizationDocument(existing)
+                : null;
+            string propertyKey = existing?.PropertyName ?? propertyName;
+            var preservedDynamizations = item.Dynamizations
+                .Where(dynamization => !string.Equals(
+                    dynamization.PropertyName, propertyKey, StringComparison.OrdinalIgnoreCase))
+                .ToDictionary(
+                    dynamization => dynamization.PropertyName,
+                    dynamization => JsonSerializer.SerializeToElement(
+                        CreateDynamizationDocument(dynamization), HmiJsonOptions),
+                    StringComparer.OrdinalIgnoreCase);
+
+            using (ExclusiveAccess access = _tiaPortal!.ExclusiveAccess("Set Unified HMI expression dynamization"))
+            using (Transaction transaction = access.Transaction(_project!, "Set Unified HMI expression dynamization"))
+            {
+                if (existing != null && !(existing is ExpressionDynamization))
+                    existing.Delete();
+
+                var expressionDynamization = item.Dynamizations.Find(propertyName) as ExpressionDynamization
+                    ?? item.Dynamizations.Create<ExpressionDynamization>(propertyName);
+                expressionDynamization.ValueConverter.Formula = expression;
+                expressionDynamization.ValueConverter.IsFormulaSelected = true;
+
+                HmiJsonDynamization actual = CreateDynamizationDocument(expressionDynamization);
+                if (!string.Equals(actual.ValueConverter?.Formula, expression, StringComparison.Ordinal) ||
+                    actual.ValueConverter?.IsFormulaSelected != true)
+                    throw new InvalidOperationException(
+                        $"Expression dynamization read-back verification failed for '{item.Name}.{propertyName}'.");
+
+                if (expectedExistingExpression?.ValueConverter != null)
+                {
+                    expectedExistingExpression.ValueConverter.Formula = expression;
+                    expectedExistingExpression.ValueConverter.IsFormulaSelected = true;
+                    expectedExistingExpression.OnConflict = actual.OnConflict;
+                    if (!AreJsonValuesEqual(
+                        JsonSerializer.SerializeToElement(expectedExistingExpression, HmiJsonOptions),
+                        JsonSerializer.SerializeToElement(actual, HmiJsonOptions)))
+                        throw new InvalidOperationException(
+                            $"Expression update did not preserve existing mapping entries for '{item.Name}.{propertyName}'.");
+                }
+
+                if (item.Dynamizations.Count != preservedDynamizations.Count + 1)
+                    throw new InvalidOperationException(
+                        $"Updating '{item.Name}.{propertyName}' changed the number of unrelated dynamizations.");
+                foreach (DynamizationBase other in item.Dynamizations)
+                {
+                    if (string.Equals(other.PropertyName, propertyName, StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    if (!preservedDynamizations.TryGetValue(other.PropertyName, out JsonElement expected) ||
+                        !AreJsonValuesEqual(
+                            expected,
+                            JsonSerializer.SerializeToElement(CreateDynamizationDocument(other), HmiJsonOptions)))
+                        throw new InvalidOperationException(
+                            $"Updating '{item.Name}.{propertyName}' changed unrelated dynamization '{other.PropertyName}'.");
+                }
+
+                transaction.CommitOnDispose();
+            }
+
+            return JsonSerializer.SerializeToElement(
+                CreateDynamizationDocument(item.Dynamizations.Find(propertyName)!),
+                HmiJsonOptions);
+        }
+
+        public object SetExpressionDynamizationEntries(
+            string screenName,
+            string itemName,
+            string propertyName,
+            JsonElement entries,
+            string onConflict = "fail",
+            string? targetName = null)
+        {
+            if (!string.Equals(onConflict, "fail", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(onConflict, "replace", StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException("on_conflict must be 'fail' or 'replace'.", nameof(onConflict));
+            if (entries.ValueKind != JsonValueKind.Array || entries.GetArrayLength() == 0)
+                throw new InvalidDataException("entries must be a non-empty array.");
+
+            var hmi = FindHmiSoftware(targetName);
+            var screen = FindHmiScreen(hmi, screenName);
+            if (screen == null)
+                throw new InvalidOperationException($"Screen '{screenName}' not found.");
+            HmiScreenItemBase item = screen.ScreenItems.Find(itemName)
+                ?? throw new InvalidOperationException($"Item '{itemName}' not found on screen '{screenName}'.");
+
+            PropertyInfo targetProperty = FindProperty(item.GetType(), propertyName);
+            propertyName = targetProperty.Name;
+            Type propertyType = Nullable.GetUnderlyingType(targetProperty.PropertyType) ?? targetProperty.PropertyType;
+            if (!IsSupportedValue(propertyType))
+                throw new InvalidDataException(
+                    $"Expression condition entries are not supported for property '{propertyName}' on '{item.GetType().Name}'.");
+
+            var expectedConverter = new HmiJsonValueConverter
+            {
+                Formula = "",
+                IsFormulaSelected = false,
+                ConditionType = ConditionType.Expression.ToString(),
+                Entries = BuildExpressionMappingEntries(entries, propertyType)
+            };
+            var expected = new HmiJsonDynamization
+            {
+                Type = "Expression",
+                Property = propertyName,
+                ValueConverter = expectedConverter
+            };
+
+            DynamizationBase? existing = item.Dynamizations.Find(propertyName);
+            if (existing != null && !string.Equals(onConflict, "replace", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException(
+                    $"Refusing to replace '{existing.GetType().Name}' dynamization on '{item.Name}.{propertyName}'.");
+
+            var preservedDynamizations = item.Dynamizations
+                .Where(dynamization => !string.Equals(
+                    dynamization.PropertyName, propertyName, StringComparison.OrdinalIgnoreCase))
+                .ToDictionary(
+                    dynamization => dynamization.PropertyName,
+                    dynamization => JsonSerializer.SerializeToElement(
+                        CreateDynamizationDocument(dynamization), HmiJsonOptions),
+                    StringComparer.OrdinalIgnoreCase);
+
+            using (ExclusiveAccess access = _tiaPortal!.ExclusiveAccess("Set Unified HMI expression condition entries"))
+            using (Transaction transaction = access.Transaction(_project!, "Set Unified HMI expression condition entries"))
+            {
+                existing?.Delete();
+                var expressionDynamization = item.Dynamizations.Create<ExpressionDynamization>(propertyName);
+                ApplyValueConverter(expressionDynamization.ValueConverter, expectedConverter);
+
+                HmiJsonDynamization actual = CreateDynamizationDocument(expressionDynamization);
+                if (!AreJsonValuesEqual(
+                    JsonSerializer.SerializeToElement(expected, HmiJsonOptions),
+                    JsonSerializer.SerializeToElement(actual, HmiJsonOptions)))
+                    throw new InvalidOperationException(
+                        $"Expression condition-entry read-back verification failed for '{item.Name}.{propertyName}'.");
+
+                if (item.Dynamizations.Count != preservedDynamizations.Count + 1)
+                    throw new InvalidOperationException(
+                        $"Updating '{item.Name}.{propertyName}' changed the number of unrelated dynamizations.");
+                foreach (DynamizationBase other in item.Dynamizations)
+                {
+                    if (string.Equals(other.PropertyName, propertyName, StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    if (!preservedDynamizations.TryGetValue(other.PropertyName, out JsonElement preserved) ||
+                        !AreJsonValuesEqual(
+                            preserved,
+                            JsonSerializer.SerializeToElement(CreateDynamizationDocument(other), HmiJsonOptions)))
+                        throw new InvalidOperationException(
+                            $"Updating '{item.Name}.{propertyName}' changed unrelated dynamization '{other.PropertyName}'.");
+                }
+
+                transaction.CommitOnDispose();
+            }
+
+            return JsonSerializer.SerializeToElement(
+                CreateDynamizationDocument(item.Dynamizations.Find(propertyName)!),
+                HmiJsonOptions);
+        }
+
+        private static List<HmiJsonMappingEntry> BuildExpressionMappingEntries(JsonElement entries, Type propertyType)
+        {
+            var result = new List<HmiJsonMappingEntry>();
+            int index = 0;
+            foreach (JsonElement entry in entries.EnumerateArray())
+            {
+                if (entry.ValueKind != JsonValueKind.Object ||
+                    !entry.TryGetProperty("condition", out JsonElement conditionElement) ||
+                    conditionElement.ValueKind != JsonValueKind.String ||
+                    string.IsNullOrWhiteSpace(conditionElement.GetString()))
+                    throw new InvalidDataException($"entries[{index}].condition must be a non-empty string.");
+                if (!entry.TryGetProperty("value", out JsonElement valueElement) ||
+                    valueElement.ValueKind != JsonValueKind.Object ||
+                    !valueElement.TryGetProperty("type", out JsonElement typeElement) ||
+                    typeElement.ValueKind != JsonValueKind.String ||
+                    !valueElement.TryGetProperty("value", out JsonElement textElement) ||
+                    textElement.ValueKind != JsonValueKind.String)
+                    throw new InvalidDataException(
+                        $"entries[{index}].value must contain string 'type' and 'value' fields.");
+                if (entry.EnumerateObject().Any(property =>
+                    property.Name != "condition" && property.Name != "value"))
+                    throw new InvalidDataException($"entries[{index}] contains an unsupported field.");
+                if (valueElement.EnumerateObject().Any(property =>
+                    property.Name != "type" && property.Name != "value"))
+                    throw new InvalidDataException($"entries[{index}].value contains an unsupported field.");
+
+                var mappingInput = new HmiMappingValueInput
+                {
+                    Type = typeElement.GetString() ?? "",
+                    Value = textElement.GetString() ?? ""
+                };
+                object mappedValue = ParseDynamizationMappingValue(
+                    mappingInput, propertyType, $"entries[{index}].value");
+                result.Add(new HmiJsonMappingEntry
+                {
+                    Type = "Simple",
+                    Condition = JsonSerializer.SerializeToElement(conditionElement.GetString()),
+                    Value = CreateMappingValue(mappedValue)
+                });
+                index++;
+            }
+
+            return result;
+        }
+
+        private static Type GetExpressionResultType(string resultType)
+        {
+            switch (resultType)
+            {
+                case "Boolean": return typeof(bool);
+                case "Color": return typeof(Color);
+                case "String": return typeof(string);
+                case "Byte": return typeof(byte);
+                case "Int16": return typeof(short);
+                case "UInt16": return typeof(ushort);
+                case "Int32": return typeof(int);
+                case "UInt32": return typeof(uint);
+                case "Int64": return typeof(long);
+                case "UInt64": return typeof(ulong);
+                case "Single": return typeof(float);
+                case "Double": return typeof(double);
+                case "Decimal": return typeof(decimal);
+                default:
+                    throw new InvalidDataException(
+                        $"Unsupported expression result type '{resultType}'.");
+            }
+        }
+
         public Dictionary<string, object> ExportHmiJson(
             string directory,
             bool compact = true,
@@ -346,7 +700,12 @@ namespace TiaOpennessMcp.Tia
                 Props = props,
                 Text = text,
                 Items = screen.ScreenItems.Select(item =>
-                    CreateItemDocument(item, languages, defaults, compact)).ToList()
+                    CreateItemDocument(
+                        item,
+                        languages,
+                        defaults,
+                        compact,
+                        group == null ? screen.Name : group + "/" + screen.Name)).ToList()
             };
         }
 
@@ -417,7 +776,8 @@ namespace TiaOpennessMcp.Tia
             HmiScreenItemBase item,
             IReadOnlyList<string> languages,
             Dictionary<string, HmiJsonItem>? defaults = null,
-            bool compact = false)
+            bool compact = false,
+            string? screenPath = null)
         {
             var document = new HmiJsonItem
             {
@@ -453,7 +813,20 @@ namespace TiaOpennessMcp.Tia
                 }
             }
 
-            document.Dynamizations = item.Dynamizations.Select(CreateDynamizationDocument).ToList();
+            document.Dynamizations = item.Dynamizations.Select(dynamization =>
+            {
+                try
+                {
+                    return CreateDynamizationDocument(dynamization);
+                }
+                catch (InvalidDataException ex)
+                {
+                    throw new InvalidDataException(
+                        $"Failed to export dynamization on screen '{screenPath ?? "(unknown)"}', " +
+                        $"item '{item.Name}', property '{dynamization.PropertyName}': {ex.Message}",
+                        ex);
+                }
+            }).ToList();
 
             document.Events = ReadItemEvents(item);
             if (compact && defaults != null && defaults.TryGetValue(GetItemIdentityKey(document), out HmiJsonItem? defaultItem))
@@ -717,6 +1090,22 @@ namespace TiaOpennessMcp.Tia
             return root;
         }
 
+        private static string? GetMemberTagRoot(string reference, Func<string, string?> getDataType)
+        {
+            int separator = reference.IndexOf('.');
+            while (separator > 0)
+            {
+                string root = reference.Substring(0, separator);
+                string memberPath = reference.Substring(separator + 1);
+                if (getDataType(root) != null &&
+                    System.Text.RegularExpressions.Regex.IsMatch(
+                        memberPath, @"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$"))
+                    return root;
+                separator = reference.IndexOf('.', separator + 1);
+            }
+            return null;
+        }
+
         private static HmiTag? FindReferencedTag(HmiSoftware hmi, string reference)
         {
             HmiTag? tag = hmi.Tags.Find(reference) ?? hmi.Tags.Find(GetTagLookupName(reference));
@@ -734,12 +1123,20 @@ namespace TiaOpennessMcp.Tia
                 if (parent != null) return parent;
             }
             string? root = GetArrayTagRoot(reference, name => hmi.Tags.Find(name)?.DataType);
+            if (root != null) return hmi.Tags.Find(root);
+            root = GetMemberTagRoot(reference, name => hmi.Tags.Find(name)?.DataType);
             return root == null ? null : hmi.Tags.Find(root);
         }
 
-        private static bool ContainsTagReference(Dictionary<string, string> tags, string reference) =>
-            tags.ContainsKey(reference) || tags.ContainsKey(GetTagLookupName(reference)) ||
-            GetArrayTagRoot(reference, name => tags.TryGetValue(name, out string? type) ? type : null) != null;
+        private static bool ContainsTagReference(Dictionary<string, string> tags, string reference)
+        {
+            if (tags.ContainsKey(reference) || tags.ContainsKey(GetTagLookupName(reference)))
+                return true;
+            string? getDataType(string name) =>
+                tags.TryGetValue(name, out string? type) ? type : null;
+            return GetArrayTagRoot(reference, getDataType) != null ||
+                GetMemberTagRoot(reference, getDataType) != null;
+        }
 
         private static void VerifyManifestHash(string root, HmiJsonManifest manifest, string relativePath, string path)
         {
@@ -1658,7 +2055,7 @@ namespace TiaOpennessMcp.Tia
                     if (entry is MappingTableEntrySimple simple)
                     {
                         document.Type = "Simple";
-                        document.Condition = simple.Condition;
+                        document.Condition = JsonSerializer.SerializeToElement(simple.Condition);
                     }
                     else if (entry is MappingTableEntryRange range)
                     {
@@ -1669,9 +2066,9 @@ namespace TiaOpennessMcp.Tia
                     else if (entry is MappingTableEntryBitmask bitmask)
                     {
                         document.Type = "Bitmask";
-                        document.BitCondition = bitmask.Condition;
-                        document.Relevant = bitmask.Relevant;
                         document.BitDynamizationType = bitmask.BitDynamizationType.ToString();
+                        document.Condition = JsonSerializer.SerializeToElement(bitmask.Condition);
+                        document.Relevant = bitmask.Relevant;
                     }
                     else
                         throw new InvalidDataException($"Unsupported mapping entry '{entry.GetType().Name}'.");
@@ -1752,12 +2149,23 @@ namespace TiaOpennessMcp.Tia
         {
             if (document.Formula == null)
                 throw new InvalidDataException("Value converter formula must be a string.");
-            ParseEnumValue(typeof(ConditionType), document.ConditionType, "mapping condition type");
+            ConditionType conditionType = (ConditionType)ParseEnumValue(
+                typeof(ConditionType), document.ConditionType, "mapping condition type");
+            bool hasBitmaskEntries = document.Entries.Any(entry => entry.Type == "Bitmask");
+            if (hasBitmaskEntries &&
+                ((conditionType != ConditionType.Bitmask && conditionType != ConditionType.Singlebit) ||
+                 document.Entries.Any(entry => entry.Type != "Bitmask")))
+                throw new InvalidDataException("Bitmask mapping entries require a Bitmask or Singlebit condition type and cannot be mixed with other entry types.");
+            if (conditionType == ConditionType.Bitmask && document.Entries.Count > 0 && !hasBitmaskEntries)
+                throw new InvalidDataException("Bitmask condition type requires bitmask mapping entries.");
+            if (conditionType == ConditionType.Singlebit && document.Entries.Count > 0 && !hasBitmaskEntries)
+                throw new InvalidDataException("Singlebit condition type requires bitmask mapping entries.");
+            BitDynamizationType? bitDynamizationType = null;
             foreach (HmiJsonMappingEntry entry in document.Entries)
             {
                 if (entry.Type == "Simple")
                 {
-                    if (entry.Condition == null)
+                    if (!entry.Condition.HasValue || entry.Condition.Value.ValueKind != JsonValueKind.String)
                         throw new InvalidDataException("Simple mapping entries require a condition.");
                 }
                 else if (entry.Type == "Range")
@@ -1767,9 +2175,12 @@ namespace TiaOpennessMcp.Tia
                 }
                 else if (entry.Type == "Bitmask")
                 {
-                    if (!entry.BitCondition.HasValue || !entry.Relevant.HasValue)
-                        throw new InvalidDataException("Bitmask mapping entries require bitCondition and relevant unsigned 64-bit masks.");
-                    ParseEnumValue(typeof(BitDynamizationType), entry.BitDynamizationType ?? "", "bit dynamization type");
+                    ReadBitmaskCondition(entry);
+                    ReadRelevantMask(entry);
+                    var entryBitDynamizationType = ParseBitDynamizationType(entry.BitDynamizationType);
+                    if (bitDynamizationType.HasValue && bitDynamizationType.Value != entryBitDynamizationType)
+                        throw new InvalidDataException("All bitmask mapping entries must use the same bit dynamization type.");
+                    bitDynamizationType = entryBitDynamizationType;
                 }
                 else
                     throw new InvalidDataException($"Unsupported mapping entry type '{entry.Type}'.");
@@ -1780,6 +2191,9 @@ namespace TiaOpennessMcp.Tia
                 ReadMappingValue(entry.Value);
                 ReadMappingValue(entry.AlternateValue);
             }
+            if (conditionType == ConditionType.Singlebit &&
+                bitDynamizationType.HasValue && bitDynamizationType.Value != BitDynamizationType.SingleBit)
+                throw new InvalidDataException("Singlebit condition type requires SingleBit mapping entries.");
         }
 
         private static void ApplyValueConverter(ValueConverter converter, HmiJsonValueConverter document)
@@ -1795,14 +2209,42 @@ namespace TiaOpennessMcp.Tia
                 entry.Delete();
             table.ConditionType = (ConditionType)ParseEnumValue(typeof(ConditionType),
                 document.ConditionType, "mapping condition type");
-            var bitmaskEntries = new Dictionary<BitDynamizationType, List<MappingTableEntryBitmask>>();
+            if (document.Entries.Count > 0 && document.Entries[0].Type == "Bitmask")
+            {
+                BitDynamizationType bitDynamizationType =
+                    ParseBitDynamizationType(document.Entries[0].BitDynamizationType);
+                var bitmaskEntries = table.Entries.OfType<MappingTableEntryBitmask>().ToList();
+                if (table.Entries.Count == 0)
+                    bitmaskEntries = table.Entries.Create(bitDynamizationType).ToList();
+                if (bitmaskEntries.Count != document.Entries.Count)
+                    throw new InvalidDataException(
+                        $"TIA created {bitmaskEntries.Count} '{bitDynamizationType}' bitmask entries, but the JSON contains {document.Entries.Count}.");
+                if (table.Entries.Count != bitmaskEntries.Count)
+                    throw new InvalidDataException("TIA created unexpected non-bitmask entries for a bitmask mapping table.");
+                for (int i = 0; i < bitmaskEntries.Count; i++)
+                {
+                    HmiJsonMappingEntry entry = document.Entries[i];
+                    var bitmask = bitmaskEntries[i];
+                    ulong condition = ReadBitmaskCondition(entry);
+                    BitDynamizationType entryBitDynamizationType =
+                        ParseBitDynamizationType(entry.BitDynamizationType);
+                    if (entryBitDynamizationType != bitDynamizationType ||
+                        bitmask.BitDynamizationType != entryBitDynamizationType ||
+                        bitmask.Relevant != ReadRelevantMask(entry))
+                        throw new InvalidDataException(
+                            $"TIA generated a bitmask entry with a different type or relevant mask at index {i}.");
+                    bitmask.Condition = condition;
+                    ApplyMappingEntryValues(bitmask, entry);
+                }
+                return;
+            }
             foreach (HmiJsonMappingEntry entry in document.Entries)
             {
                 MappingTableEntryBase actual;
                 if (entry.Type == "Simple")
                 {
                     var simple = table.Entries.Create<MappingTableEntrySimple>();
-                    simple.Condition = entry.Condition;
+                    simple.Condition = ReadSimpleCondition(entry);
                     actual = simple;
                 }
                 else if (entry.Type == "Range")
@@ -1812,35 +2254,54 @@ namespace TiaOpennessMcp.Tia
                     range.To = ReadMappingValue(entry.To);
                     actual = range;
                 }
-                else if (entry.Type == "Bitmask")
-                {
-                    var mode = (BitDynamizationType)ParseEnumValue(typeof(BitDynamizationType),
-                        entry.BitDynamizationType ?? "", "bit dynamization type");
-                    if (!bitmaskEntries.TryGetValue(mode, out List<MappingTableEntryBitmask>? entries))
-                    {
-                        entries = table.Entries.Create(mode).ToList();
-                        bitmaskEntries.Add(mode, entries);
-                    }
-                    var bitmask = entries.FirstOrDefault(e => e.Relevant == entry.Relevant) ??
-                        throw new InvalidDataException($"No {mode} mapping slot exists for relevant mask '{entry.Relevant}'.");
-                    entries.Remove(bitmask);
-                    bitmask.Condition = entry.BitCondition ??
-                        throw new InvalidDataException("Bitmask mapping entries require bitCondition.");
-                    actual = bitmask;
-                }
                 else
                     throw new InvalidDataException($"Unsupported mapping entry type '{entry.Type}'.");
-                if (entry.Value != null)
-                    actual.Value = ReadMappingValue(entry.Value);
-                actual.Flashing = entry.Flashing;
-                if (entry.AlternateValue != null)
-                    actual.AlternateValue = ReadMappingValue(entry.AlternateValue);
-                actual.FlashingRate = (Siemens.Engineering.HmiUnified.UI.Dynamization.Flashing.FlashingRate)
-                    ParseEnumValue(typeof(Siemens.Engineering.HmiUnified.UI.Dynamization.Flashing.FlashingRate),
-                        entry.FlashingRate, "mapping flashing rate");
+                ApplyMappingEntryValues(actual, entry);
             }
-            foreach (MappingTableEntryBitmask unused in bitmaskEntries.Values.SelectMany(entries => entries))
-                unused.Delete();
+        }
+
+        private static string ReadSimpleCondition(HmiJsonMappingEntry entry)
+        {
+            if (!entry.Condition.HasValue || entry.Condition.Value.ValueKind != JsonValueKind.String)
+                throw new InvalidDataException("Simple mapping entries require a string condition.");
+            return entry.Condition.Value.GetString() ??
+                throw new InvalidDataException("Simple mapping entry condition cannot be null.");
+        }
+
+        private static BitDynamizationType ParseBitDynamizationType(string? value)
+        {
+            if (value == null || value.Trim().Length == 0)
+                throw new InvalidDataException("Bitmask mapping entries require a bit dynamization type.");
+            return (BitDynamizationType)ParseEnumValue(typeof(BitDynamizationType),
+                value, "bitmask dynamization type");
+        }
+
+        private static ulong ReadBitmaskCondition(HmiJsonMappingEntry entry)
+        {
+            if (!entry.Condition.HasValue && entry.BitCondition.HasValue)
+                return entry.BitCondition.Value; // Legacy fork exports wrote bitmask conditions as bitCondition.
+            if (!entry.Condition.HasValue || entry.Condition.Value.ValueKind != JsonValueKind.Number ||
+                !entry.Condition.Value.TryGetUInt64(out ulong condition))
+                throw new InvalidDataException("Bitmask mapping entries require an unsigned 64-bit condition.");
+            return condition;
+        }
+
+        private static ulong ReadRelevantMask(HmiJsonMappingEntry entry)
+        {
+            return entry.Relevant ?? throw new InvalidDataException(
+                "Bitmask mapping entries require an unsigned 64-bit relevant mask.");
+        }
+
+        private static void ApplyMappingEntryValues(MappingTableEntryBase actual, HmiJsonMappingEntry entry)
+        {
+            if (entry.Value != null)
+                actual.Value = ReadMappingValue(entry.Value);
+            actual.Flashing = entry.Flashing;
+            if (entry.AlternateValue != null)
+                actual.AlternateValue = ReadMappingValue(entry.AlternateValue);
+            actual.FlashingRate = (Siemens.Engineering.HmiUnified.UI.Dynamization.Flashing.FlashingRate)
+                ParseEnumValue(typeof(Siemens.Engineering.HmiUnified.UI.Dynamization.Flashing.FlashingRate),
+                    entry.FlashingRate, "mapping flashing rate");
         }
 
         private static void ApplyDynamizations(
@@ -2556,10 +3017,12 @@ namespace TiaOpennessMcp.Tia
         private sealed class HmiJsonMappingEntry
         {
             public string Type { get; set; } = "";
-            public ulong? BitCondition { get; set; }
-            public ulong? Relevant { get; set; }
+            public JsonElement? Condition { get; set; }
             public string? BitDynamizationType { get; set; }
-            public string? Condition { get; set; }
+            public ulong? Relevant { get; set; }
+            /// <summary>Legacy alias for bitmask Condition; read only on import, never written.</summary>
+            [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+            public ulong? BitCondition { get; set; }
             public HmiJsonMappingValue? From { get; set; }
             public HmiJsonMappingValue? To { get; set; }
             public HmiJsonMappingValue? Value { get; set; }

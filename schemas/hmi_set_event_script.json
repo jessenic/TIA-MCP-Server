@@ -1,0 +1,35 @@
+{
+  "name": "hmi_set_event_script",
+  "description": "Create or update one supported screen or item event script in place and verify the script read-back.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "screen_name": {
+        "type": "string",
+        "description": "Screen name."
+      },
+      "item_name": {
+        "type": "string",
+        "description": "Optional item name; omit to update a screen event."
+      },
+      "event_type": {
+        "type": "string",
+        "description": "Event enum name supported by the selected screen or item (see hmi_read_event_scripts)."
+      },
+      "script": {
+        "type": "string",
+        "description": "Complete JavaScript event handler source."
+      },
+      "target_name": {
+        "type": "string",
+        "description": "Target HMI software name (optional)."
+      }
+    },
+    "required": [
+      "screen_name",
+      "event_type",
+      "script"
+    ],
+    "additionalProperties": false
+  }
+}

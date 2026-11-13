@@ -12,9 +12,22 @@ namespace TiaOpennessMcp.Tools
         private readonly List<ToolDefinition> _tools = new List<ToolDefinition>();
         private readonly Dictionary<string, Func<JsonElement?, CallToolResult>> _handlers =
             new Dictionary<string, Func<JsonElement?, CallToolResult>>(StringComparer.OrdinalIgnoreCase);
+        private readonly Lazy<IHmiToolOperations> _hmiToolOperations;
 
         public ToolRegistry()
+            : this(new Lazy<IHmiToolOperations>(() => TiaManager.Instance))
         {
+        }
+
+        public ToolRegistry(IHmiToolOperations hmiToolOperations)
+            : this(new Lazy<IHmiToolOperations>(() =>
+                hmiToolOperations ?? throw new ArgumentNullException(nameof(hmiToolOperations))))
+        {
+        }
+
+        private ToolRegistry(Lazy<IHmiToolOperations> hmiToolOperations)
+        {
+            _hmiToolOperations = hmiToolOperations;
             RegisterAllTools();
         }
 
@@ -27,6 +40,11 @@ namespace TiaOpennessMcp.Tools
                 try
                 {
                     return handler(args);
+                }
+                catch (TimeoutException ex)
+                {
+                    Console.Error.WriteLine($"[ToolRegistry] Timeout executing '{toolName}': {ex.Message}");
+                    return CallToolResult.Error($"Timed out executing '{toolName}': {ex.Message}");
                 }
                 catch (Exception ex)
                 {
@@ -231,6 +249,50 @@ namespace TiaOpennessMcp.Tools
                     string? folder = GetStringProp(args, "folder");
                     string msg = TiaManager.Instance.ImportBlock(plc, xml, overwrite, folder);
                     return CallToolResult.Text(msg);
+                });
+
+            // 13a. tia_import_scl_block
+            Register("tia_import_scl_block", "Import a complete SCL block source string; the server creates the temporary .scl file. Existing same-name blocks are backed up, deleted, and replaced; failed imports attempt to restore the backup.",
+                schema =>
+                {
+                    schema.Properties["scl_code"] = new ToolProperty
+                    {
+                        Type = "string",
+                        Description = "Complete SCL source for exactly one FUNCTION, FUNCTION_BLOCK, ORGANIZATION_BLOCK, or DATA_BLOCK."
+                    };
+                    schema.Properties["plc_name"] = new ToolProperty
+                    {
+                        Type = "string",
+                        Description = "Name of the target PLC (optional, defaults to first PLC)."
+                    };
+                    schema.Properties["folder"] = new ToolProperty
+                    {
+                        Type = "string",
+                        Description = "Target block group path (optional; an existing block's group is preserved when omitted)."
+                    };
+                    schema.Properties["compile_after_import"] = new ToolProperty
+                    {
+                        Type = "boolean",
+                        Description = "Compile the target PLC after import (default true). Compilation errors are reported and do not roll back the imported block.",
+                        Default = true
+                    };
+                    schema.Properties["open_after_import"] = new ToolProperty
+                    {
+                        Type = "boolean",
+                        Description = "Open the imported block in the TIA Portal editor after import (default false).",
+                        Default = false
+                    };
+                    schema.Required = new List<string> { "scl_code" };
+                },
+                args =>
+                {
+                    string sclCode = GetStringProp(args, "scl_code") ?? throw new ArgumentException("scl_code is required.");
+                    string? plc = GetStringProp(args, "plc_name");
+                    string? folder = GetStringProp(args, "folder");
+                    bool compileAfterImport = GetBoolProp(args, "compile_after_import", true);
+                    bool openAfterImport = GetBoolProp(args, "open_after_import", false);
+                    return CallToolResult.Json(
+                        TiaManager.Instance.ImportSclBlock(plc, sclCode, folder, compileAfterImport, openAfterImport));
                 });
 
             // 14. tia_delete_block
@@ -489,24 +551,201 @@ namespace TiaOpennessMcp.Tools
                     return CallToolResult.Json(TiaManager.Instance.GetHmiScreenItems(screen, target));
                 });
 
+            Register("hmi_get_screen_item", "Read one screen item with its complete supported properties, event scripts, and full tag/expression dynamization state.",
+                schema =>
+                {
+                    schema.Properties["screen_name"] = new ToolProperty { Type = "string", Description = "Name of the screen containing the item." };
+                    schema.Properties["item_name"] = new ToolProperty { Type = "string", Description = "Name of the item to inspect." };
+                    schema.Properties["target_name"] = new ToolProperty { Type = "string", Description = "Target HMI software name (optional)." };
+                    schema.Required = new List<string> { "screen_name", "item_name" };
+                },
+                args =>
+                {
+                    string screen = GetStringProp(args, "screen_name") ?? throw new ArgumentException("screen_name is required.");
+                    string item = GetStringProp(args, "item_name") ?? throw new ArgumentException("item_name is required.");
+                    string? target = GetStringProp(args, "target_name");
+                    return CallToolResult.Json(_hmiToolOperations.Value.GetHmiScreenItem(screen, item, target));
+                });
+
+            Register("hmi_update_screen_item", "Update allowlisted screen-item properties in place and verify the resulting item state.",
+                schema =>
+                {
+                    schema.Properties["screen_name"] = new ToolProperty { Type = "string", Description = "Name of the screen containing the item." };
+                    schema.Properties["item_name"] = new ToolProperty { Type = "string", Description = "Name of the item to update." };
+                    schema.Properties["item_properties"] = new ToolProperty
+                    {
+                        Type = "object",
+                        Description = "Non-empty object of supported property/value pairs. Allowed names: Visible, Left, Top, Width, Height, CenterX, CenterY, Radius, BackColor, ForeColor, BorderColor, BorderWidth.",
+                        Properties = new Dictionary<string, ToolProperty>
+                        {
+                            ["Visible"] = new ToolProperty { Type = "boolean", Description = "Whether the item is visible." },
+                            ["Left"] = new ToolProperty { Type = "integer", Description = "Horizontal position." },
+                            ["Top"] = new ToolProperty { Type = "integer", Description = "Vertical position." },
+                            ["Width"] = new ToolProperty { Type = "integer", Description = "Item width." },
+                            ["Height"] = new ToolProperty { Type = "integer", Description = "Item height." },
+                            ["CenterX"] = new ToolProperty { Type = "integer", Description = "Circle center X coordinate." },
+                            ["CenterY"] = new ToolProperty { Type = "integer", Description = "Circle center Y coordinate." },
+                            ["Radius"] = new ToolProperty { Type = "integer", Description = "Circle radius." },
+                            ["BackColor"] = new ToolProperty { Type = "string", Description = "Background color (#RRGGBB, #AARRGGBB, or supported TIA color name)." },
+                            ["ForeColor"] = new ToolProperty { Type = "string", Description = "Foreground/text color (#RRGGBB, #AARRGGBB, or supported TIA color name)." },
+                            ["BorderColor"] = new ToolProperty { Type = "string", Description = "Border color (#RRGGBB, #AARRGGBB, or supported TIA color name)." },
+                            ["BorderWidth"] = new ToolProperty { Type = "integer", Description = "Border width." }
+                        },
+                        AdditionalProperties = false
+                    };
+                    schema.Properties["target_name"] = new ToolProperty { Type = "string", Description = "Target HMI software name (optional)." };
+                    schema.Required = new List<string> { "screen_name", "item_name", "item_properties" };
+                },
+                args =>
+                {
+                    string screen = GetStringProp(args, "screen_name") ?? throw new ArgumentException("screen_name is required.");
+                    string item = GetStringProp(args, "item_name") ?? throw new ArgumentException("item_name is required.");
+                    if (!args.HasValue || !args.Value.TryGetProperty("item_properties", out JsonElement properties))
+                        throw new ArgumentException("item_properties is required.");
+                    string? target = GetStringProp(args, "target_name");
+                    return CallToolResult.Json(
+                        _hmiToolOperations.Value.UpdateHmiScreenItemProperties(screen, item, properties, target));
+                });
+
+            Register("hmi_read_event_scripts", "Read event scripts and the V21-supported event names for a screen or one screen item.",
+                schema =>
+                {
+                    schema.Properties["screen_name"] = new ToolProperty { Type = "string", Description = "Screen name. When item_name is omitted, reads the screen's events." };
+                    schema.Properties["item_name"] = new ToolProperty { Type = "string", Description = "Optional item name; omit to read screen events." };
+                    schema.Properties["target_name"] = new ToolProperty { Type = "string", Description = "Target HMI software name (optional)." };
+                    schema.Required = new List<string> { "screen_name" };
+                },
+                args =>
+                {
+                    string screen = GetStringProp(args, "screen_name") ?? throw new ArgumentException("screen_name is required.");
+                    string? item = GetStringProp(args, "item_name");
+                    string? target = GetStringProp(args, "target_name");
+                    return CallToolResult.Json(_hmiToolOperations.Value.GetHmiEventScripts(screen, item, target));
+                });
+
+            Register("hmi_set_event_script", "Create or update one supported screen or item event script in place and verify the script read-back.",
+                schema =>
+                {
+                    schema.Properties["screen_name"] = new ToolProperty { Type = "string", Description = "Screen name." };
+                    schema.Properties["item_name"] = new ToolProperty { Type = "string", Description = "Optional item name; omit to update a screen event." };
+                    schema.Properties["event_type"] = new ToolProperty { Type = "string", Description = "Event enum name supported by the selected screen or item (see hmi_read_event_scripts)." };
+                    schema.Properties["script"] = new ToolProperty { Type = "string", Description = "Complete JavaScript event handler source." };
+                    schema.Properties["target_name"] = new ToolProperty { Type = "string", Description = "Target HMI software name (optional)." };
+                    schema.Required = new List<string> { "screen_name", "event_type", "script" };
+                },
+                args =>
+                {
+                    string screen = GetStringProp(args, "screen_name") ?? throw new ArgumentException("screen_name is required.");
+                    string eventType = GetStringProp(args, "event_type") ?? throw new ArgumentException("event_type is required.");
+                    string script = GetStringProp(args, "script") ?? throw new ArgumentException("script is required.");
+                    string? item = GetStringProp(args, "item_name");
+                    string? target = GetStringProp(args, "target_name");
+                    return CallToolResult.Json(
+                        _hmiToolOperations.Value.UpdateHmiEventScript(screen, eventType, script, item, target));
+                });
+
+            Register("hmi_get_js_type_definitions", "Get the server-bundled, documented subset of WinCC Unified runtime JavaScript type declarations. This is not a complete Siemens declaration set.",
+                schema => { },
+                args =>
+                {
+                    const string resourceUri = "tia://docs/hmi-javascript-type-definitions";
+                    ResourceContent definition = McpResourceCatalog.Read(resourceUri).Contents[0];
+                    return CallToolResult.Json(new
+                    {
+                        ResourceUri = resourceUri,
+                        MimeType = definition.MimeType,
+                        Scope = "Documented subset; not a complete or vendor-generated Siemens V21 declaration set.",
+                        Definitions = definition.Text
+                    });
+                });
+
             Register("hmi_export_json", "Export a Unified HMI target as a versioned JSON directory containing screens, tag tables, alarms, optional styles, and file hashes.",
                 schema =>
                 {
-                    schema.Properties["output_directory"] = new ToolProperty { Type = "string", Description = "Directory to write the hmi/<Target> JSON export." };
+                    schema.Properties["output_directory"] = new ToolProperty { Type = "string", Description = "Optional local server directory. Omit to create a remote-readable staged export and return its transfer_id." };
                     schema.Properties["compact"] = new ToolProperty { Type = "boolean", Description = "Omit item properties equal to their TIA-created type defaults (default: true)." };
                     schema.Properties["script_files"] = new ToolProperty { Type = "boolean", Description = "Write event scripts into .js sidecar files instead of inline JSON strings (default: false)." };
                     schema.Properties["include_library"] = new ToolProperty { Type = "boolean", Description = "Package the complete project type library, including faceplates, dynamic SVG definitions and PLC type dependencies, in a hashed V21 .zal21 archive (default: true). Requires committed library versions." };
                     schema.Properties["target_name"] = new ToolProperty { Type = "string", Description = "Target HMI software/device selector (optional when only one target exists)." };
-                    schema.Required = new List<string> { "output_directory" };
                 },
                 args =>
                 {
-                    string directory = GetStringProp(args, "output_directory") ?? throw new ArgumentException("output_directory is required.");
+                    string? directory = GetStringProp(args, "output_directory");
                     bool compact = GetBoolProp(args, "compact", true);
                     bool scriptFiles = GetBoolProp(args, "script_files", false);
                     string? target = GetStringProp(args, "target_name");
-                    return CallToolResult.Json(TiaManager.Instance.ExportHmiJson(directory, compact, scriptFiles, target,
-                        GetBoolProp(args, "include_library", true)));
+                    bool includeLibrary = GetBoolProp(args, "include_library", true);
+                    string? transferId = null;
+                    if (string.IsNullOrWhiteSpace(directory))
+                        transferId = HmiJsonTransferStore.CreateExport(out directory);
+                    string exportDirectory = directory ?? throw new InvalidOperationException("The export directory could not be resolved.");
+                    try
+                    {
+                        Dictionary<string, object> result = TiaManager.Instance.ExportHmiJson(exportDirectory, compact, scriptFiles, target, includeLibrary);
+                        if (transferId != null)
+                        {
+                            result.Remove("directory");
+                            result.Remove("fileHashes");
+                            result["transferId"] = transferId;
+                            result["files"] = HmiJsonTransferStore.ListFiles(transferId);
+                        }
+                        return CallToolResult.Json(result);
+                    }
+                    catch
+                    {
+                        if (transferId != null)
+                            HmiJsonTransferStore.Delete(transferId);
+                        throw;
+                    }
+                });
+
+            Register("hmi_read_export_file", "Read a staged HMI JSON export file in bounded Base64 chunks.",
+                schema =>
+                {
+                    schema.Properties["transfer_id"] = new ToolProperty { Type = "string", Description = "Transfer ID returned by hmi_export_json." };
+                    schema.Properties["relative_path"] = new ToolProperty { Type = "string", Description = "Export file path, such as manifest.json or screens/0001-Main.json." };
+                    schema.Properties["offset"] = new ToolProperty { Type = "integer", Description = "Byte offset (default: 0); use nextOffset from the previous response." };
+                    schema.Properties["chunk_bytes"] = new ToolProperty { Type = "integer", Description = "Maximum bytes to return (default: 262144; maximum: 524288)." };
+                    schema.Required = new List<string> { "transfer_id", "relative_path" };
+                },
+                args =>
+                {
+                    string transferId = GetStringProp(args, "transfer_id") ?? throw new ArgumentException("transfer_id is required.");
+                    string relativePath = GetStringProp(args, "relative_path") ?? throw new ArgumentException("relative_path is required.");
+                    long offset = GetLongProp(args, "offset") ?? 0;
+                    int chunkBytes = GetIntProp(args, "chunk_bytes") ?? 0;
+                    return CallToolResult.Json(HmiJsonTransferStore.ReadChunk(transferId, relativePath, offset, chunkBytes));
+                });
+
+            Register("hmi_begin_import", "Create a temporary HMI JSON import transfer. Upload manifest.json and every referenced file with hmi_upload_import_file.",
+                schema => { },
+                args => CallToolResult.Json(new Dictionary<string, object>
+                {
+                    ["transferId"] = HmiJsonTransferStore.CreateImport(),
+                    ["maxFileBytes"] = 10 * 1024 * 1024,
+                    ["maxTransferBytes"] = 100 * 1024 * 1024,
+                    ["maxChunkBytes"] = 512 * 1024,
+                    ["expiresAfterHours"] = 24
+                }));
+
+            Register("hmi_upload_import_file", "Upload a file to a staged HMI JSON import using sequential Base64 chunks.",
+                schema =>
+                {
+                    schema.Properties["transfer_id"] = new ToolProperty { Type = "string", Description = "Import transfer ID returned by hmi_begin_import." };
+                    schema.Properties["relative_path"] = new ToolProperty { Type = "string", Description = "Relative file path, such as manifest.json or screens/0001-Main.json." };
+                    schema.Properties["content_base64"] = new ToolProperty { Type = "string", Description = "Base64-encoded bytes for this chunk; chunks are limited to 512 KiB decoded." };
+                    schema.Properties["offset"] = new ToolProperty { Type = "integer", Description = "Byte offset of this chunk; begin at zero and use receivedBytes from the previous response." };
+                    schema.Properties["total_bytes"] = new ToolProperty { Type = "integer", Description = "Total decoded file size in bytes, no more than 10 MiB." };
+                    schema.Required = new List<string> { "transfer_id", "relative_path", "content_base64", "offset", "total_bytes" };
+                },
+                args =>
+                {
+                    string transferId = GetStringProp(args, "transfer_id") ?? throw new ArgumentException("transfer_id is required.");
+                    string relativePath = GetStringProp(args, "relative_path") ?? throw new ArgumentException("relative_path is required.");
+                    string content = GetStringProp(args, "content_base64") ?? throw new ArgumentException("content_base64 is required.");
+                    long offset = GetLongProp(args, "offset") ?? throw new ArgumentException("offset is required.");
+                    long totalBytes = GetLongProp(args, "total_bytes") ?? throw new ArgumentException("total_bytes is required.");
+                    return CallToolResult.Json(HmiJsonTransferStore.WriteChunk(transferId, relativePath, content, offset, totalBytes));
                 });
 
             Register("hmi_render_json", "Render exported Unified HMI JSON offline to lossless PNG previews, numbered layout overlays and geometry/warnings reports. Resolves static nested screen windows; never connects to TIA or executes scripts. Complex controls use explicit placeholders.",
@@ -528,24 +767,33 @@ namespace TiaOpennessMcp.Tools
                         GetStringProp(args, "screen_name"), GetStringProp(args, "language"), scale));
                 });
 
-            Register("hmi_import_json", "Upsert a versioned Unified HMI JSON directory under an Openness transaction, verify it, compile, and never save the project.",
+            Register("hmi_import_json", "Upsert a versioned Unified HMI JSON directory or staged transfer under an Openness transaction, verify it, compile, and never save the project.",
                 schema =>
                 {
-                    schema.Properties["input_directory"] = new ToolProperty { Type = "string", Description = "Directory containing manifest.json and the referenced screen/tag/alarm files." };
+                    schema.Properties["input_directory"] = new ToolProperty { Type = "string", Description = "Server-local directory containing manifest.json and referenced files. Use this or transfer_id, not both." };
+                    schema.Properties["transfer_id"] = new ToolProperty { Type = "string", Description = "Staged import ID returned by hmi_begin_import. Use this or input_directory, not both." };
                     schema.Properties["prune_items"] = new ToolProperty { Type = "boolean", Description = "Delete screen items absent from imported screen files (default: false)." };
                     schema.Properties["dry_run"] = new ToolProperty { Type = "boolean", Description = "Validate the files and target without making changes (default: false)." };
                     schema.Properties["verify_hashes"] = new ToolProperty { Type = "boolean", Description = "Verify exported file hashes (default: true). Set false only when intentionally editing exported JSON without refreshing manifest hashes." };
                     schema.Properties["target_name"] = new ToolProperty { Type = "string", Description = "Target HMI software/device selector (optional when only one target exists)." };
-                    schema.Required = new List<string> { "input_directory" };
                 },
                 args =>
                 {
-                    string directory = GetStringProp(args, "input_directory") ?? throw new ArgumentException("input_directory is required.");
+                    string? directory = GetStringProp(args, "input_directory");
+                    string? transferId = GetStringProp(args, "transfer_id");
+                    if (string.IsNullOrWhiteSpace(directory) == string.IsNullOrWhiteSpace(transferId))
+                        throw new ArgumentException("Provide exactly one of input_directory or transfer_id.");
+                    if (transferId != null)
+                    {
+                        HmiJsonTransferStore.EnsureUploadsComplete(transferId);
+                        directory = HmiJsonTransferStore.GetDirectory(transferId, "import");
+                    }
+                    string importDirectory = directory ?? throw new InvalidOperationException("The import directory could not be resolved.");
                     bool pruneItems = GetBoolProp(args, "prune_items", false);
                     bool dryRun = GetBoolProp(args, "dry_run", false);
                     bool verifyHashes = GetBoolProp(args, "verify_hashes", true);
                     string? target = GetStringProp(args, "target_name");
-                    return CallToolResult.Json(TiaManager.Instance.ImportHmiJson(directory, pruneItems, dryRun, target, verifyHashes));
+                    return CallToolResult.Json(TiaManager.Instance.ImportHmiJson(importDirectory, pruneItems, dryRun, target, verifyHashes));
                 });
 
             Register("hmi_patch_json", "Validate or apply declarative Unified HMI JSON set/bind/delete operations with require and verify guards; changes are transactional, compiled, and never saved.",
@@ -784,18 +1032,18 @@ namespace TiaOpennessMcp.Tools
                 });
 
             // 32. hmi_set_tag_dynamization
-            Register("hmi_set_tag_dynamization", "Set tag dynamization on a screen item property (e.g. BackColor range dynamization linked to a tag with range entries).",
+            Register("hmi_set_tag_dynamization", "Set tag dynamization on a screen item property using numeric ranges or Boolean Singlebit mapping.",
                 schema =>
                 {
                     schema.Properties["screen_name"] = new ToolProperty { Type = "string", Description = "Screen name." };
                     schema.Properties["item_name"] = new ToolProperty { Type = "string", Description = "Item name." };
                     schema.Properties["property_name"] = new ToolProperty { Type = "string", Description = "Property to dynamize (e.g. 'BackColor', 'Visibility')." };
                     schema.Properties["tag_name"] = new ToolProperty { Type = "string", Description = "HMI tag name to evaluate." };
-                    schema.Properties["condition_type"] = new ToolProperty { Type = "string", Description = "'None' or 'Range'." };
+                    schema.Properties["condition_type"] = new ToolProperty { Type = "string", Description = "'None', 'Range', or 'Singlebit'." };
                     schema.Properties["ranges"] = new ToolProperty
                     {
                         Type = "array",
-                        Description = "List of ranges: [{from: 0, to: 0, value: 'gray'}, {from: 1, to: 1, value: 'green'}].",
+                        Description = "For Range, list numeric from/to bounds. For Singlebit, provide exactly two entries with matching bounds 0/0 and 1/1; their values map the off/on states.",
                         Items = new ToolProperty
                         {
                             Type = "object",
@@ -823,6 +1071,174 @@ namespace TiaOpennessMcp.Tools
 
                     var res = TiaManager.Instance.SetTagDynamization(screen, item, prop, tag, condition, ranges, target);
                     return CallToolResult.Text(res);
+                });
+
+            Register("hmi_delete_dynamization", "Delete one dynamization from a screen item property in place, preserving the item and its other dynamizations.",
+                schema =>
+                {
+                    schema.Properties["screen_name"] = new ToolProperty { Type = "string", Description = "Target screen." };
+                    schema.Properties["item_name"] = new ToolProperty { Type = "string", Description = "Target screen item name." };
+                    schema.Properties["property_name"] = new ToolProperty { Type = "string", Description = "Property whose dynamization to delete, such as BackColor." };
+                    schema.Properties["target_name"] = new ToolProperty { Type = "string", Description = "Target HMI software name (optional)." };
+                    schema.Required = new List<string> { "screen_name", "item_name", "property_name" };
+                },
+                args =>
+                {
+                    string screen = GetStringProp(args, "screen_name") ?? throw new ArgumentException("screen_name is required.");
+                    string item = GetStringProp(args, "item_name") ?? throw new ArgumentException("item_name is required.");
+                    string property = GetStringProp(args, "property_name") ?? throw new ArgumentException("property_name is required.");
+                    string? target = GetStringProp(args, "target_name");
+                    return CallToolResult.Json(_hmiToolOperations.Value.DeleteHmiDynamization(
+                        screen, item, property, target));
+                });
+
+            // Update one existing converter entry without recreating the dynamization.
+            Register("hmi_update_dynamization_entry", "Update the value, alternate value, or flashing settings of one existing tag or expression dynamization mapping entry.",
+                schema =>
+                {
+                    schema.Properties["screen_name"] = new ToolProperty { Type = "string", Description = "Target screen." };
+                    schema.Properties["item_name"] = new ToolProperty { Type = "string", Description = "Target screen item name." };
+                    schema.Properties["property_name"] = new ToolProperty { Type = "string", Description = "Dynamized property, such as BackColor." };
+                    schema.Properties["entry_index"] = new ToolProperty { Type = "integer", Description = "Zero-based index in the mapping table entries." };
+                    var mappingValueProperties = new Dictionary<string, ToolProperty>
+                    {
+                        ["type"] = new ToolProperty { Type = "string", Description = "CLR mapping value type (for example Color, String, Boolean, or Double)." },
+                        ["value"] = new ToolProperty { Type = "string", Description = "Value encoded as text; colors use #RRGGBB or #AARRGGBB." }
+                    };
+                    var mappingValueRequired = new List<string> { "type", "value" };
+                    schema.Properties["new_value"] = new ToolProperty
+                    {
+                        Type = "object",
+                        Description = "Optional typed replacement for the entry's primary value.",
+                        Properties = mappingValueProperties,
+                        Required = mappingValueRequired
+                    };
+                    schema.Properties["new_alternate_value"] = new ToolProperty
+                    {
+                        Type = "object",
+                        Description = "Optional typed replacement for the entry's alternate value.",
+                        Properties = mappingValueProperties,
+                        Required = mappingValueRequired
+                    };
+                    schema.Properties["new_flashing"] = new ToolProperty { Type = "boolean", Description = "Optional flashing enable state." };
+                    schema.Properties["new_flashing_rate"] = new ToolProperty { Type = "string", Description = "Optional TIA flashing rate enum name." };
+                    schema.Properties["target_name"] = new ToolProperty { Type = "string", Description = "Target HMI software name (optional)." };
+                    schema.Required = new List<string> { "screen_name", "item_name", "property_name", "entry_index" };
+                },
+                args =>
+                {
+                    string screen = GetStringProp(args, "screen_name") ?? throw new ArgumentException("screen_name required.");
+                    string item = GetStringProp(args, "item_name") ?? throw new ArgumentException("item_name required.");
+                    string property = GetStringProp(args, "property_name") ?? throw new ArgumentException("property_name required.");
+                    int entryIndex = GetIntProp(args, "entry_index") ?? throw new ArgumentException("entry_index must be an integer.");
+                    var newValue = GetMappingValueInputProp(args, "new_value");
+                    var newAlternateValue = GetMappingValueInputProp(args, "new_alternate_value");
+                    bool? newFlashing = GetNullableBoolProp(args, "new_flashing");
+                    string? newFlashingRate = GetStringProp(args, "new_flashing_rate");
+                    string? target = GetStringProp(args, "target_name");
+
+                    string result = TiaManager.Instance.UpdateDynamizationEntry(
+                        screen, item, property, entryIndex, newValue, newAlternateValue,
+                        newFlashing, newFlashingRate, target);
+                    return CallToolResult.Text(result);
+                });
+
+            Register("hmi_set_expression_dynamization", "Create or update one expression dynamization formula in place, preserving its mapping entries and all other item dynamizations.",
+                schema =>
+                {
+                    schema.Properties["screen_name"] = new ToolProperty { Type = "string", Description = "Target screen." };
+                    schema.Properties["item_name"] = new ToolProperty { Type = "string", Description = "Target screen item." };
+                    schema.Properties["property_name"] = new ToolProperty { Type = "string", Description = "Item property to dynamize, such as Visible or Top." };
+                    schema.Properties["expression"] = new ToolProperty { Type = "string", Description = "Non-empty WinCC Unified expression formula." };
+                    schema.Properties["result_type"] = new ToolProperty
+                    {
+                        Type = "string",
+                        Description = "Declared result type; must match the target property's CLR type. Formula semantics are not statically inferred.",
+                        Enum = new List<string> { "Boolean", "Color", "String", "Byte", "Int16", "UInt16", "Int32", "UInt32", "Int64", "UInt64", "Single", "Double", "Decimal" }
+                    };
+                    schema.Properties["on_conflict"] = new ToolProperty
+                    {
+                        Type = "string",
+                        Description = "Whether an existing tag dynamization on this same property may be replaced (default: fail).",
+                        Enum = new List<string> { "fail", "replace" },
+                        Default = "fail"
+                    };
+                    schema.Properties["target_name"] = new ToolProperty { Type = "string", Description = "Target HMI software name (optional)." };
+                    schema.Required = new List<string> { "screen_name", "item_name", "property_name", "expression", "result_type" };
+                },
+                args =>
+                {
+                    string screen = GetStringProp(args, "screen_name") ?? throw new ArgumentException("screen_name is required.");
+                    string item = GetStringProp(args, "item_name") ?? throw new ArgumentException("item_name is required.");
+                    string property = GetStringProp(args, "property_name") ?? throw new ArgumentException("property_name is required.");
+                    string expression = GetStringProp(args, "expression") ?? throw new ArgumentException("expression is required.");
+                    string resultType = GetStringProp(args, "result_type") ?? throw new ArgumentException("result_type is required.");
+                    string onConflict = GetStringProp(args, "on_conflict") ?? "fail";
+                    string? target = GetStringProp(args, "target_name");
+                    return CallToolResult.Json(_hmiToolOperations.Value.SetExpressionDynamization(
+                        screen, item, property, expression, resultType, onConflict, target));
+                });
+
+            Register("hmi_set_expression_dynamization_entries", "Replace the ordered condition/value rows of one expression dynamization in place and verify the read-back.",
+                schema =>
+                {
+                    schema.Properties["screen_name"] = new ToolProperty { Type = "string", Description = "Target screen." };
+                    schema.Properties["item_name"] = new ToolProperty { Type = "string", Description = "Target screen item." };
+                    schema.Properties["property_name"] = new ToolProperty { Type = "string", Description = "Property whose Expressions-tab condition rows to set, such as Top or Visible." };
+                    schema.Properties["entries"] = new ToolProperty
+                    {
+                        Type = "array",
+                        Description = "Non-empty, ordered list of Boolean condition expressions and mapped property values. Replaces all rows for this property.",
+                        Items = new ToolProperty
+                        {
+                            Type = "object",
+                            Properties = new Dictionary<string, ToolProperty>
+                            {
+                                ["condition"] = new ToolProperty { Type = "string", Description = "WinCC Unified condition expression; its syntax is validated by TIA, not this tool." },
+                                ["value"] = new ToolProperty
+                                {
+                                    Type = "object",
+                                    Properties = new Dictionary<string, ToolProperty>
+                                    {
+                                        ["type"] = new ToolProperty
+                                        {
+                                            Type = "string",
+                                            Description = "Typed mapped value; must match the target property's CLR type.",
+                                            Enum = new List<string> { "Boolean", "Color", "String", "Byte", "Int16", "UInt16", "Int32", "UInt32", "Int64", "UInt64", "Single", "Double", "Decimal" }
+                                        },
+                                        ["value"] = new ToolProperty { Type = "string", Description = "Mapped value encoded as text (for example \"500\", \"true\", or \"#00FF00\")." }
+                                    },
+                                    Required = new List<string> { "type", "value" },
+                                    AdditionalProperties = false
+                                }
+                            },
+                            Required = new List<string> { "condition", "value" },
+                            AdditionalProperties = false
+                        }
+                    };
+                    schema.Properties["on_conflict"] = new ToolProperty
+                    {
+                        Type = "string",
+                        Description = "Whether an existing dynamization on this property may be replaced (default: fail).",
+                        Enum = new List<string> { "fail", "replace" },
+                        Default = "fail"
+                    };
+                    schema.Properties["target_name"] = new ToolProperty { Type = "string", Description = "Target HMI software name (optional)." };
+                    schema.Required = new List<string> { "screen_name", "item_name", "property_name", "entries" };
+                },
+                args =>
+                {
+                    string screen = GetStringProp(args, "screen_name") ?? throw new ArgumentException("screen_name is required.");
+                    string item = GetStringProp(args, "item_name") ?? throw new ArgumentException("item_name is required.");
+                    string property = GetStringProp(args, "property_name") ?? throw new ArgumentException("property_name is required.");
+                    if (!args.HasValue || args.Value.ValueKind != JsonValueKind.Object ||
+                        !args.Value.TryGetProperty("entries", out JsonElement entries) ||
+                        entries.ValueKind != JsonValueKind.Array)
+                        throw new ArgumentException("entries must be an array.");
+                    string onConflict = GetStringProp(args, "on_conflict") ?? "fail";
+                    string? target = GetStringProp(args, "target_name");
+                    return CallToolResult.Json(_hmiToolOperations.Value.SetExpressionDynamizationEntries(
+                        screen, item, property, entries.Clone(), onConflict, target));
                 });
 
             // 33. hmi_update_button_scripts
@@ -1465,6 +1881,17 @@ namespace TiaOpennessMcp.Tools
             return null;
         }
 
+        private static long? GetLongProp(JsonElement? element, string propName)
+        {
+            if (element.HasValue && element.Value.ValueKind == JsonValueKind.Object &&
+                element.Value.TryGetProperty(propName, out var prop))
+            {
+                if (prop.ValueKind == JsonValueKind.Number && prop.TryGetInt64(out long val))
+                    return val;
+            }
+            return null;
+        }
+
         private static uint? GetUIntProp(JsonElement? element, string propName)
         {
             if (element.HasValue && element.Value.ValueKind == JsonValueKind.Object &&
@@ -1509,6 +1936,33 @@ namespace TiaOpennessMcp.Tools
             return defaultValue;
         }
 
+        private static bool? GetNullableBoolProp(JsonElement? element, string propName)
+        {
+            if (!element.HasValue || element.Value.ValueKind != JsonValueKind.Object ||
+                !element.Value.TryGetProperty(propName, out var prop))
+                return null;
+            if (prop.ValueKind == JsonValueKind.True) return true;
+            if (prop.ValueKind == JsonValueKind.False) return false;
+            throw new ArgumentException($"{propName} must be a boolean.");
+        }
+
+        private static HmiMappingValueInput? GetMappingValueInputProp(JsonElement? element, string propName)
+        {
+            if (!element.HasValue || element.Value.ValueKind != JsonValueKind.Object ||
+                !element.Value.TryGetProperty(propName, out var prop))
+                return null;
+            if (prop.ValueKind != JsonValueKind.Object ||
+                !prop.TryGetProperty("type", out var type) || type.ValueKind != JsonValueKind.String ||
+                !prop.TryGetProperty("value", out var value) || value.ValueKind != JsonValueKind.String)
+                throw new ArgumentException($"{propName} must be an object with string 'type' and 'value' fields.");
+
+            return new HmiMappingValueInput
+            {
+                Type = type.GetString() ?? "",
+                Value = value.GetString() ?? ""
+            };
+        }
+
         private static List<string>? GetStringListProp(JsonElement? element, string propName)
         {
             if (element.HasValue && element.Value.ValueKind == JsonValueKind.Object &&
@@ -1529,29 +1983,45 @@ namespace TiaOpennessMcp.Tools
             return null;
         }
 
-        private static List<RangeEntryDto>? GetRangesProp(JsonElement? element, string propName)
+        private static List<HmiRangeEntryInput>? GetRangesProp(JsonElement? element, string propName)
         {
             if (element.HasValue && element.Value.ValueKind == JsonValueKind.Object &&
                 element.Value.TryGetProperty(propName, out var prop) &&
                 prop.ValueKind == JsonValueKind.Array)
             {
-                var list = new List<RangeEntryDto>();
+                var list = new List<HmiRangeEntryInput>();
                 foreach (var item in prop.EnumerateArray())
                 {
-                    if (item.ValueKind == JsonValueKind.Object)
-                    {
-                        double from = 0.0, to = 0.0;
-                        string val = "";
-                        if (item.TryGetProperty("from", out var pFrom) && pFrom.TryGetDouble(out var dFrom)) from = dFrom;
-                        if (item.TryGetProperty("to", out var pTo) && pTo.TryGetDouble(out var dTo)) to = dTo;
-                        if (item.TryGetProperty("value", out var pVal)) val = pVal.GetString() ?? "";
+                    if (item.ValueKind != JsonValueKind.Object)
+                        throw new ArgumentException($"Each '{propName}' entry must be an object.");
+                    if (!item.TryGetProperty("from", out var pFrom))
+                        throw new ArgumentException($"Each '{propName}' entry must include a numeric 'from' value.");
+                    if (!item.TryGetProperty("to", out var pTo))
+                        throw new ArgumentException($"Each '{propName}' entry must include a numeric 'to' value.");
+                    if (!item.TryGetProperty("value", out var pVal) || pVal.ValueKind != JsonValueKind.String)
+                        throw new ArgumentException($"Each '{propName}' entry must include a string 'value'.");
 
-                        list.Add(new RangeEntryDto { From = from, To = to, Value = val });
-                    }
+                    list.Add(new HmiRangeEntryInput
+                    {
+                        From = GetRangeNumber(pFrom, propName, "from"),
+                        To = GetRangeNumber(pTo, propName, "to"),
+                        Value = pVal.GetString() ?? ""
+                    });
                 }
                 return list;
             }
             return null;
+        }
+
+        private static object GetRangeNumber(JsonElement value, string propName, string fieldName)
+        {
+            if (value.ValueKind != JsonValueKind.Number)
+                throw new ArgumentException($"'{fieldName}' in '{propName}' entries must be a number.");
+            if (value.TryGetInt32(out int intValue)) return intValue;
+            if (value.TryGetInt64(out long longValue)) return longValue;
+            if (value.TryGetUInt64(out ulong ulongValue)) return ulongValue;
+            if (value.TryGetDouble(out double doubleValue)) return doubleValue;
+            throw new ArgumentException($"'{fieldName}' in '{propName}' entries is outside the supported numeric range.");
         }
 
         private static List<TextListEntryInput> GetTextListEntries(JsonElement? element, string propName)

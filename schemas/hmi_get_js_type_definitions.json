@@ -1,0 +1,9 @@
+{
+  "name": "hmi_get_js_type_definitions",
+  "description": "Get the server-bundled, documented subset of WinCC Unified runtime JavaScript type declarations. This is not a complete Siemens declaration set.",
+  "parameters": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "name": "hmi_delete_dynamization",
+  "description": "Delete one dynamization from a screen item property in place, preserving the item and its other dynamizations.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "screen_name": {
+        "type": "string",
+        "description": "Target screen."
+      },
+      "item_name": {
+        "type": "string",
+        "description": "Target screen item name."
+      },
+      "property_name": {
+        "type": "string",
+        "description": "Property whose dynamization to delete, such as BackColor."
+      },
+      "target_name": {
+        "type": "string",
+        "description": "Target HMI software name (optional)."
+      }
+    },
+    "required": [
+      "screen_name",
+      "item_name",
+      "property_name"
+    ],
+    "additionalProperties": false
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "name": "hmi_get_screen_item",
+  "description": "Read one screen item with its complete supported properties, event scripts, and full tag/expression dynamization state.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "screen_name": {
+        "type": "string",
+        "description": "Name of the screen containing the item."
+      },
+      "item_name": {
+        "type": "string",
+        "description": "Name of the item to inspect."
+      },
+      "target_name": {
+        "type": "string",
+        "description": "Target HMI software name (optional)."
+      }
+    },
+    "required": [
+      "screen_name",
+      "item_name"
+    ],
+    "additionalProperties": false
+  }
+}

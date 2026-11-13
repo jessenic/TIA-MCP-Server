@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Net;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -17,6 +20,8 @@ namespace TiaOpennessMcp.Server
     {
         private readonly ServerConfig _config;
         private readonly ToolRegistry _toolRegistry;
+        private readonly string _bearerToken;
+        private readonly HashSet<string> _corsAllowedOrigins;
         private readonly JsonSerializerOptions _jsonOptions;
         private readonly HttpListener _listener;
         private readonly ConcurrentDictionary<string, SseSession> _sessions = new ConcurrentDictionary<string, SseSession>();
@@ -28,6 +33,25 @@ namespace TiaOpennessMcp.Server
         {
             _config = config;
             _toolRegistry = toolRegistry;
+            _bearerToken = config.Server.RequireBearerToken
+                ? Environment.GetEnvironmentVariable("TIA_MCP_BEARER_TOKEN")?.Trim() ?? ""
+                : "";
+            if (config.Server.RequireBearerToken && string.IsNullOrWhiteSpace(_bearerToken))
+            {
+                throw new InvalidOperationException("Set the TIA_MCP_BEARER_TOKEN environment variable before starting the HTTP server.");
+            }
+
+            string allowedOrigins = Environment.GetEnvironmentVariable("TIA_MCP_CORS_ALLOWED_ORIGINS") ?? "";
+            _corsAllowedOrigins = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string origin in allowedOrigins.Split(','))
+            {
+                string trimmedOrigin = origin.Trim();
+                if (!string.IsNullOrEmpty(trimmedOrigin))
+                {
+                    _corsAllowedOrigins.Add(trimmedOrigin);
+                }
+            }
+
             _jsonOptions = new JsonSerializerOptions
             {
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -119,27 +143,49 @@ namespace TiaOpennessMcp.Server
         {
             var req = context.Request;
             var res = context.Response;
-
-            // Apply CORS headers
-            if (_config.Server.EnableCors)
-            {
-                res.AddHeader("Access-Control-Allow-Origin", "*");
-                res.AddHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-                res.AddHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept");
-            }
-
-            if (req.HttpMethod.Equals("OPTIONS", StringComparison.OrdinalIgnoreCase))
-            {
-                res.StatusCode = (int)HttpStatusCode.NoContent;
-                res.Close();
-                return;
-            }
-
             string rawPath = req.Url?.AbsolutePath ?? "/";
-            string path = rawPath.TrimEnd('/').ToLowerInvariant();
+            string requestTarget = _config.Server.LogHttpRequestDetails
+                ? req.Url?.PathAndQuery ?? rawPath
+                : rawPath;
+            var requestTimer = Stopwatch.StartNew();
+            Console.Error.WriteLine($"[HttpMcpServer] Request: {req.HttpMethod} {requestTarget}");
 
             try
             {
+                string? origin = req.Headers["Origin"];
+                if (_config.Server.EnableCors && origin != null && _corsAllowedOrigins.Contains(origin))
+                {
+                    res.AddHeader("Access-Control-Allow-Origin", origin);
+                    res.AddHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+                    res.AddHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept");
+                    res.AddHeader("Vary", "Origin");
+                }
+
+                if (req.HttpMethod.Equals("OPTIONS", StringComparison.OrdinalIgnoreCase))
+                {
+                    res.StatusCode = (int)HttpStatusCode.NoContent;
+                    res.Close();
+                    return;
+                }
+
+                if (_config.Server.RequireBearerToken)
+                {
+                    string authorization = req.Headers["Authorization"] ?? "";
+                    const string bearerPrefix = "Bearer ";
+                    string providedToken = authorization.StartsWith(bearerPrefix, StringComparison.OrdinalIgnoreCase)
+                        ? authorization.Substring(bearerPrefix.Length).Trim()
+                        : "";
+                    if (string.IsNullOrEmpty(providedToken) || !FixedTimeEquals(providedToken, _bearerToken))
+                    {
+                        res.StatusCode = (int)HttpStatusCode.Unauthorized;
+                        res.AddHeader("WWW-Authenticate", "Bearer");
+                        res.Close();
+                        return;
+                    }
+                }
+
+                string path = rawPath.TrimEnd('/').ToLowerInvariant();
+
                 // Health & Status endpoints
                 if (path == "" || path == "/status" || path == "/health")
                 {
@@ -178,6 +224,16 @@ namespace TiaOpennessMcp.Server
                 await res.OutputStream.WriteAsync(notFoundBytes, 0, notFoundBytes.Length).ConfigureAwait(false);
                 res.Close();
             }
+            catch (TimeoutException ex)
+            {
+                Console.Error.WriteLine($"[HttpMcpServer] Request timed out: {req.HttpMethod} {rawPath}: {ex.Message}");
+                try
+                {
+                    res.StatusCode = (int)HttpStatusCode.GatewayTimeout;
+                    res.Close();
+                }
+                catch { }
+            }
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"[HttpMcpServer] Error handling {req.HttpMethod} {rawPath}: {ex}");
@@ -192,6 +248,31 @@ namespace TiaOpennessMcp.Server
                 }
                 catch { }
             }
+            finally
+            {
+                requestTimer.Stop();
+                Console.Error.WriteLine(
+                    $"[HttpMcpServer] Completed: {req.HttpMethod} {rawPath} -> {res.StatusCode} ({requestTimer.ElapsedMilliseconds} ms)");
+            }
+        }
+
+        private static bool FixedTimeEquals(string left, string right)
+        {
+            byte[] leftHash;
+            byte[] rightHash;
+            using (SHA256 sha256 = SHA256.Create())
+            {
+                leftHash = sha256.ComputeHash(Encoding.UTF8.GetBytes(left));
+                rightHash = sha256.ComputeHash(Encoding.UTF8.GetBytes(right));
+            }
+
+            int difference = 0;
+            for (int i = 0; i < leftHash.Length; i++)
+            {
+                difference |= leftHash[i] ^ rightHash[i];
+            }
+
+            return difference == 0;
         }
 
         private async Task HandleStatusAsync(HttpListenerContext context)
@@ -202,7 +283,7 @@ namespace TiaOpennessMcp.Server
             var statusObj = new
             {
                 server = "TiaOpennessMcp",
-                version = "2.0.0",
+                version = "2.4.0",
                 mode = _config.Server.Mode,
                 port = _config.Server.Port,
                 connected = tia.IsConnected,
@@ -299,10 +380,12 @@ namespace TiaOpennessMcp.Server
             {
                 body = await reader.ReadToEndAsync().ConfigureAwait(false);
             }
+            LogRequestBody(body);
 
             // Respond 202 Accepted immediately to POST
             res.StatusCode = (int)HttpStatusCode.Accepted;
             res.Close();
+            Console.Error.WriteLine($"[HttpMcpServer] Queued SSE RPC message for session {sessionId}.");
 
             // Process JSON-RPC request asynchronously and deliver result via SSE stream
             _ = Task.Run(() =>
@@ -314,6 +397,7 @@ namespace TiaOpennessMcp.Server
                     {
                         session.EnqueueMessage(responseJson);
                     }
+                    Console.Error.WriteLine($"[HttpMcpServer] Finished SSE RPC processing for session {sessionId}.");
                 }
                 catch (Exception ex)
                 {
@@ -332,6 +416,7 @@ namespace TiaOpennessMcp.Server
             {
                 body = await reader.ReadToEndAsync().ConfigureAwait(false);
             }
+            LogRequestBody(body);
 
             string responseJson = ProcessJsonRpcRequest(body);
             byte[] bytes = Encoding.UTF8.GetBytes(responseJson);
@@ -341,6 +426,14 @@ namespace TiaOpennessMcp.Server
             res.ContentLength64 = bytes.Length;
             await res.OutputStream.WriteAsync(bytes, 0, bytes.Length).ConfigureAwait(false);
             res.Close();
+        }
+
+        private void LogRequestBody(string body)
+        {
+            if (_config.Server.LogHttpRequestDetails)
+            {
+                Console.Error.WriteLine($"[HttpMcpServer] Request body: {JsonSerializer.Serialize(body)}");
+            }
         }
 
         public string ProcessJsonRpcRequest(string rawJson)
@@ -357,6 +450,7 @@ namespace TiaOpennessMcp.Server
             }
             catch (Exception ex)
             {
+                Console.Error.WriteLine($"[HttpMcpServer] Invalid JSON-RPC request: {ex.Message}");
                 return JsonSerializer.Serialize(JsonRpcResponse.Fail(null, -32700, $"Parse error: {ex.Message}"), _jsonOptions);
             }
 
@@ -364,6 +458,8 @@ namespace TiaOpennessMcp.Server
             {
                 return JsonSerializer.Serialize(JsonRpcResponse.Fail(null, -32600, "Invalid Request"), _jsonOptions);
             }
+
+            Console.Error.WriteLine($"[HttpMcpServer] Processing JSON-RPC method '{req.Method}'.");
 
             // Notifications
             if (req.Method.StartsWith("notifications/") || req.Method == "exit")
@@ -380,11 +476,12 @@ namespace TiaOpennessMcp.Server
                         ServerInfo = new ServerInfo
                         {
                             Name = "tia-portal-openness-v21",
-                            Version = "2.0.0"
+                            Version = "2.4.0"
                         },
                         Capabilities = new ServerCapabilities
                         {
-                            Tools = new System.Collections.Generic.Dictionary<string, object>()
+                            Tools = new System.Collections.Generic.Dictionary<string, object>(),
+                            Resources = new System.Collections.Generic.Dictionary<string, object>()
                         }
                     };
                     return JsonSerializer.Serialize(JsonRpcResponse.Success(req.Id, initResult), _jsonOptions);
@@ -399,11 +496,48 @@ namespace TiaOpennessMcp.Server
                     };
                     return JsonSerializer.Serialize(JsonRpcResponse.Success(req.Id, toolsResult), _jsonOptions);
 
+                case "resources/list":
+                    return JsonSerializer.Serialize(
+                        JsonRpcResponse.Success(req.Id, McpResourceCatalog.List()), _jsonOptions);
+
+                case "resources/read":
+                    return HandleResourceRead(req);
+
                 case "tools/call":
                     return HandleToolCall(req);
 
                 default:
                     return JsonSerializer.Serialize(JsonRpcResponse.Fail(req.Id, -32601, $"Method not found: '{req.Method}'"), _jsonOptions);
+            }
+        }
+
+        private string HandleResourceRead(JsonRpcRequest req)
+        {
+            if (req.Params == null ||
+                req.Params.Value.ValueKind != JsonValueKind.Object ||
+                !req.Params.Value.TryGetProperty("uri", out JsonElement uriElement) ||
+                uriElement.ValueKind != JsonValueKind.String)
+            {
+                return JsonSerializer.Serialize(
+                    JsonRpcResponse.Fail(req.Id, -32602, "Invalid params: expected a string 'uri'."),
+                    _jsonOptions);
+            }
+
+            string uri = uriElement.GetString()!;
+            try
+            {
+                return JsonSerializer.Serialize(
+                    JsonRpcResponse.Success(req.Id, McpResourceCatalog.Read(uri)), _jsonOptions);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                return JsonSerializer.Serialize(
+                    JsonRpcResponse.Fail(req.Id, -32002, ex.Message), _jsonOptions);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return JsonSerializer.Serialize(
+                    JsonRpcResponse.Fail(req.Id, -32603, ex.Message), _jsonOptions);
             }
         }
 
@@ -431,8 +565,18 @@ namespace TiaOpennessMcp.Server
                 return JsonSerializer.Serialize(JsonRpcResponse.Fail(req.Id, -32602, "Missing 'name' in tools/call params"), _jsonOptions);
             }
 
-            var result = _toolRegistry.Execute(toolName!, toolArgs);
-            return JsonSerializer.Serialize(JsonRpcResponse.Success(req.Id, result), _jsonOptions);
+            var toolTimer = Stopwatch.StartNew();
+            Console.Error.WriteLine($"[HttpMcpServer] Executing tool '{toolName}'.");
+            try
+            {
+                var result = _toolRegistry.Execute(toolName!, toolArgs);
+                return JsonSerializer.Serialize(JsonRpcResponse.Success(req.Id, result), _jsonOptions);
+            }
+            finally
+            {
+                toolTimer.Stop();
+                Console.Error.WriteLine($"[HttpMcpServer] Tool '{toolName}' execution finished ({toolTimer.ElapsedMilliseconds} ms).");
+            }
         }
 
         public void Dispose()

@@ -3,7 +3,9 @@
     "host": "http://localhost:5001/",
     "port": 5001,
     "mode": "HttpAndStdio",
-    "enableCors": true
+    "enableCors": true,
+    "requireBearerToken": true,
+    "logHttpRequestDetails": false
   },
   "tia": {
     "autoConnect": false,

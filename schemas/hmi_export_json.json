@@ -1,6 +1,6 @@
 {
   "name": "hmi_export_json",
-  "description": "Export a Unified HMI target as a versioned JSON directory containing screens, tag tables, alarms, optional styles, and file hashes.",
+  "description": "Export a Unified HMI target as versioned JSON files. Omit output_directory to stage a remote-readable export and return a transfer_id.",
   "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -13,7 +13,7 @@
         "type": "boolean"
       },
       "output_directory": {
-        "description": "Directory to write the hmi/<Target> JSON export.",
+        "description": "Optional local server directory. Omit for a staged export readable with hmi_read_export_file.",
         "type": "string"
       },
       "script_files": {
@@ -25,9 +25,6 @@
         "type": "string"
       }
     },
-    "required": [
-      "output_directory"
-    ],
     "type": "object"
   }
 }

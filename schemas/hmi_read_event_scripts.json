@@ -1,0 +1,25 @@
+{
+  "name": "hmi_read_event_scripts",
+  "description": "Read event scripts and the V21-supported event names for a screen or one screen item.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "screen_name": {
+        "type": "string",
+        "description": "Screen name. When item_name is omitted, reads the screen's events."
+      },
+      "item_name": {
+        "type": "string",
+        "description": "Optional item name; omit to read screen events."
+      },
+      "target_name": {
+        "type": "string",
+        "description": "Target HMI software name (optional)."
+      }
+    },
+    "required": [
+      "screen_name"
+    ],
+    "additionalProperties": false
+  }
+}

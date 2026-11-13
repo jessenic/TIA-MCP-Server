@@ -1,0 +1,65 @@
+{
+  "name": "hmi_set_expression_dynamization",
+  "description": "Create or update one expression dynamization formula in place, preserving its mapping entries and all other item dynamizations.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "screen_name": {
+        "type": "string",
+        "description": "Target screen."
+      },
+      "item_name": {
+        "type": "string",
+        "description": "Target screen item."
+      },
+      "property_name": {
+        "type": "string",
+        "description": "Item property to dynamize, such as Visible or Top."
+      },
+      "expression": {
+        "type": "string",
+        "description": "Non-empty WinCC Unified expression formula."
+      },
+      "result_type": {
+        "type": "string",
+        "description": "Declared result type; must match the target property's CLR type. Formula semantics are not statically inferred.",
+        "enum": [
+          "Boolean",
+          "Color",
+          "String",
+          "Byte",
+          "Int16",
+          "UInt16",
+          "Int32",
+          "UInt32",
+          "Int64",
+          "UInt64",
+          "Single",
+          "Double",
+          "Decimal"
+        ]
+      },
+      "on_conflict": {
+        "type": "string",
+        "description": "Whether an existing tag dynamization on this same property may be replaced (default: fail).",
+        "enum": [
+          "fail",
+          "replace"
+        ],
+        "default": "fail"
+      },
+      "target_name": {
+        "type": "string",
+        "description": "Target HMI software name (optional)."
+      }
+    },
+    "required": [
+      "screen_name",
+      "item_name",
+      "property_name",
+      "expression",
+      "result_type"
+    ],
+    "additionalProperties": false
+  }
+}

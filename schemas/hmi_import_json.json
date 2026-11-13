@@ -1,6 +1,6 @@
 {
   "name": "hmi_import_json",
-  "description": "Upsert a versioned Unified HMI JSON directory under an Openness transaction, verify it, compile, and never save the project.",
+  "description": "Upsert a versioned Unified HMI JSON directory under an Openness transaction, verify it, compile, and never save the project. Provide exactly one of input_directory or transfer_id.",
   "parameters": {
     "additionalProperties": false,
     "properties": {
@@ -9,7 +9,11 @@
         "type": "boolean"
       },
       "input_directory": {
-        "description": "Directory containing manifest.json and the referenced screen/tag/alarm files.",
+        "description": "Server-local directory containing manifest.json and referenced files. Use this or transfer_id, not both.",
+        "type": "string"
+      },
+      "transfer_id": {
+        "description": "Staged import ID returned by hmi_begin_import. Use this or input_directory, not both.",
         "type": "string"
       },
       "prune_items": {
@@ -25,9 +29,6 @@
         "type": "boolean"
       }
     },
-    "required": [
-      "input_directory"
-    ],
     "type": "object"
   }
 }

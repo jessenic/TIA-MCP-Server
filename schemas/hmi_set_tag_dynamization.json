@@ -1,6 +1,6 @@
 {
   "name": "hmi_set_tag_dynamization",
-  "description": "Set tag dynamization on a screen item property (e.g. BackColor range dynamization linked to a tag with range entries).",
+  "description": "Set tag dynamization on a screen item property using numeric ranges or Boolean Singlebit mapping.",
   "parameters": {
     "type": "object",
     "properties": {
@@ -22,11 +22,11 @@
       },
       "condition_type": {
         "type": "string",
-        "description": "\u0027None\u0027 or \u0027Range\u0027."
+        "description": "\u0027None\u0027, \u0027Range\u0027, or \u0027Singlebit\u0027."
       },
       "ranges": {
         "type": "array",
-        "description": "List of ranges: [{from: 0, to: 0, value: \u0027gray\u0027}, {from: 1, to: 1, value: \u0027green\u0027}].",
+        "description": "For Range, list numeric from/to bounds. For Singlebit, provide exactly two entries with matching bounds 0/0 and 1/1; their values map the off/on states.",
         "items": {
           "type": "object",
           "description": "",

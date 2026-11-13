@@ -1,5 +1,5 @@
 # Siemens TIA Portal V21 Openness MCP Server
-## Complete Tools Reference Dictionary (68 Tools)
+## Complete Tools Reference Dictionary (81 Tools)
 
 **Protocol Specification:** Model Context Protocol (MCP) JSON-RPC 2.0  
 **Transport Binding:** HTTP (`POST /mcp`), SSE (`GET /sse`), stdio  
@@ -14,10 +14,24 @@
 | :---: | :--- | :---: | :--- |
 | **1** | [Connection & Session Management](#category-1-connection--session-management-8-tools) | 8 | `tia_get_status`, `tia_list_processes`, `tia_connect`, `tia_disconnect`, `tia_get_project_info`, `tia_open_project`, `tia_save_project`, `tia_close_project` |
 | **2** | [Hardware & Device Topology](#category-2-hardware--device-topology-2-tools) | 2 | `tia_list_devices`, `tia_get_device_tree` |
-| **3** | [PLC Software, Blocks & Compilation](#category-3-plc-software-blocks--compilation-9-tools) | 9 | `tia_list_plcs`, `tia_list_blocks`, `tia_get_block_code`, `tia_import_block`, `tia_delete_block`, `tia_list_plc_types`, `tia_get_plc_type`, `tia_import_plc_type`, `tia_compile` |
-| **4** | [WinCC Unified HMI Engineering](#category-4-wincc-unified-hmi-screen--widget-engineering-35-tools) | 35 | `hmi_list_targets`, `hmi_list_screens`, `hmi_create_screen`, `hmi_delete_screen`, `hmi_get_screen_items`, `hmi_delete_screen_items`, `hmi_add_label`, `hmi_add_button`, `hmi_add_toggle_switch`, `hmi_add_shape`, `hmi_add_io_field`, `hmi_set_tag_dynamization`, `hmi_update_button_scripts`, `hmi_list_tag_tables`, `hmi_list_tags`, `hmi_create_tag`, `hmi_create_discrete_alarm`, `hmi_update_tag_acquisition_cycles`, `hmi_set_tag_range`, `hmi_create_data_log`, `hmi_assign_logging_tags`, `hmi_list_connections`, `hmi_create_connection`, `hmi_delete_connection`, `hmi_list_text_lists`, `hmi_create_text_list`, `hmi_delete_text_list`, `hmi_export_text_lists`, `hmi_compile`, `tia_list_tag_tables`, `tia_get_tags`, `hmi_export_json`, `hmi_import_json`, `hmi_patch_json`, `hmi_render_json` |
+| **3** | [PLC Software, Blocks & Compilation](#category-3-plc-software-blocks--compilation-10-tools) | 10 | `tia_list_plcs`, `tia_list_blocks`, `tia_get_block_code`, `tia_import_block`, `tia_import_scl_block`, `tia_delete_block`, `tia_list_plc_types`, `tia_get_plc_type`, `tia_import_plc_type`, `tia_compile` |
+| **4** | [WinCC Unified HMI Engineering](#category-4-wincc-unified-hmi-screen--widget-engineering-47-tools) | 47 | `hmi_list_targets`, `hmi_list_screens`, `hmi_create_screen`, `hmi_delete_screen`, `hmi_get_screen_items`, `hmi_get_screen_item`, `hmi_update_screen_item`, `hmi_read_event_scripts`, `hmi_set_event_script`, `hmi_delete_screen_items`, `hmi_add_label`, `hmi_add_button`, `hmi_add_toggle_switch`, `hmi_add_shape`, `hmi_add_io_field`, `hmi_set_tag_dynamization`, `hmi_delete_dynamization`, `hmi_update_dynamization_entry`, `hmi_set_expression_dynamization`, `hmi_set_expression_dynamization_entries`, `hmi_get_js_type_definitions`, `hmi_update_button_scripts`, `hmi_list_tag_tables`, `hmi_list_tags`, `hmi_create_tag`, `hmi_create_discrete_alarm`, `hmi_update_tag_acquisition_cycles`, `hmi_set_tag_range`, `hmi_create_data_log`, `hmi_assign_logging_tags`, `hmi_list_connections`, `hmi_create_connection`, `hmi_delete_connection`, `hmi_list_text_lists`, `hmi_create_text_list`, `hmi_delete_text_list`, `hmi_export_text_lists`, `hmi_compile`, `tia_list_tag_tables`, `tia_get_tags`, `hmi_export_json`, `hmi_read_export_file`, `hmi_begin_import`, `hmi_upload_import_file`, `hmi_import_json`, `hmi_patch_json`, `hmi_render_json` |
 | **5** | [Siemens TestSuite Automation](#category-5-siemens-testsuite-automation-2-tools) | 2 | `tia_testsuite_list_tests`, `tia_testsuite_load_test` |
 | **6** | [S7-PLCSIM Advanced Live Simulation & Testing](#category-6-s7-plcsim-advanced-live-simulation--testing-12-tools) | 12 | `plcsim_list_instances`, `plcsim_connect`, `plcsim_disconnect`, `plcsim_get_status`, `plcsim_set_operating_state`, `plcsim_set_scale_factor`, `plcsim_read_tag`, `plcsim_write_tag`, `plcsim_read_tags`, `plcsim_write_tags`, `plcsim_run_sequence`, `plcsim_run_mixing_sequence` |
+
+## MCP Documentation Resources
+
+The server exposes these read-only Markdown resources through `resources/list` and `resources/read`:
+
+| URI | Contents |
+| :--- | :--- |
+| `tia://docs/tools-reference` | Detailed tool arguments and return shapes. |
+| `tia://docs/skills-and-tools` | Server, skills, and tools overview. |
+| `tia://docs/agent-prompting-and-system-functions` | Agent prompting guidance and WinCC Unified system functions. |
+| `tia://docs/hmi-javascript-type-definitions` | Bundled TypeScript declaration subset for documented WinCC Unified runtime APIs. |
+
+Use the live tool schemas as the authority for currently available tool names and arguments.
+The bundled Openness assemblies cover authoring APIs, not the complete WinCC Unified runtime-script declaration surface. The JavaScript type-definition resource is an explicitly scoped subset based on APIs documented by this server; it is not a Siemens-generated V21 declaration file. It omits unverified tag-read and direct item-object access APIs.
 
 ---
 
@@ -191,7 +205,7 @@
 
 ---
 
-## Category 3: PLC Software, Blocks & Compilation (9 Tools)
+## Category 3: PLC Software, Blocks & Compilation (10 Tools)
 
 ### 11. `tia_list_plcs`
 - **Description:** Lists all PLCs with block counts, UDT counts, and tag table counts.
@@ -277,6 +291,19 @@
 
 ---
 
+### 14a. `tia_import_scl_block`
+- **Description:** Imports a complete SCL source for one PLC block. When a block with the same name exists, it is backed up, deleted, and replaced; a failed import attempts to restore the backup. This is whole-block replacement, not an in-place edit. Compilation defaults to enabled; compilation errors are returned and do not roll back the import.
+- **Parameters:**
+  | Parameter | Type | Required | Default | Description |
+  | :--- | :---: | :---: | :---: | :--- |
+  | `scl_code` | string | **Yes** | — | Complete source for exactly one `FUNCTION`, `FUNCTION_BLOCK`, `ORGANIZATION_BLOCK`, or `DATA_BLOCK`. |
+  | `plc_name` | string | No | null | Target PLC name. |
+  | `folder` | string | No | null | Existing PLC block group path; when omitted, preserves the existing block's group or uses the root group for a new block. |
+  | `compile_after_import` | boolean | No | `true` | Compile the target PLC after generation. Compilation errors do not trigger rollback. |
+  | `open_after_import` | boolean | No | `false` | Open the imported block in the TIA Portal editor. |
+
+---
+
 ### 15. `tia_delete_block`
 - **Description:** Deletes a program block from the PLC.
 - **Parameters:**
@@ -344,7 +371,7 @@
 
 ---
 
-## Category 4: WinCC Unified HMI Screen & Widget Engineering (35 Tools)
+## Category 4: WinCC Unified HMI Screen & Widget Engineering (46 Tools)
 
 ### 20. `hmi_list_targets`
 - **Description:** Enumerates all WinCC Unified runtime devices and software containers.
@@ -533,7 +560,7 @@
 ---
 
 ### 31. `hmi_set_tag_dynamization`
-- **Description:** Binds a screen item property (e.g. `BackColor`, `Visible`) to an HMI tag using `ConditionType.Range`.
+- **Description:** Binds a screen item property (e.g. `BackColor`, `Visible`) to an HMI tag using `ConditionType.Range` or `ConditionType.Singlebit`.
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
   | :--- | :---: | :---: | :---: | :--- |
@@ -541,8 +568,8 @@
   | `item_name` | string | **Yes** | — | Target screen item name. |
   | `property_name` | string | **Yes** | — | Property to dynamize (`"BackColor"`). |
   | `tag_name` | string | **Yes** | — | HMI tag name. |
-  | `condition_type` | string | No | `"None"` | `"None"` or `"Range"`. |
-  | `ranges` | array | No | null | List of `{ "from": 0, "to": 0, "value": "gray" }`. |
+  | `condition_type` | string | No | `"None"` | `"None"`, `"Range"`, or `"Singlebit"`. |
+  | `ranges` | array | No | null | For `Range`, provide numeric bounds. For `Singlebit`, provide exactly one `0..0` and one `1..1` entry; values map the off/on states. |
   | `target_name` | string | No | null | Target HMI software. |
 - **Sample Invocation:**
   ```json
@@ -559,7 +586,53 @@
   }
   ```
 
+### `hmi_update_dynamization_entry`
+- **Description:** Updates selected values or flashing settings on one existing mapping-table entry in a tag or expression dynamization. Entry indices are zero-based and preserve all other entries and conditions.
+- **Parameters:**
+  | Parameter | Type | Required | Default | Description |
+  | :--- | :---: | :---: | :---: | :--- |
+  | `screen_name` | string | **Yes** | — | Target screen. |
+  | `item_name` | string | **Yes** | — | Target screen item name. |
+  | `property_name` | string | **Yes** | — | Dynamized property, such as `BackColor`. |
+  | `entry_index` | integer | **Yes** | — | Zero-based mapping-table entry index. |
+  | `new_value` | object | No | — | Optional `{ "type": "Color", "value": "#E80000" }` replacement for the entry's primary value. |
+  | `new_alternate_value` | object | No | — | Optional typed replacement for the alternate value, using the same `{ "type": "...", "value": "..." }` shape. |
+  | `new_flashing` | boolean | No | — | Optional flashing enable state. |
+  | `new_flashing_rate` | string | No | — | Optional TIA flashing rate enum name. |
+  | `target_name` | string | No | null | Target HMI software. |
+- Mapping value types use the exported CLR names: `String`, `Boolean`, `Color`, `Byte`, `Int16`, `UInt16`, `Int32`, `UInt32`, `Int64`, `UInt64`, `Single`, `Double`, or `Decimal`. The supplied type must match the existing entry value type.
+- **Sample Invocation:**
+  ```json
+  {
+    "screen_name": "Main_UnitControlSideBar",
+    "item_name": "UCS_Ind_Alarm",
+    "property_name": "BackColor",
+    "entry_index": 1,
+    "new_value": { "type": "Color", "value": "#E80000" }
+  }
+  ```
+
 ---
+
+### `hmi_delete_dynamization`
+- **Description:** Deletes only the selected item's dynamization for one property. The item and all its other properties and dynamizations are preserved; the operation is verified and left unsaved.
+- **Parameters:**
+  | Parameter | Type | Required | Default | Description |
+  | :--- | :---: | :---: | :---: | :--- |
+  | `screen_name` | string | **Yes** | — | Target screen. |
+  | `item_name` | string | **Yes** | — | Target screen item. |
+  | `property_name` | string | **Yes** | — | Dynamized property, such as `BackColor`. |
+  | `target_name` | string | No | null | Target HMI software. |
+- The tool fails if the item or dynamization does not exist. It does not save the project.
+- **Sample Invocation:**
+  ```json
+  {
+    "screen_name": "Main_UnitControlSideBar_ForTesting",
+    "item_name": "UCS_Btn_2",
+    "property_name": "BackColor",
+    "target_name": "HMI_RT_1"
+  }
+  ```
 
 ### 32. `hmi_update_button_scripts`
 - **Description:** Modifies existing button scripts **in-place** without deleting screen items, running Openness JavaScript syntax checking.
@@ -960,19 +1033,33 @@
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
   | :--- | :---: | :---: | :---: | :--- |
-  | `output_directory` | string | **Yes** | — | Destination directory for `manifest.json`, `screens/`, `tags/`, and `alarms/`. |
+  | `output_directory` | string | No | staged transfer | Optional server-local destination. Omit for a remote-readable export; response includes `transferId` and `files`. |
   | `compact` | boolean | No | `true` | Omit item properties equal to the TIA-created type defaults. |
   | `script_files` | boolean | No | `false` | Store event scripts as `.js` sidecar files rather than inline strings. |
   | `include_library` | boolean | No | `true` | Include the complete project type library in `library/HmiAssets.zal21`, including faceplates, dynamic SVGs, all committed versions and PLC dependencies. |
   | `target_name` | string | No | null | Target HMI software/device selector. |
 
+### `hmi_read_export_file`
+- **Purpose:** Fetch one file from a staged export. The result contains Base64-encoded bytes so JSON and script files round-trip exactly.
+- **Parameters:** `transfer_id`, `relative_path`, optional `offset` (default 0), and optional `chunk_bytes` (default 262144; maximum 524288).
+- **Chunking:** Decode `contentBase64`, append it at `offset`, then request the next chunk at `nextOffset` until `complete` is true. Each file is limited to 10 MiB and each staged export to 100 MiB.
+
+### `hmi_begin_import`
+- **Purpose:** Create a server-side staging area and return a `transferId` for a remote import.
+- **Limits:** 10 MiB per file, 100 MiB per transfer, 5000 files, 512 KiB per uploaded chunk. Transfers expire after 24 hours.
+
+### `hmi_upload_import_file`
+- **Purpose:** Upload one relative-path file into a staged import as sequential Base64 chunks.
+- **Parameters:** `transfer_id`, `relative_path`, `content_base64`, `offset`, and `total_bytes`. Start each file at offset 0; continue using `receivedBytes` until `complete` is true.
+
 **JSON fidelity:** Tag and Expression dynamizations include their value converters,
-ordered Simple/Range mapping entries, typed values, flashing settings, and raw text
-markup. Faceplates include `containedType`; compact defaults are cached per contained
-type. Internal tags include `dataType`; unset limits are null. Unsupported dynamizations
-and tag-based limits fail explicitly rather than exporting lossy placeholders.
-Bitmask entries retain `bitCondition`, `relevant` (unsigned 64-bit masks), and
-`bitDynamizationType` (`SingleBit` / `MultiBit`). Script dynamizations retain code,
+ordered Simple/Range/Bitmask mapping entries, typed values, flashing settings, and raw
+text markup. Bitmask entries preserve the API's `bitDynamizationType`, unsigned 64-bit
+`condition`, and generated `relevant` mask. Faceplates include `containedType`; compact
+defaults are cached per contained type. Internal tags include `dataType`; unset limits
+are null. Unsupported dynamizations, mapping kinds, and tag-based limits fail explicitly
+rather than exporting lossy placeholders.
+Legacy fork exports that wrote the bitmask condition as `bitCondition` still import. Script dynamizations retain code,
 global definition code, async mode and trigger type/duration/tag list. ResourceList
 dynamizations retain the resource-list name and tag; the actual text/graphic list
 must already exist in the destination (it is not embedded in this export).
@@ -1004,7 +1091,8 @@ using TIA's library editor. Local schemas are under [schemas/svghmi](../schemas/
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
   | :--- | :---: | :---: | :---: | :--- |
-  | `input_directory` | string | **Yes** | — | Directory containing `manifest.json` and referenced JSON/script files. |
+  | `input_directory` | string | One required | — | Server-local directory containing `manifest.json` and referenced JSON/script files. |
+  | `transfer_id` | string | One required | — | Completed upload ID from `hmi_begin_import`; use instead of `input_directory`. |
   | `prune_items` | boolean | No | `false` | Delete screen items absent from imported screen files. |
   | `dry_run` | boolean | No | `false` | Validate the files and target without making changes. |
   | `verify_hashes` | boolean | No | `true` | Verify exported hashes. Set false only for intentional edits that have not refreshed manifest hashes. |
@@ -1016,6 +1104,17 @@ project transaction before creating faceplate instances. Existing committed vers
 with matching GUIDs are reused. Name/GUID/version conflicts fail, never overwrite.
 Dry runs inspect the package but do not copy types into the project. Legacy packages
 without a library archive require destination types to already exist.
+`input_directory` and `transfer_id` are mutually exclusive. For remote OpenCode clients,
+omit `output_directory` on export, fetch the returned file list with
+`hmi_read_export_file`, then create an import transfer and upload the edited manifest
+and all referenced files with `hmi_upload_import_file`. Use `hmi_import_json` with
+`dry_run: true` before authorizing an actual import. Staging paths are confined to
+server-managed transfer directories; no arbitrary server path is accepted by transfer
+tools. Edited files must have refreshed manifest hashes, or the import preview must
+explicitly set `verify_hashes: false`.
+A dynamization reference may be a dotted UDT member path such as
+`UnitParent_UnitData.UnitStatus.Error`; validation requires its root HMI tag to exist,
+and the full member path is preserved when assigned to TIA.
 
 ---
 
@@ -1045,6 +1144,53 @@ without a library archive require destination types to already exist.
 - **Limits:** Legacy compact exports without `defaultsFile` use approximate omitted values and warn. Faceplates, custom widgets/SVG, alarm/trend controls and other unsupported controls are explicit geometry placeholders. Graphics are not embedded in the export. Font substitutions, rich-text/skin/window-adaption/chrome/compositing approximations are reported. Dynamic visibility/text/color remain static and are identified in the report. This is not a runtime screenshot or visual sign-off.
 - **Integrity:** Rendering intentionally accepts edited JSON without checking manifest hashes. It never imports changes. Import still verifies hashes by default. Relative paths are confined to the input directory; cyclic nested windows and excessive dimensions fail explicitly.
 - **CLI:** `TiaOpennessMcp.exe --render-hmi INPUT --output OUTPUT [--screen GROUP/NAME] [--language en-US] [--scale 2]`. This mode bypasses server startup and auto-connection.
+
+### New in v2.2.0: Direct Item, Event, and Expression Operations
+
+#### `hmi_get_screen_item`
+- **Description:** Reads one item as a complete supported `tia-mcp-hmi/1` item document, including its type/properties, multilingual text, event scripts, and complete tag/expression value-converter state.
+- **Parameters:** `screen_name` and `item_name` are required; `target_name` is optional.
+- **Behavior:** Read-only. Expression formulas, conditions, mappings, alternates, flashing settings, and tag binding options are included where supported by V21.
+
+#### `hmi_update_screen_item`
+- **Description:** Updates one item in place and returns the full item readback. It never deletes or recreates the item.
+- **Parameters:** `screen_name`, `item_name`, and non-empty `item_properties` object are required; `target_name` is optional.
+- **Allowlisted properties:** `Visible`, `Left`, `Top`, `Width`, `Height`, `CenterX`, `CenterY`, `Radius`, `BackColor`, `ForeColor`, `BorderColor`, and `BorderWidth`. Unknown or read-only properties and invalid value types fail explicitly.
+- **Behavior:** Each requested property is validated before mutation; the update is applied transactionally and every supplied property is verified by readback. No project save is performed.
+
+#### `hmi_read_event_scripts`
+- **Description:** Reads event scripts on a screen, or on one item when `item_name` is supplied, and returns supported event enum names for that target.
+- **Parameters:** `screen_name` is required; `item_name` and `target_name` are optional.
+- **Behavior:** Event names come from the V21 Openness event composition for the selected target type. Missing targets and unsupported event-handler APIs fail explicitly.
+
+#### `hmi_set_event_script`
+- **Description:** Creates or updates one event handler in place on a screen or item.
+- **Parameters:** `screen_name`, `event_type`, and `script` are required; `item_name` and `target_name` are optional.
+- **Behavior:** Only event values supported by the selected V21 handler enum are accepted. Other event handlers and item identity/layout are preserved. The new source is read back and checked; syntax diagnostics are returned when exposed by the API. No project save is performed.
+
+#### `hmi_set_expression_dynamization`
+- **Description:** Creates or updates the formula of one expression dynamization without reconciling or replacing other dynamizations or the existing expression's mapping entries.
+- **Parameters:** `screen_name`, `item_name`, `property_name`, `expression`, and `result_type` are required; `on_conflict` (`fail` or `replace`) and `target_name` are optional.
+- **Declared result types:** `Boolean`, `Color`, `String`, `Byte`, `Int16`, `UInt16`, `Int32`, `UInt32`, `Int64`, `UInt64`, `Single`, `Double`, and `Decimal`. The declared type must match the target property's CLR type. The formula must be non-empty; its expression semantics are not statically inferred by this tool.
+- **Behavior:** Replacing a tag dynamization on the same property requires `on_conflict: "replace"`. Formula state and existing mapping entries are verified by readback. No project save or compile is performed.
+
+#### `hmi_set_expression_dynamization_entries`
+- **Description:** Replaces one property's ordered Expressions-tab condition/value rows and returns the verified readback.
+- **Parameters:** `screen_name`, `item_name`, `property_name`, and non-empty `entries` are required; `on_conflict` (`fail` or `replace`) and `target_name` are optional.
+- **Entry format:** Each row has a non-empty `condition` string and typed `value` object, for example `{ "condition": "AND32('StatusWord', 1) != 0", "value": { "type": "Int32", "value": "500" } }`. Values must match the target property's CLR type.
+- **Behavior:** The supplied list replaces all condition rows for that property, in order. Existing same-property dynamizations require `on_conflict: "replace"`; other dynamizations, item properties, and events are preserved. TIA validates expression syntax; this tool does not compile or save the project.
+
+### New in v2.4.0: Expression condition rows
+
+The `hmi_set_expression_dynamization_entries` tool writes condition/value tables. It is separate from `hmi_set_expression_dynamization`, which writes a value formula.
+
+### New in v2.3.0: Runtime JavaScript declarations
+
+#### `hmi_get_js_type_definitions`
+- **Description:** Returns the server-bundled TypeScript declarations for the WinCC Unified runtime APIs documented by this server.
+- **Parameters:** None.
+- **Behavior:** This is an offline, read-only reference operation and does not connect to TIA Portal. The returned declarations are a conservative subset, not Siemens' complete or vendor-generated V21 type definitions. Unverified tag-read and direct item-object access APIs are intentionally omitted.
+- **Resource:** The same declaration file is available at `tia://docs/hmi-javascript-type-definitions` with MIME type `text/typescript`.
 
 ---
 

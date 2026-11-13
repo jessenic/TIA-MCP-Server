@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text;
+using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using Siemens.Engineering;
 using Siemens.Engineering.Compiler;
@@ -10,13 +12,21 @@ using Siemens.Engineering.HW;
 using Siemens.Engineering.HW.Features;
 using Siemens.Engineering.SW;
 using Siemens.Engineering.SW.Blocks;
+using Siemens.Engineering.SW.ExternalSources;
 using Siemens.Engineering.SW.Tags;
 using Siemens.Engineering.SW.Types;
 
 namespace TiaOpennessMcp.Tia
 {
-    public partial class TiaManager : IDisposable
+    public partial class TiaManager : IDisposable, IHmiToolOperations
     {
+        private static readonly Regex SclBlockDeclarationRegex = new Regex(
+            @"(?im)^\s*(?<kind>FUNCTION_BLOCK|FUNCTION|ORGANIZATION_BLOCK|DATA_BLOCK)\s+(?:""(?<quoted>[^""]+)""|(?<identifier>[A-Za-z_][A-Za-z0-9_]*))(?=\s|:|$)",
+            RegexOptions.CultureInvariant);
+        private static readonly Regex SclCommentsRegex = new Regex(
+            @"/\*.*?\*/|\(\*.*?\*\)|//[^\r\n]*",
+            RegexOptions.Singleline | RegexOptions.CultureInvariant);
+
         private static readonly Lazy<TiaManager> _instance = new Lazy<TiaManager>(() => new TiaManager());
         public static TiaManager Instance => _instance.Value;
 
@@ -585,6 +595,333 @@ namespace TiaOpennessMcp.Tia
             }
         }
 
+        public SclBlockImportResult ImportSclBlock(
+            string? plcName,
+            string sclCode,
+            string? targetFolder = null,
+            bool compileAfterImport = true,
+            bool openAfterImport = false)
+        {
+            if (string.IsNullOrWhiteSpace(sclCode))
+                throw new ArgumentException("scl_code must contain a complete SCL block source.", nameof(sclCode));
+
+            var (blockName, blockKind) = GetSclBlockDeclaration(sclCode);
+            var plc = FindPlc(plcName);
+            List<BlockLocation> matches = FindBlockLocations(plc.BlockGroup, blockName);
+            if (matches.Count > 1)
+            {
+                throw new InvalidOperationException(
+                    $"Block name '{blockName}' is ambiguous in PLC '{plc.Name}'; refusing to replace any block.");
+            }
+
+            BlockLocation? existing = matches.Count == 1 ? matches[0] : null;
+            string sourceFile = Path.Combine(Path.GetTempPath(), $"tia_scl_{Guid.NewGuid():N}.scl");
+            string backupFile = Path.Combine(Path.GetTempPath(), $"tia_scl_backup_{Guid.NewGuid():N}.xml");
+            bool existingDeleted = false;
+
+            try
+            {
+                if (existing != null)
+                {
+                    existing.Block.Export(new FileInfo(backupFile), ExportOptions.WithDefaults);
+                }
+
+                string destinationFolder = string.IsNullOrWhiteSpace(targetFolder)
+                    ? existing?.FolderPath ?? ""
+                    : targetFolder ?? "";
+                PlcBlockGroup destinationGroup = FindBlockGroup(plc.BlockGroup, destinationFolder);
+
+                File.WriteAllText(sourceFile, sclCode, new UTF8Encoding(false));
+                string sourceName = Path.GetFileNameWithoutExtension(sourceFile);
+                PlcExternalSource source = plc.ExternalSourceGroup.ExternalSources.CreateFromFile(sourceName, sourceFile)
+                    ?? throw new InvalidOperationException("TIA Portal did not create an external SCL source.");
+
+                if (existing != null)
+                {
+                    try
+                    {
+                        existing.Block.Delete();
+                        existingDeleted = true;
+                    }
+                    catch (Exception deleteException)
+                    {
+                        try
+                        {
+                            source.Delete();
+                        }
+                        catch (Exception cleanupException)
+                        {
+                            throw new InvalidOperationException(
+                                $"Could not replace block '{blockName}': deletion failed ({deleteException.Message}) and the imported external source could not be removed ({cleanupException.Message}).",
+                                deleteException);
+                        }
+
+                        throw;
+                    }
+                }
+
+                IList<IEngineeringObject> generated;
+                try
+                {
+                    generated = destinationGroup is PlcBlockUserGroup destinationUserGroup
+                        ? source.GenerateBlocksFromSource(
+                            destinationUserGroup,
+                            GenerateBlockOption.KeepOnError)
+                        : source.GenerateBlocksFromSource(GenerateBlockOption.KeepOnError);
+
+                    PlcBlock? importedBlock = generated
+                        .OfType<PlcBlock>()
+                        .FirstOrDefault(block => string.Equals(block.Name, blockName, StringComparison.OrdinalIgnoreCase));
+
+                    if (importedBlock == null)
+                    {
+                        string generatedNames = string.Join(", ", generated.Select(item => item.ToString()));
+                        throw new InvalidOperationException(
+                            $"SCL source did not generate the declared block '{blockName}'. Generated objects: {generatedNames}.");
+                    }
+
+                    var result = new SclBlockImportResult
+                    {
+                        Imported = true,
+                        BlockName = importedBlock.Name,
+                        BlockKind = blockKind,
+                        Folder = destinationFolder,
+                        ReplacedExistingBlock = existing != null
+                    };
+
+                    try
+                    {
+                        source.Delete();
+                    }
+                    catch (Exception ex)
+                    {
+                        result.Warnings.Add($"Imported external source could not be removed from the project: {ex.Message}");
+                    }
+
+                    if (existing != null)
+                    {
+                        try
+                        {
+                            File.Delete(backupFile);
+                        }
+                        catch (Exception ex)
+                        {
+                            result.Warnings.Add($"Block backup could not be removed: {backupFile}. {ex.Message}");
+                        }
+                    }
+
+                    if (compileAfterImport)
+                    {
+                        try
+                        {
+                            result.Compilation = Compile(plc.Name);
+                        }
+                        catch (Exception ex)
+                        {
+                            result.CompilationError = ex.Message;
+                        }
+                    }
+
+                    if (openAfterImport)
+                    {
+                        try
+                        {
+                            importedBlock.ShowInEditor();
+                            result.OpenedInEditor = true;
+                        }
+                        catch (Exception ex)
+                        {
+                            result.OpenError = ex.Message;
+                        }
+                    }
+
+                    return result;
+                }
+                catch (Exception importException)
+                {
+                    SclImportRollbackResult rollback = RollBackSclImport(
+                        plc,
+                        blockName,
+                        existing,
+                        existingDeleted,
+                        backupFile);
+
+                    if (existing == null || !existingDeleted)
+                    {
+                        if (!string.IsNullOrEmpty(rollback.CleanupError))
+                        {
+                            throw new InvalidOperationException(
+                                $"SCL import failed: {importException.Message} Cleanup also failed: {rollback.CleanupError}",
+                                importException);
+                        }
+
+                        throw new InvalidOperationException($"SCL import failed: {importException.Message}", importException);
+                    }
+
+                    if (!rollback.Restored)
+                    {
+                        string cleanupDetails = string.IsNullOrEmpty(rollback.CleanupError)
+                            ? ""
+                            : $" Partial generated block cleanup also failed: {rollback.CleanupError}";
+                        throw new InvalidOperationException(
+                            $"SCL import failed: {importException.Message} The previous block could not be restored: {rollback.RestoreError}{cleanupDetails} Backup retained at '{backupFile}'.",
+                            importException);
+                    }
+
+                    string rollbackMessage = "The previous block was restored.";
+                    if (!string.IsNullOrEmpty(rollback.CleanupError))
+                        rollbackMessage += $" Partial generated block cleanup also failed: {rollback.CleanupError}";
+
+                    try
+                    {
+                        File.Delete(backupFile);
+                    }
+                    catch (Exception ex)
+                    {
+                        rollbackMessage += $" Backup could not be removed from '{backupFile}': {ex.Message}";
+                    }
+
+                    throw new InvalidOperationException(
+                        $"SCL import failed: {importException.Message} {rollbackMessage}",
+                        importException);
+                }
+            }
+            finally
+            {
+                if (File.Exists(sourceFile))
+                    File.Delete(sourceFile);
+
+                if (File.Exists(backupFile) && !existingDeleted)
+                    File.Delete(backupFile);
+            }
+        }
+
+        private (string BlockName, string BlockKind) GetSclBlockDeclaration(string sclCode)
+        {
+            sclCode = sclCode.TrimStart('\uFEFF');
+            string withoutComments = SclCommentsRegex.Replace(sclCode, string.Empty);
+            MatchCollection declarations = SclBlockDeclarationRegex.Matches(withoutComments);
+            if (declarations.Count != 1)
+            {
+                throw new ArgumentException(
+                    $"SCL source must contain exactly one complete FUNCTION, FUNCTION_BLOCK, ORGANIZATION_BLOCK, or DATA_BLOCK declaration; found {declarations.Count}.");
+            }
+
+            Match declaration = declarations[0];
+            string name = declaration.Groups["quoted"].Success
+                ? declaration.Groups["quoted"].Value
+                : declaration.Groups["identifier"].Value;
+            return (name, declaration.Groups["kind"].Value.ToUpperInvariant());
+        }
+
+        private List<BlockLocation> FindBlockLocations(PlcBlockGroup root, string blockName)
+        {
+            var matches = new List<BlockLocation>();
+
+            void Walk(PlcBlockGroup group, string folderPath)
+            {
+                foreach (PlcBlock block in group.Blocks)
+                {
+                    if (string.Equals(block.Name, blockName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        matches.Add(new BlockLocation
+                        {
+                            Block = block,
+                            Group = group,
+                            FolderPath = folderPath
+                        });
+                    }
+                }
+
+                foreach (PlcBlockUserGroup subGroup in group.Groups)
+                {
+                    string subPath = string.IsNullOrEmpty(folderPath)
+                        ? subGroup.Name
+                        : $"{folderPath}/{subGroup.Name}";
+                    Walk(subGroup, subPath);
+                }
+            }
+
+            Walk(root, "");
+            return matches;
+        }
+
+        private PlcBlockGroup FindBlockGroup(PlcBlockGroup root, string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+                return root;
+
+            PlcBlockGroup current = root;
+            foreach (string part in path.Split(new[] { '/', '\\' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                PlcBlockUserGroup? next = current.Groups.FirstOrDefault(
+                    group => string.Equals(group.Name, part, StringComparison.OrdinalIgnoreCase));
+                if (next == null)
+                {
+                    throw new ArgumentException($"PLC block group '{path}' was not found.", nameof(path));
+                }
+
+                current = next;
+            }
+
+            return current;
+        }
+
+        private SclImportRollbackResult RollBackSclImport(
+            PlcSoftware plc,
+            string blockName,
+            BlockLocation? existing,
+            bool existingDeleted,
+            string backupFile)
+        {
+            var result = new SclImportRollbackResult();
+            foreach (BlockLocation partialBlock in FindBlockLocations(plc.BlockGroup, blockName))
+            {
+                try
+                {
+                    partialBlock.Block.Delete();
+                }
+                catch (Exception ex)
+                {
+                    result.CleanupError = ex.Message;
+                }
+            }
+
+            if (!existingDeleted || existing == null)
+                return result;
+
+            try
+            {
+                IList<PlcBlock> restored = existing.Group.Blocks.Import(
+                    new FileInfo(backupFile),
+                    ImportOptions.Override);
+                if (restored.Count == 0)
+                    throw new InvalidOperationException("TIA Portal did not report a restored block.");
+
+                result.Restored = true;
+            }
+            catch (Exception ex)
+            {
+                result.RestoreError = ex.Message;
+            }
+
+            return result;
+        }
+
+        private sealed class BlockLocation
+        {
+            public PlcBlock Block { get; set; } = null!;
+            public PlcBlockGroup Group { get; set; } = null!;
+            public string FolderPath { get; set; } = "";
+        }
+
+        private sealed class SclImportRollbackResult
+        {
+            public bool Restored { get; set; }
+            public string? RestoreError { get; set; }
+            public string? CleanupError { get; set; }
+        }
+
         public void DeleteBlock(string? plcName, string blockName)
         {
             var plc = FindPlc(plcName);
@@ -991,6 +1328,20 @@ namespace TiaOpennessMcp.Tia
         public string ProgrammingLanguage { get; set; } = "";
         public string XmlContent { get; set; } = "";
         public string? ExtractedScl { get; set; }
+    }
+
+    public class SclBlockImportResult
+    {
+        public bool Imported { get; set; }
+        public string BlockName { get; set; } = "";
+        public string BlockKind { get; set; } = "";
+        public string Folder { get; set; } = "";
+        public bool ReplacedExistingBlock { get; set; }
+        public CompilationReport? Compilation { get; set; }
+        public string? CompilationError { get; set; }
+        public bool? OpenedInEditor { get; set; }
+        public string? OpenError { get; set; }
+        public List<string> Warnings { get; set; } = new List<string>();
     }
 
     public class PlcTypeInfo

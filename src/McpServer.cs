@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using TiaOpennessMcp.Protocol;
@@ -80,11 +81,12 @@ namespace TiaOpennessMcp
                         ServerInfo = new ServerInfo
                         {
                             Name = "tia-portal-openness-v21",
-                            Version = "1.0.0"
+                            Version = "2.4.0"
                         },
                         Capabilities = new ServerCapabilities
                         {
-                            Tools = new System.Collections.Generic.Dictionary<string, object>()
+                            Tools = new System.Collections.Generic.Dictionary<string, object>(),
+                            Resources = new System.Collections.Generic.Dictionary<string, object>()
                         }
                     };
                     SendResponse(JsonRpcResponse.Success(req.Id, initResult));
@@ -102,6 +104,14 @@ namespace TiaOpennessMcp
                     SendResponse(JsonRpcResponse.Success(req.Id, toolsResult));
                     break;
 
+                case "resources/list":
+                    SendResponse(JsonRpcResponse.Success(req.Id, McpResourceCatalog.List()));
+                    break;
+
+                case "resources/read":
+                    HandleResourceRead(req);
+                    break;
+
                 case "tools/call":
                     HandleToolCall(req);
                     break;
@@ -110,6 +120,32 @@ namespace TiaOpennessMcp
                     Console.Error.WriteLine($"[McpServer] Method not found: {req.Method}");
                     SendResponse(JsonRpcResponse.Fail(req.Id, -32601, $"Method '{req.Method}' not found."));
                     break;
+            }
+        }
+
+        private void HandleResourceRead(JsonRpcRequest req)
+        {
+            if (!req.Params.HasValue ||
+                req.Params.Value.ValueKind != JsonValueKind.Object ||
+                !req.Params.Value.TryGetProperty("uri", out JsonElement uriElement) ||
+                uriElement.ValueKind != JsonValueKind.String)
+            {
+                SendResponse(JsonRpcResponse.Fail(req.Id, -32602, "Invalid params: expected a string 'uri'."));
+                return;
+            }
+
+            string uri = uriElement.GetString()!;
+            try
+            {
+                SendResponse(JsonRpcResponse.Success(req.Id, McpResourceCatalog.Read(uri)));
+            }
+            catch (KeyNotFoundException ex)
+            {
+                SendResponse(JsonRpcResponse.Fail(req.Id, -32002, ex.Message));
+            }
+            catch (InvalidOperationException ex)
+            {
+                SendResponse(JsonRpcResponse.Fail(req.Id, -32603, ex.Message));
             }
         }
 

@@ -1,0 +1,80 @@
+{
+  "name": "hmi_update_dynamization_entry",
+  "description": "Update the value, alternate value, or flashing settings of one existing tag or expression dynamization mapping entry.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "screen_name": {
+        "type": "string",
+        "description": "Target screen."
+      },
+      "item_name": {
+        "type": "string",
+        "description": "Target screen item name."
+      },
+      "property_name": {
+        "type": "string",
+        "description": "Dynamized property, such as BackColor."
+      },
+      "entry_index": {
+        "type": "integer",
+        "description": "Zero-based index in the mapping table entries."
+      },
+      "new_value": {
+        "type": "object",
+        "description": "Optional typed replacement for the entry's primary value.",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "CLR mapping value type (for example Color, String, Boolean, or Double)."
+          },
+          "value": {
+            "type": "string",
+            "description": "Value encoded as text; colors use #RRGGBB or #AARRGGBB."
+          }
+        },
+        "required": [
+          "type",
+          "value"
+        ]
+      },
+      "new_alternate_value": {
+        "type": "object",
+        "description": "Optional typed replacement for the entry's alternate value.",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "CLR mapping value type (for example Color, String, Boolean, or Double)."
+          },
+          "value": {
+            "type": "string",
+            "description": "Value encoded as text; colors use #RRGGBB or #AARRGGBB."
+          }
+        },
+        "required": [
+          "type",
+          "value"
+        ]
+      },
+      "new_flashing": {
+        "type": "boolean",
+        "description": "Optional flashing enable state."
+      },
+      "new_flashing_rate": {
+        "type": "string",
+        "description": "Optional TIA flashing rate enum name."
+      },
+      "target_name": {
+        "type": "string",
+        "description": "Target HMI software name (optional)."
+      }
+    },
+    "required": [
+      "screen_name",
+      "item_name",
+      "property_name",
+      "entry_index"
+    ],
+    "additionalProperties": false
+  }
+}

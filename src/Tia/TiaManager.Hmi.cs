@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Security;
 using System.Text;
 using Siemens.Engineering;
@@ -293,6 +294,16 @@ namespace TiaOpennessMcp.Tia
                                         Value = re.Value?.ToString() ?? ""
                                     });
                                 }
+                                else if (entry is MappingTableEntryBitmask bitmask)
+                                {
+                                    dynInfo.BitmaskEntries.Add(new BitmaskEntryDto
+                                    {
+                                        BitDynamizationType = bitmask.BitDynamizationType.ToString(),
+                                        Condition = bitmask.Condition,
+                                        Relevant = bitmask.Relevant,
+                                        Value = bitmask.Value?.ToString() ?? ""
+                                    });
+                                }
                             }
                         }
                     }
@@ -303,6 +314,204 @@ namespace TiaOpennessMcp.Tia
             }
 
             return list;
+        }
+
+        public HmiEventScriptsDetails GetHmiEventScripts(
+            string screenName,
+            string? itemName = null,
+            string? targetName = null)
+        {
+            var hmiSw = FindHmiSoftware(targetName);
+            var screen = FindHmiScreen(hmiSw, screenName);
+            if (screen == null)
+                throw new InvalidOperationException($"Screen '{screenName}' not found.");
+
+            object target = screen;
+            string targetKind = "screen";
+            string targetNameForResult = screen.Name;
+            if (!string.IsNullOrWhiteSpace(itemName))
+            {
+                target = screen.ScreenItems.Find(itemName)
+                    ?? throw new InvalidOperationException($"Item '{itemName}' not found on screen '{screenName}'.");
+                targetKind = "item";
+                targetNameForResult = ((HmiScreenItemBase)target).Name;
+            }
+
+            EventHandlerSurface surface = GetEventHandlerSurface(target);
+            var result = new HmiEventScriptsDetails
+            {
+                ScreenName = screen.Name,
+                TargetKind = targetKind,
+                TargetName = targetNameForResult,
+                SupportedEventTypes = surface.EventType.IsEnum
+                    ? Enum.GetNames(surface.EventType).ToList()
+                    : new List<string>()
+            };
+
+            if (surface.Handlers is System.Collections.IEnumerable handlers)
+            {
+                foreach (object handler in handlers)
+                {
+                    object? eventType = handler.GetType().GetProperty("EventType")?.GetValue(handler, null);
+                    object? script = handler.GetType().GetProperty("Script")?.GetValue(handler, null);
+                    object? scriptCode = script?.GetType().GetProperty("ScriptCode")?.GetValue(script, null);
+                    if (eventType == null || scriptCode is not string code)
+                        throw new InvalidOperationException(
+                            $"An event handler on '{targetNameForResult}' does not expose readable event type and script code.");
+
+                    result.Events.Add(new HmiEventScriptEntry
+                    {
+                        EventType = eventType.ToString()!,
+                        Script = code
+                    });
+                }
+            }
+            else
+            {
+                throw new InvalidOperationException(
+                    $"Event handlers on '{targetNameForResult}' are not enumerable through the V21 Openness API.");
+            }
+
+            return result;
+        }
+
+        public HmiEventScriptUpdateResult UpdateHmiEventScript(
+            string screenName,
+            string eventType,
+            string scriptCode,
+            string? itemName = null,
+            string? targetName = null)
+        {
+            if (string.IsNullOrWhiteSpace(eventType))
+                throw new ArgumentException("event_type is required.", nameof(eventType));
+            if (scriptCode == null)
+                throw new ArgumentNullException(nameof(scriptCode));
+
+            var hmiSw = FindHmiSoftware(targetName);
+            var screen = FindHmiScreen(hmiSw, screenName);
+            if (screen == null)
+                throw new InvalidOperationException($"Screen '{screenName}' not found.");
+
+            object target = screen;
+            string targetNameForResult = screen.Name;
+            if (!string.IsNullOrWhiteSpace(itemName))
+            {
+                target = screen.ScreenItems.Find(itemName)
+                    ?? throw new InvalidOperationException($"Item '{itemName}' not found on screen '{screenName}'.");
+                targetNameForResult = ((HmiScreenItemBase)target).Name;
+            }
+
+            EventHandlerSurface surface = GetEventHandlerSurface(target);
+            object eventValue;
+            if (surface.EventType.IsEnum)
+            {
+                string? supportedName = Enum.GetNames(surface.EventType).FirstOrDefault(name =>
+                    string.Equals(name, eventType, StringComparison.OrdinalIgnoreCase));
+                if (supportedName == null)
+                    throw new ArgumentException(
+                        $"Unsupported event '{eventType}' for '{targetNameForResult}'. Supported events: " +
+                        string.Join(", ", Enum.GetNames(surface.EventType)) + ".",
+                        nameof(eventType));
+                eventValue = Enum.Parse(surface.EventType, supportedName);
+            }
+            else
+            {
+                throw new InvalidOperationException(
+                    $"The V21 Openness API exposes an unsupported event selector type '{surface.EventType.Name}'.");
+            }
+
+            HmiEventScriptsDetails readback;
+            HmiEventScriptEntry? updatedEvent;
+            object? script;
+            List<string> errors;
+            List<string> warnings;
+            using (ExclusiveAccess access = _tiaPortal!.ExclusiveAccess("Update Unified HMI event script"))
+            using (Transaction transaction = access.Transaction(_project!, "Update Unified HMI event script"))
+            {
+                object? handler = surface.Find?.Invoke(surface.Handlers, new[] { eventValue });
+                if (handler == null)
+                {
+                    try
+                    {
+                        handler = surface.Create.Invoke(surface.Handlers, new[] { eventValue });
+                    }
+                    catch (TargetInvocationException ex) when (ex.InnerException != null)
+                    {
+                        throw new InvalidOperationException(
+                            $"TIA could not create event '{eventType}' on '{targetNameForResult}': {ex.InnerException.Message}",
+                            ex.InnerException);
+                    }
+                }
+
+                script = handler?.GetType().GetProperty("Script")?.GetValue(handler, null);
+                PropertyInfo? scriptCodeProperty = script?.GetType().GetProperty("ScriptCode");
+                if (scriptCodeProperty?.CanWrite != true ||
+                    scriptCodeProperty.SetMethod?.IsPublic != true)
+                    throw new InvalidOperationException(
+                        $"Event '{eventType}' on '{targetNameForResult}' does not expose writable script code.");
+
+                scriptCodeProperty.SetValue(script, scriptCode, null);
+
+                readback = GetHmiEventScripts(screen.Name, itemName, targetName);
+                updatedEvent = readback.Events.FirstOrDefault(e =>
+                    string.Equals(e.EventType, eventType, StringComparison.OrdinalIgnoreCase));
+                if (updatedEvent == null || !string.Equals(updatedEvent.Script, scriptCode, StringComparison.Ordinal))
+                    throw new InvalidOperationException(
+                        $"Event script read-back verification failed for '{targetNameForResult}.{eventType}'.");
+
+                errors = GetScriptDiagnostics(script, "Errors");
+                warnings = GetScriptDiagnostics(script, "Warnings");
+                transaction.CommitOnDispose();
+            }
+
+            return new HmiEventScriptUpdateResult
+            {
+                ScreenName = screen.Name,
+                TargetKind = readback.TargetKind,
+                TargetName = targetNameForResult,
+                EventType = updatedEvent.EventType,
+                Script = updatedEvent.Script,
+                Errors = errors,
+                Warnings = warnings
+            };
+        }
+
+        private static EventHandlerSurface GetEventHandlerSurface(object target)
+        {
+            PropertyInfo? handlersProperty = target.GetType().GetProperty(
+                "EventHandlers",
+                BindingFlags.Instance | BindingFlags.Public);
+            object? handlers = handlersProperty?.GetValue(target, null);
+            if (handlers == null)
+                throw new InvalidOperationException(
+                    $"'{target.GetType().Name}' does not expose V21 event handlers.");
+
+            MethodInfo? create = handlers.GetType().GetMethods().FirstOrDefault(method =>
+                method.Name == "Create" && method.GetParameters().Length == 1 &&
+                method.GetParameters()[0].ParameterType.IsEnum);
+            if (create == null)
+                throw new InvalidOperationException(
+                    $"Event creation is not supported on '{target.GetType().Name}' by the V21 Openness API.");
+
+            Type eventType = create.GetParameters()[0].ParameterType;
+            MethodInfo? find = handlers.GetType().GetMethods().FirstOrDefault(method =>
+                method.Name == "Find" && method.GetParameters().Length == 1 &&
+                method.GetParameters()[0].ParameterType == eventType);
+            return new EventHandlerSurface(handlers, create, find, eventType);
+        }
+
+        private static List<string> GetScriptDiagnostics(object? script, string propertyName)
+        {
+            MethodInfo? syntaxCheck = script?.GetType().GetMethod("SyntaxCheck", Type.EmptyTypes);
+            object? diagnostics = syntaxCheck?.Invoke(script, null);
+            object? values = diagnostics?.GetType().GetProperty(propertyName)?.GetValue(diagnostics, null);
+            if (values is not System.Collections.IEnumerable enumerable)
+                return new List<string>();
+
+            return enumerable.Cast<object?>()
+                .Where(value => value != null)
+                .Select(value => value!.ToString()!)
+                .ToList();
         }
 
         public int DeleteHmiScreenItems(string screenName, List<string>? itemNames = null, string? prefix = null, string? targetName = null)
@@ -569,9 +778,44 @@ namespace TiaOpennessMcp.Tia
             string propertyName,
             string tagName,
             string conditionType = "None",
-            List<RangeEntryDto>? ranges = null,
+            List<HmiRangeEntryInput>? ranges = null,
             string? targetName = null)
         {
+            bool isRange = conditionType.Equals("Range", StringComparison.OrdinalIgnoreCase);
+            bool isSingleBit = conditionType.Equals("Singlebit", StringComparison.OrdinalIgnoreCase);
+            if (!isRange && !isSingleBit && !conditionType.Equals("None", StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException($"Unsupported dynamization condition type '{conditionType}'. Use 'None', 'Range', or 'Singlebit'.", nameof(conditionType));
+            if (isRange && (ranges == null || ranges.Count == 0))
+                throw new ArgumentException("Range dynamization requires at least one range entry.", nameof(ranges));
+
+            HmiRangeEntryInput? stateZero = null;
+            HmiRangeEntryInput? stateOne = null;
+            if (isSingleBit)
+            {
+                if (ranges == null || ranges.Count != 2)
+                    throw new ArgumentException("Singlebit dynamization requires exactly two entries: one for state 0 and one for state 1.", nameof(ranges));
+
+                foreach (HmiRangeEntryInput range in ranges)
+                {
+                    int state = GetSingleBitState(range);
+                    if (state == 0)
+                    {
+                        if (stateZero != null)
+                            throw new ArgumentException("Singlebit dynamization must have exactly one state 0 entry.", nameof(ranges));
+                        stateZero = range;
+                    }
+                    else
+                    {
+                        if (stateOne != null)
+                            throw new ArgumentException("Singlebit dynamization must have exactly one state 1 entry.", nameof(ranges));
+                        stateOne = range;
+                    }
+                }
+
+                if (stateZero == null || stateOne == null)
+                    throw new ArgumentException("Singlebit dynamization requires one entry for state 0 and one for state 1.", nameof(ranges));
+            }
+
             var hmiSw = FindHmiSoftware(targetName);
             var screen = FindHmiScreen(hmiSw, screenName);
             if (screen == null) throw new InvalidOperationException($"Screen '{screenName}' not found.");
@@ -583,32 +827,225 @@ namespace TiaOpennessMcp.Tia
                        ?? item.Dynamizations.Create<TagDynamization>(propertyName);
             tDyn.Tag = tagName;
 
-            if (conditionType.Equals("Range", StringComparison.OrdinalIgnoreCase) && ranges != null && ranges.Count > 0)
+            if (isRange || isSingleBit)
             {
-                tDyn.ValueConverter.MappingTable.ConditionType = ConditionType.Range;
-                while (tDyn.ValueConverter.MappingTable.Entries.Count > 0)
+                var mappingTable = tDyn.ValueConverter.MappingTable;
+                while (mappingTable.Entries.Count > 0)
                 {
-                    tDyn.ValueConverter.MappingTable.Entries[0].Delete();
+                    mappingTable.Entries[0].Delete();
                 }
 
-                foreach (var r in ranges)
+                if (isRange)
                 {
-                    var entry = tDyn.ValueConverter.MappingTable.Entries.Create<MappingTableEntryRange>();
-                    entry.From = r.From;
-                    entry.To = r.To;
-                    if (propertyName.EndsWith("Color", StringComparison.OrdinalIgnoreCase))
+                    mappingTable.ConditionType = ConditionType.Range;
+                    foreach (HmiRangeEntryInput range in ranges!)
                     {
-                        var col = ParseColor(r.Value) ?? Color.White;
-                        entry.Value = col;
-                    }
-                    else
-                    {
-                        entry.Value = r.Value;
+                        var entry = mappingTable.Entries.Create<MappingTableEntryRange>();
+                        entry.From = range.From;
+                        entry.To = range.To;
+                        entry.Value = GetDynamizationValue(propertyName, range.Value);
                     }
                 }
+                else
+                {
+                    mappingTable.ConditionType = ConditionType.Singlebit;
+                    var entries = mappingTable.Entries.OfType<MappingTableEntryBitmask>().ToList();
+                    if (mappingTable.Entries.Count == 0)
+                    {
+                        try
+                        {
+                            entries = mappingTable.Entries.Create(BitDynamizationType.SingleBit).ToList();
+                        }
+                        catch (EngineeringTargetInvocationException)
+                        {
+                            // TIA may have generated the entries when ConditionType was assigned.
+                            entries = mappingTable.Entries.OfType<MappingTableEntryBitmask>().ToList();
+                            if (entries.Count == 0)
+                                throw;
+                        }
+                    }
+                    if (mappingTable.Entries.Count != entries.Count)
+                        throw new InvalidOperationException("TIA created unexpected non-bitmask entries for a Singlebit dynamization.");
+                    if (entries.Count != 2)
+                        throw new InvalidOperationException($"TIA created {entries.Count} entries for Singlebit dynamization; expected 2.");
+
+                    MappingTableEntryBitmask zeroEntry = entries.SingleOrDefault(entry => entry.Condition == 0)
+                        ?? throw new InvalidOperationException("TIA did not create the state 0 entry for Singlebit dynamization.");
+                    MappingTableEntryBitmask oneEntry = entries.SingleOrDefault(entry => entry.Condition != 0)
+                        ?? throw new InvalidOperationException("TIA did not create the state 1 entry for Singlebit dynamization.");
+                    zeroEntry.Value = GetDynamizationValue(propertyName, stateZero!.Value);
+                    oneEntry.Value = GetDynamizationValue(propertyName, stateOne!.Value);
+                }
+
+                ConditionType expectedCondition = isRange ? ConditionType.Range : ConditionType.Singlebit;
+                int expectedEntryCount = isRange ? ranges!.Count : 2;
+                if (mappingTable.ConditionType != expectedCondition || mappingTable.Entries.Count != expectedEntryCount)
+                    throw new InvalidOperationException(
+                        $"TIA did not apply the requested {expectedCondition} mapping to '{itemName}.{propertyName}'.");
             }
 
             return $"Dynamization on '{itemName}.{propertyName}' linked to '{tagName}' successfully.";
+        }
+
+        public object DeleteHmiDynamization(
+            string screenName,
+            string itemName,
+            string propertyName,
+            string? targetName = null)
+        {
+            if (string.IsNullOrWhiteSpace(screenName))
+                throw new ArgumentException("screen_name must not be empty.", nameof(screenName));
+            if (string.IsNullOrWhiteSpace(itemName))
+                throw new ArgumentException("item_name must not be empty.", nameof(itemName));
+            if (string.IsNullOrWhiteSpace(propertyName))
+                throw new ArgumentException("property_name must not be empty.", nameof(propertyName));
+
+            var hmiSw = FindHmiSoftware(targetName);
+            var screen = FindHmiScreen(hmiSw, screenName);
+            if (screen == null) throw new InvalidOperationException($"Screen '{screenName}' not found.");
+
+            var item = screen.ScreenItems.Find(itemName);
+            if (item == null) throw new InvalidOperationException($"Item '{itemName}' not found on screen '{screenName}'.");
+
+            using (ExclusiveAccess access = _tiaPortal!.ExclusiveAccess("Delete Unified HMI dynamization"))
+            using (Transaction transaction = access.Transaction(_project!, "Delete Unified HMI dynamization"))
+            {
+                DynamizationBase? dynamization = item.Dynamizations.Find(propertyName);
+                if (dynamization == null)
+                    throw new InvalidOperationException(
+                        $"Dynamization for '{itemName}.{propertyName}' was not found on screen '{screenName}'.");
+
+                string dynamizationType = dynamization.GetType().Name;
+                dynamization.Delete();
+                if (item.Dynamizations.Find(propertyName) != null)
+                    throw new InvalidOperationException(
+                        $"Dynamization for '{itemName}.{propertyName}' remained after deletion.");
+
+                transaction.CommitOnDispose();
+                return new
+                {
+                    screenName,
+                    itemName,
+                    propertyName,
+                    dynamizationType,
+                    deleted = true
+                };
+            }
+        }
+
+        private static int GetSingleBitState(HmiRangeEntryInput range)
+        {
+            double from = Convert.ToDouble(range.From, CultureInfo.InvariantCulture);
+            double to = Convert.ToDouble(range.To, CultureInfo.InvariantCulture);
+            if (from != to || (from != 0 && from != 1))
+                throw new ArgumentException("Singlebit entries must use matching from/to bounds of 0 or 1.");
+            return (int)from;
+        }
+
+        private static object GetDynamizationValue(string propertyName, string value)
+        {
+            if (propertyName.EndsWith("Color", StringComparison.OrdinalIgnoreCase))
+                return ParseColor(value) ?? Color.White;
+            return value;
+        }
+
+        public string UpdateDynamizationEntry(
+            string screenName,
+            string itemName,
+            string propertyName,
+            int entryIndex,
+            HmiMappingValueInput? newValue = null,
+            HmiMappingValueInput? newAlternateValue = null,
+            bool? newFlashing = null,
+            string? newFlashingRate = null,
+            string? targetName = null)
+        {
+            var hmiSw = FindHmiSoftware(targetName);
+            var screen = FindHmiScreen(hmiSw, screenName);
+            if (screen == null) throw new InvalidOperationException($"Screen '{screenName}' not found.");
+
+            var item = screen.ScreenItems.Find(itemName);
+            if (item == null) throw new InvalidOperationException($"Item '{itemName}' not found on screen '{screenName}'.");
+
+            var dynamization = item.Dynamizations.Find(propertyName);
+            ValueConverter converter;
+            if (dynamization is TagDynamization tagDynamization)
+                converter = tagDynamization.ValueConverter;
+            else if (dynamization is ExpressionDynamization expressionDynamization)
+                converter = expressionDynamization.ValueConverter;
+            else
+                throw new InvalidOperationException(
+                    $"A tag or expression dynamization for '{itemName}.{propertyName}' was not found.");
+
+            var entries = converter.MappingTable.Entries;
+            if (entryIndex < 0 || entryIndex >= entries.Count)
+                throw new ArgumentOutOfRangeException(nameof(entryIndex),
+                    $"Entry index must be between 0 and {entries.Count - 1}.");
+            if (newValue == null && newAlternateValue == null &&
+                !newFlashing.HasValue && newFlashingRate == null)
+                throw new ArgumentException("At least one mapping entry value or flashing property must be provided.");
+
+            MappingTableEntryBase entry = entries[entryIndex];
+            object? value = newValue == null
+                ? null
+                : ParseDynamizationMappingValue(newValue, entry.Value?.GetType(), "new_value");
+            Type? alternateValueType = entry.AlternateValue?.GetType() ?? entry.Value?.GetType();
+            object? alternateValue = newAlternateValue == null
+                ? null
+                : ParseDynamizationMappingValue(newAlternateValue, alternateValueType, "new_alternate_value");
+            Siemens.Engineering.HmiUnified.UI.Dynamization.Flashing.FlashingRate? flashingRate =
+                newFlashingRate == null
+                    ? (Siemens.Engineering.HmiUnified.UI.Dynamization.Flashing.FlashingRate?)null
+                    : (Siemens.Engineering.HmiUnified.UI.Dynamization.Flashing.FlashingRate)ParseEnumValue(
+                        typeof(Siemens.Engineering.HmiUnified.UI.Dynamization.Flashing.FlashingRate),
+                        newFlashingRate,
+                        "new_flashing_rate");
+
+            if (newValue != null) entry.Value = value;
+            if (newAlternateValue != null) entry.AlternateValue = alternateValue;
+            if (newFlashing.HasValue) entry.Flashing = newFlashing.Value;
+            if (flashingRate.HasValue) entry.FlashingRate = flashingRate.Value;
+
+            return $"Updated mapping entry {entryIndex} on '{itemName}.{propertyName}'.";
+        }
+
+        private static object ParseDynamizationMappingValue(
+            HmiMappingValueInput input,
+            Type? expectedType,
+            string propertyName)
+        {
+            object value;
+            switch (input.Type)
+            {
+                case "String": value = input.Value; break;
+                case "Boolean":
+                    if (!bool.TryParse(input.Value, out bool booleanValue))
+                        throw new InvalidDataException($"'{propertyName}' must be 'true' or 'false' for Boolean values.");
+                    value = booleanValue;
+                    break;
+                case "Color": value = ParseJsonColor(input.Value, propertyName); break;
+                case "Byte": value = byte.Parse(input.Value, NumberStyles.Integer, CultureInfo.InvariantCulture); break;
+                case "Int16": value = short.Parse(input.Value, NumberStyles.Integer, CultureInfo.InvariantCulture); break;
+                case "UInt16": value = ushort.Parse(input.Value, NumberStyles.Integer, CultureInfo.InvariantCulture); break;
+                case "Int32": value = int.Parse(input.Value, NumberStyles.Integer, CultureInfo.InvariantCulture); break;
+                case "UInt32": value = uint.Parse(input.Value, NumberStyles.Integer, CultureInfo.InvariantCulture); break;
+                case "Int64": value = long.Parse(input.Value, NumberStyles.Integer, CultureInfo.InvariantCulture); break;
+                case "UInt64": value = ulong.Parse(input.Value, NumberStyles.Integer, CultureInfo.InvariantCulture); break;
+                case "Single": value = float.Parse(input.Value, NumberStyles.Float, CultureInfo.InvariantCulture); break;
+                case "Double": value = double.Parse(input.Value, NumberStyles.Float, CultureInfo.InvariantCulture); break;
+                case "Decimal": value = decimal.Parse(input.Value, NumberStyles.Number, CultureInfo.InvariantCulture); break;
+                default:
+                    throw new InvalidDataException(
+                        $"Unsupported mapping value type '{input.Type}' for '{propertyName}'.");
+            }
+
+            if (expectedType == null)
+                throw new InvalidOperationException(
+                    $"Cannot infer the existing CLR value type for '{propertyName}'.");
+            if (value.GetType() != expectedType)
+                throw new InvalidDataException(
+                    $"'{propertyName}' has type '{expectedType.Name}', but the supplied value has type '{value.GetType().Name}'.");
+            return value;
         }
 
         public ScriptUpdateSummary UpdateHmiButtonScripts(
@@ -1822,6 +2259,46 @@ namespace TiaOpennessMcp.Tia
         public List<DynamizationInfo> Dynamizations { get; } = new List<DynamizationInfo>();
     }
 
+    public class HmiEventScriptsDetails
+    {
+        public string ScreenName { get; set; } = "";
+        public string TargetKind { get; set; } = "";
+        public string TargetName { get; set; } = "";
+        public List<string> SupportedEventTypes { get; set; } = new List<string>();
+        public List<HmiEventScriptEntry> Events { get; } = new List<HmiEventScriptEntry>();
+    }
+
+    public class HmiEventScriptEntry
+    {
+        public string EventType { get; set; } = "";
+        public string Script { get; set; } = "";
+    }
+
+    public class HmiEventScriptUpdateResult : HmiEventScriptEntry
+    {
+        public string ScreenName { get; set; } = "";
+        public string TargetKind { get; set; } = "";
+        public string TargetName { get; set; } = "";
+        public List<string> Errors { get; set; } = new List<string>();
+        public List<string> Warnings { get; set; } = new List<string>();
+    }
+
+    internal sealed class EventHandlerSurface
+    {
+        public EventHandlerSurface(object handlers, MethodInfo create, MethodInfo? find, Type eventType)
+        {
+            Handlers = handlers;
+            Create = create;
+            Find = find;
+            EventType = eventType;
+        }
+
+        public object Handlers { get; }
+        public MethodInfo Create { get; }
+        public MethodInfo? Find { get; }
+        public Type EventType { get; }
+    }
+
     public class DynamizationInfo
     {
         public string Property { get; set; } = "";
@@ -1829,12 +2306,34 @@ namespace TiaOpennessMcp.Tia
         public string TagName { get; set; } = "";
         public string ConditionType { get; set; } = "";
         public List<RangeEntryDto> Ranges { get; } = new List<RangeEntryDto>();
+        public List<BitmaskEntryDto> BitmaskEntries { get; } = new List<BitmaskEntryDto>();
+    }
+
+    public class BitmaskEntryDto
+    {
+        public string BitDynamizationType { get; set; } = "";
+        public ulong Condition { get; set; }
+        public ulong Relevant { get; set; }
+        public string Value { get; set; } = "";
     }
 
     public class RangeEntryDto
     {
         public double From { get; set; }
         public double To { get; set; }
+        public string Value { get; set; } = "";
+    }
+
+    public class HmiRangeEntryInput
+    {
+        public object From { get; set; } = 0;
+        public object To { get; set; } = 0;
+        public string Value { get; set; } = "";
+    }
+
+    public class HmiMappingValueInput
+    {
+        public string Type { get; set; } = "";
         public string Value { get; set; } = "";
     }
 

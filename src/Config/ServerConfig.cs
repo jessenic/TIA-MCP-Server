@@ -72,6 +72,8 @@ namespace TiaOpennessMcp.Config
         public int Port { get; set; } = 5001;
         public string Mode { get; set; } = "HttpAndStdio"; // Http, Stdio, or HttpAndStdio
         public bool EnableCors { get; set; } = true;
+        public bool RequireBearerToken { get; set; } = true;
+        public bool LogHttpRequestDetails { get; set; } = false;
     }
 
     public class TiaSettings

@@ -1,9 +1,9 @@
 ---
 name: hmi-json
 description: >-
-  Work with WinCC Unified HMI JSON exports from the TIA MCP server. Use when asked
-  to export, inspect, edit, review, version, or import HMI screens, widgets, tags,
-  alarms, dynamizations, event scripts, styles, or guarded JSON patches.
+  Work with WinCC Unified HMI JSON exports from the TIA MCP server. Use only when the
+  user explicitly requests an HMI JSON operation or authorizes this skill. Clarify
+  vague requests to export or read out an HMI when JSON intent is not stated.
 ---
 
 # WinCC Unified HMI JSON
@@ -14,14 +14,17 @@ checking the selected TIA project, target, or impact before importing changes.
 
 ## When to use
 
-- The user asks to export a Unified HMI target or inspect an existing HMI JSON export.
-- The user wants to edit screen layout, text, properties, tags, alarms, or scripts in
-  exported JSON rather than make a one-off series of widget calls.
-- The user asks to import an edited export or apply a guarded HMI patch.
+- Use this skill only when the user explicitly requests an HMI JSON operation (for
+  example, “export this HMI to JSON,” “inspect this HMI JSON export,” or “edit/import
+  this JSON”) or explicitly authorizes using the skill.
+- A request such as “export this HMI” or “read out this HMI” without mentioning JSON is
+  ambiguous; ask whether the user wants a JSON export before using this skill.
+- Do not infer authorization merely because the task could be performed with HMI JSON.
 
 For Figma-to-HMI design conversion, use the `figma-to-wincc-unified` skill to produce
-the screen design, then use this skill to serialize, review, and import that design.
-For other Openness operations, use `tia-portal-openness`.
+the screen design. Use this skill to serialize, review, or import that design only if
+the user explicitly requests JSON work or authorizes this skill. For other Openness
+operations, use `tia-portal-openness`.
 
 ## Safety and scope
 
@@ -50,7 +53,11 @@ For other Openness operations, use `tia-portal-openness`.
 1. Check the TIA connection and active project using `tia_get_status`. If not connected,
    follow the connection procedure in `tia-portal-openness`.
 2. Resolve the intended target with `hmi_list_targets` when needed.
-3. Call `hmi_export_json` with an absolute `output_directory`. For example:
+3. Call `hmi_export_json` with an absolute `output_directory` when the caller can
+   access the server filesystem. For remote clients without a shared filesystem, omit
+   `output_directory`; the tool creates a staged transfer and returns a `transferId`
+   and `files` list. Read each listed file through `hmi_read_export_file`, decoding the
+   returned Base64 chunks in order.
 
    ```json
    {
@@ -61,10 +68,17 @@ For other Openness operations, use `tia-portal-openness`.
    }
    ```
 
-4. Read the returned directory, target name, counts, screen paths, and hashes. Inspect
-   the manifest and relevant exported files before making claims about the design.
+4. Read the returned local directory or fetch the staged `manifest.json`, target name,
+   screen files, and other relevant files. Inspect them before making claims about the
+   design; the manifest contains the file hashes.
 5. Keep the export structure intact and make focused edits. Preserve screen item array
    order: it represents visual stacking order.
+
+For remote transfers, create an import staging area with `hmi_begin_import`, then upload
+the edited `manifest.json` and every referenced file with `hmi_upload_import_file`.
+Files must be uploaded as sequential Base64 chunks, starting at offset 0 and continuing
+from each response's `receivedBytes`; each file is limited to 10 MiB and each transfer
+to 100 MiB. Staging transfers expire after 24 hours.
 
 `compact` defaults to true and omits properties equal to the TIA-created defaults for
 that item type. `script_files` defaults to false. When true, scripts are written as
@@ -127,12 +141,14 @@ Conventions:
   `"onConflict": "replace"`.
 - Expression dynamizations use `type: "Expression"` and a required `valueConverter`.
   Both tag and expression converters preserve `formula`, `isFormulaSelected`,
-  `conditionType`, and ordered `entries`. Simple entries have `condition`; Range
-  entries have typed `from` and `to`. Their `value` and `alternateValue` use
+  `conditionType`, and ordered `entries`. Simple entries have a string `condition`;
+  Range entries have typed `from` and `to`. Bitmask entries preserve the enum
+  `bitDynamizationType`, unsigned 64-bit `condition`, and TIA-generated unsigned
+  64-bit `relevant` mask. Their `value` and `alternateValue` use
   `{ "type": "Boolean", "value": true }` (or the exported CLR primitive/color type).
   Preserve typed values and raw ProjectText markup verbatim, plus `flashing` and
   `flashingRate`. Do not replace mapping-table expressions with a guessed formula.
-- Bitmask converter entries have `type: "Bitmask"`, `bitCondition`, `relevant`
+- Bitmask converter entries have `type: "Bitmask"`, `condition`, `relevant`
   (unsigned 64-bit masks), and `bitDynamizationType` (`SingleBit` or `MultiBit`).
   Preserve integer precision; do not convert masks through floating-point numbers.
 - Script dynamizations use `type: "Script"` and a `script` object with `code`,
@@ -158,7 +174,10 @@ Conventions:
   Destination system tags are accepted in references but not exported as user tags.
 - Internal tags use `connection: "<Internal tag>"`, an empty `plcTag`, and `dataType`.
   An unset minimum/maximum is JSON null. Array-element bindings retain bracket syntax;
-  validation accepts existing member identities or indices within declared array bounds.
+  dotted UDT member bindings retain the full path and require an existing root HMI tag.
+  Import validation checks that the dotted suffix is well-formed, but does not resolve
+  member names against the PLC UDT; the TIA assignment/compile remains authoritative.
+  Array-element validation checks indices against declared array bounds.
 
 ## Editing an export
 
@@ -178,9 +197,68 @@ Conventions:
    pass `verify_hashes: false` to `hmi_import_json` and clearly disclose that
    integrity checks were bypassed. Do not change hashes for unedited files.
 6. Import supports Tag, Expression, Script, and ResourceList dynamizations, with
-   Simple/Range/Bitmask converter mappings. Other kinds fail explicitly. Legacy
-   `ExpressionDynamization` placeholders lack converter data: re-export rather than
-   attempting to import them.
+   Simple/Range/Bitmask converter mappings. Setting `Singlebit` may cause TIA to create its bitmask entries
+   automatically; reuse those entries and create them only if the table is empty.
+   Import verifies generated relevant masks against the JSON. Other
+   dynamization/mapping kinds fail explicitly. Legacy `ExpressionDynamization`
+   placeholders lack converter data: re-export rather than attempting to import them.
+
+## Singlebit setter and tool availability
+
+- `hmi_set_tag_dynamization` with `condition_type: "Singlebit"` sets or replaces the
+  mapping table; it is not a one-entry editor. Use `hmi_update_dynamization_entry` for
+  a targeted update to an existing row.
+- TIA may generate Singlebit entries when the condition type is assigned, even if an
+  initial Openness collection read appears empty. If a setter call fails, assume the
+  in-memory object may have been partially changed: inspect it before retrying. Do not
+  blindly call the setter again or use `condition_type: "None"` as a reset.
+- Use `hmi_delete_dynamization` to remove one dynamization directly by screen, item,
+  and property. It preserves other dynamizations and the item, verifies the deletion,
+  and leaves the project unsaved.
+- If a tool documented here is missing from the live MCP tool list, refresh or reconnect
+  the client and verify its configured server endpoint before concluding the tool is
+  unavailable. Do not substitute a whole-mapping setter for an in-place entry update.
+
+## In-place dynamization entry updates
+
+Use `hmi_update_dynamization_entry` when changing values or flashing settings on one
+existing mapping-table entry is more targeted than reimporting a screen. This directly
+modifies the selected project's in-memory engineering object; confirm the active
+project and HMI target, inspect the current dynamization, and get user authorization
+before calling it. It does not save the project.
+
+- Identify the item and dynamized property with `screen_name`, `item_name`, and
+  `property_name`. The existing dynamization must be a Tag or Expression dynamization.
+- `entry_index` is the zero-based position in the ordered mapping table, not a condition
+  value or bit number. Inspect the exported converter entries first to choose the index;
+  for example, the second entry has index `1`.
+- Set one or more of `new_value`, `new_alternate_value`, `new_flashing`, or
+  `new_flashing_rate`. At least one is required. Value objects use
+  `{ "type": "Color", "value": "#E80000" }`; the type must match the existing entry's
+  CLR value type (`Color`, `String`, `Boolean`, `Byte`, `Int16`, `UInt16`, `Int32`,
+  `UInt32`, `Int64`, `UInt64`, `Single`, `Double`, or `Decimal`). Numeric and boolean
+  values are encoded as strings in this tool input.
+- The tool changes only the selected entry's supplied fields. It preserves the
+  condition, mapping table order, and all unspecified fields and entries.
+- For a direct Openness update, verify the result with `hmi_get_screen_items` on the
+  same screen. Its `BitmaskEntries` include the Singlebit condition, relevant mask,
+  and value. Compare the returned dynamization state before and after the edit; do
+  not export/import JSON solely to verify a direct tool update. Compile the target
+  with `hmi_compile`. If a field changed by the updater is not present in the direct
+  readout, state that verification limitation rather than assuming it was preserved.
+
+Example: change the second BackColor entry to red:
+
+```json
+{
+  "screen_name": "Main_UnitControlSideBar",
+  "item_name": "UCS_Ind_Alarm",
+  "property_name": "BackColor",
+  "entry_index": 1,
+  "new_value": { "type": "Color", "value": "#E80000" },
+  "target_name": "HMI_RT_1"
+}
+```
 
 ## Render images for AI layout checking
 
@@ -231,7 +309,9 @@ reviews reproducible; otherwise en-US is preferred, then the first manifest lang
 ## Import workflow
 
 1. Confirm with the user the exact project, HMI target, files, and intended changes.
-2. Run `hmi_import_json` with `dry_run: true`, the input directory, and exact target.
+2. Run `hmi_import_json` with `dry_run: true`, either the input directory or completed
+   transfer ID, and exact target. Provide exactly one of `input_directory` and
+   `transfer_id`.
    Use `verify_hashes: true` when hashes were refreshed. If files were intentionally
    edited without refreshing hashes, use `verify_hashes: false` for the preview and
    clearly note the integrity-check bypass.
@@ -352,8 +432,10 @@ patch. The patch also compiles and leaves the project unsaved.
   destination; their creation identity is not exposed by the V21 public API.
   Their exported interface values are applied to the existing definition.
 - Tag-based limits are unsupported and fail explicitly.
+- Unsupported converter entry kinds and tag-based limits fail explicitly.
 - Preserve validation and compiler diagnostics in the final report. Never describe
   an unsuccessful compile as a verified result.
 
-For the authoritative tool argument descriptions, see
-[the HMI JSON tool reference](../../../docs/TOOLS_REFERENCE.md#category-4-wincc-unified-hmi-screen--widget-engineering-35-tools).
+For detailed tool arguments and return shapes, read the MCP resource
+`tia://docs/tools-reference` (Category 4: WinCC Unified HMI Engineering). Prefer
+the live MCP tool schemas when available.

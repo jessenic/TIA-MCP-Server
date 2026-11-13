@@ -25,3 +25,7 @@ Desktop.ini
 $RECYCLE.BIN/
 .DS_Store
 /hmi
+
+## vscode generated
+.vscode/
+.mcp.json

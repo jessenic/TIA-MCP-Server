@@ -1,0 +1,9 @@
+{
+  "name": "hmi_begin_import",
+  "description": "Create a temporary HMI JSON import transfer.",
+  "parameters": {
+    "additionalProperties": false,
+    "properties": {},
+    "type": "object"
+  }
+}

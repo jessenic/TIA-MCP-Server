@@ -1,7 +1,7 @@
 # Siemens TIA Portal V21 Openness MCP Server
 ## Complete Skills & Tools Reference Manual
 
-**Version:** 2.0.0  
+**Version:** 2.4.0
 **Target Platform:** Siemens TIA Portal V21 (PublicAPI .NET Framework 4.8 x64)  
 **Supported Transports:** HTTP JSON-RPC 2.0, Server-Sent Events (SSE), stdio MCP  
 **Default Endpoints:** `http://localhost:5001/mcp`, `http://localhost:5001/sse`, `http://localhost:5001/status`
@@ -11,6 +11,16 @@
 ## 1. Architecture & Connection Persistence
 
 The TIA Openness MCP Server functions as a high-performance, persistent connector between AI agents and Siemens TIA Portal. 
+
+The server also provides read-only MCP documentation resources:
+
+| URI | Contents |
+| --- | --- |
+| `tia://docs/tools-reference` | Detailed tool arguments and return shapes. |
+| `tia://docs/skills-and-tools` | This skills and tools overview. |
+| `tia://docs/agent-prompting-and-system-functions` | Prompting guidance and WinCC Unified system functions. |
+
+Read these through the MCP resource interface. Live tool schemas remain authoritative for tool availability and arguments.
 
 ```
  +--------------------------------------------------------------------------------+
@@ -102,8 +112,13 @@ The `tia-portal-openness` skill instructs AI agents on standard operating proced
   - `tia_list_devices`                     - `hmi_list_targets`                 - `tia_testsuite_list_tests`
   - `tia_list_plcs`                        - `hmi_list_screens`                 - `tia_testsuite_load_test`
   - `tia_list_blocks`                      - `hmi_get_screen_items`
+  -                                        - `hmi_get_screen_item` / `hmi_update_screen_item`
   - `tia_get_block_code`                   - `hmi_add_label` / `button`
-  - `tia_import_block`                     - `hmi_set_tag_dynamization`
+  - `tia_import_block` / `tia_import_scl_block` - `hmi_set_tag_dynamization`
+         │                                 - `hmi_read_event_scripts` / `hmi_set_event_script`
+         │                                 - `hmi_set_expression_dynamization`
+         │                                 - `hmi_set_expression_dynamization_entries`
+         │                                 - `hmi_get_js_type_definitions`
          │                                 - `hmi_update_button_scripts`
          ▼                                        │
   `tia_compile` (PLC)                             ▼
@@ -201,7 +216,7 @@ The `tia-portal-openness` skill instructs AI agents on standard operating proced
 
 ---
 
-### Category 3: PLC Software, Blocks & Compilation (9 Tools)
+### Category 3: PLC Software, Blocks & Compilation (10 Tools)
 
 #### 11. `tia_list_plcs`
 - **Description:** List all CPU devices and summarize their software metrics (block counts, UDT counts, tag table counts).
@@ -227,6 +242,15 @@ The `tia-portal-openness` skill instructs AI agents on standard operating proced
   - `overwrite` *(boolean, optional, default: true)*: Overwrite existing block.
   - `plc_name` *(string, optional)*: Target PLC.
   - `folder` *(string, optional)*: Subfolder inside Program Blocks.
+
+#### 14a. `tia_import_scl_block`
+- **Description:** Import a complete SCL block source. Existing blocks with the same name are backed up, deleted, and replaced; failed imports attempt to restore the backup. This is whole-block replacement, not an in-place edit. Compilation defaults to enabled, and compiler errors do not roll back the import.
+- **Input Parameters:**
+  - `scl_code` *(string, required)*: Complete source for exactly one `FUNCTION`, `FUNCTION_BLOCK`, `ORGANIZATION_BLOCK`, or `DATA_BLOCK`.
+  - `plc_name` *(string, optional)*: Target PLC.
+  - `folder` *(string, optional)*: Existing PLC block group path. If omitted, an existing block's group is preserved; new blocks go in the root group.
+  - `compile_after_import` *(boolean, optional, default: true)*: Compile after generation.
+  - `open_after_import` *(boolean, optional, default: false)*: Open the imported block in the TIA Portal editor.
 
 #### 15. `tia_delete_block`
 - **Description:** Delete a block from the PLC software container.
@@ -315,6 +339,10 @@ The `tia-portal-openness` skill instructs AI agents on standard operating proced
   - `target_name` *(string, optional)*: HMI software name.
 - **Returns:** Array of objects with `Left`, `Top`, `Width`, `Height`, `BackColor`, `BorderColor`, `Text`, `TappedScript`, and `Dynamizations`.
 
+For complete supported state on one item, use `hmi_get_screen_item`. To update its allowlisted properties without replacing the item, use `hmi_update_screen_item`. Use `hmi_read_event_scripts` / `hmi_set_event_script` for supported screen or item events. Use `hmi_set_expression_dynamization` to update an expression formula while preserving mapping rows, or `hmi_set_expression_dynamization_entries` to replace the ordered Expressions-tab condition/value rows for one property. The latter requires explicit `on_conflict: "replace"` when a same-property dynamization already exists. Both direct updates verify readback and do not save the project.
+
+Use `hmi_get_js_type_definitions` or the read-only resource `tia://docs/hmi-javascript-type-definitions` for the server-bundled TypeScript declaration subset. It documents only runtime APIs referenced by this server; it is not a complete Siemens-generated V21 API definition and omits unverified tag-read and direct item-object access APIs.
+
 #### 25. `hmi_delete_screen_items`
 - **Description:** Delete specific screen items by name list or prefix (e.g. `"M101_"`).
 - **Input Parameters:**
@@ -385,14 +413,14 @@ The `tia-portal-openness` skill instructs AI agents on standard operating proced
   - `target_name` *(string, optional)*: Target HMI software.
 
 #### 30. `hmi_set_tag_dynamization`
-- **Description:** Configure tag dynamization on an item property (such as `BackColor` range dynamization).
+- **Description:** Configure tag dynamization on an item property using numeric ranges or Boolean `Singlebit` mapping.
 - **Input Parameters:**
   - `screen_name` *(string, required)*: Screen name.
   - `item_name` *(string, required)*: Item name.
   - `property_name` *(string, required)*: Property to dynamize (`"BackColor"`, `"Visible"`).
   - `tag_name` *(string, required)*: HMI tag name.
-  - `condition_type` *(string, optional, default: "None")*: `"None"` or `"Range"`.
-  - `ranges` *(array of objects, optional)*: List of `{ "from": 0, "to": 0, "value": "gray" }`.
+  - `condition_type` *(string, optional, default: "None")*: `"None"`, `"Range"`, or `"Singlebit"`.
+  - `ranges` *(array of objects, optional)*: For `"Range"`, numeric lower/upper bounds; for `"Singlebit"`, exactly one `0..0` and one `1..1` entry whose values map the off/on states.
   - `target_name` *(string, optional)*: Target HMI software.
 - **Sample Invocation:**
   ```json
@@ -408,6 +436,22 @@ The `tia-portal-openness` skill instructs AI agents on standard operating proced
     ]
   }
   ```
+
+#### `hmi_update_dynamization_entry`
+- **Description:** Update one existing tag or expression dynamization mapping entry in place.
+- **Input Parameters:**
+  - `screen_name`, `item_name`, `property_name` *(string, required)*: Identify the screen item and its dynamized property.
+  - `entry_index` *(integer, required)*: Zero-based mapping-table entry index.
+  - `new_value`, `new_alternate_value` *(object, optional)*: Typed value object, for example `{ "type": "Color", "value": "#E80000" }`. The supplied CLR type must match the existing entry value.
+  - `new_flashing` *(boolean, optional)*: Update the entry's flashing enable state.
+  - `new_flashing_rate` *(string, optional)*: TIA flashing rate enum name.
+  - `target_name` *(string, optional)*: Target HMI software.
+
+#### `hmi_delete_dynamization`
+- **Description:** Delete only one item's dynamization for a selected property. The screen item and its other dynamizations are preserved; the operation is verified and does not save the project.
+- **Input Parameters:**
+  - `screen_name`, `item_name`, `property_name` *(string, required)*: Identify the screen item and the dynamized property to remove.
+  - `target_name` *(string, optional)*: Target HMI software.
 
 #### 31. `hmi_update_button_scripts`
 - **Description:** Modify button event scripts **in-place** without deleting items. Supports substring search/replace or unconditional script setting, running Openness JavaScript syntax checking.
@@ -703,4 +747,3 @@ The `tia-portal-openness` skill instructs AI agents on standard operating proced
 | **Text Lists** | `hmi_list_text_lists` | Returns configured text lists | **PASSED** |
 | **TestSuite Lookup**| `tia_testsuite_list_tests` | Returns configured test cases | **PASSED** |
 | **HMI Compilation** | `hmi_compile` on Unified target | Returns `State: Success`, `Errors: 0` | **PASSED** |
-
