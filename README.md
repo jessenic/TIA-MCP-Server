@@ -4,7 +4,7 @@
 [![Simulation](https://img.shields.io/badge/Simulation-S7--PLCSIM%20Advanced%20V8.0-008080.svg)](https://support.industry.siemens.com)
 [![Protocol](https://img.shields.io/badge/MCP-2024--11--05-blue.svg)](https://modelcontextprotocol.io)
 [![Runtime](https://img.shields.io/badge/.NET%20Framework-4.8%20x64-512BD4.svg)](https://dotnet.microsoft.com)
-[![Version](https://img.shields.io/badge/Version-v2.9.0-blue.svg)](#version-history--bug-fixes)
+[![Version](https://img.shields.io/badge/Version-v2.10.0-blue.svg)](#version-history--bug-fixes)
 [![Tools](https://img.shields.io/badge/Tools-110%20Registered-brightgreen.svg)](#complete-tools-reference-dictionary-110-tools)
 [![License](https://img.shields.io/badge/License-MIT-orange.svg)](LICENSE)
 
@@ -814,6 +814,11 @@ This repository includes 3 turnkey agent skills located in `.agents/skills/`:
 ---
 
 ## Version History & Bug Fixes
+
+### [v2.10.0] - 2026-11-16
+* Added Siemens online documentation tools (`docs_search`, `docs_read_page`, `docs_get_toc`, `docs_list_publications`) for the TIA Portal, STEP 7, WinCC Unified, Openness and PLCSIM documentation; they need internet access but no TIA connection.
+* Fixed the Openness AllowList registration format.
+* Updated the reported MCP server version and assembly metadata to v2.10.0.
 
 ### [v2.9.0] - 2026-11-13
 * Added direct global-DB member attribute reads with exact PLC/DB/member targeting and explicit metadata limits; PLC text-list inventory remains deferred because no complete V21 API contract was verified.
