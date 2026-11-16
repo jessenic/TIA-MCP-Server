@@ -1,0 +1,14 @@
+{
+  "name": "hmi_list_screen_groups",
+  "description": "List the nested screen-group hierarchy and direct screen counts for one unambiguous HMI Unified target.",
+  "parameters": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "target_name": {
+        "type": "string",
+        "description": "Exact device, device-item, or HMI software name; required when multiple HMI targets exist."
+      }
+    }
+  }
+}

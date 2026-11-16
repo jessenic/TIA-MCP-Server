@@ -1,0 +1,13 @@
+{
+  "name": "tia_create_project",
+  "description": "Create a project in an existing empty directory using the connected TIA Portal instance; existing content is never overwritten.",
+  "parameters": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "destination_location": { "type": "string", "description": "Full path to an existing empty directory." },
+      "project_name": { "type": "string", "description": "Plain project name without a path or .ap21 extension." }
+    },
+    "required": ["destination_location", "project_name"]
+  }
+}

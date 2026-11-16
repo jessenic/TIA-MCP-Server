@@ -1,0 +1,25 @@
+{
+  "name": "tia_get_tag_table_attributes",
+  "description": "Read the V21-reported attributes, values, access modes, and supported types for one exact PLC tag table.",
+  "parameters": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "table_name": {
+        "type": "string",
+        "description": "Exact PLC tag-table name."
+      },
+      "plc_name": {
+        "type": "string",
+        "description": "Exact PLC software name; required when the project has multiple PLCs."
+      },
+      "group_path": {
+        "type": "string",
+        "description": "Exact tag-table-group path, required when the table name is duplicated. Use an empty string for the root group."
+      }
+    },
+    "required": [
+      "table_name"
+    ]
+  }
+}

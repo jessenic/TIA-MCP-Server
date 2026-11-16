@@ -1,0 +1,40 @@
+{
+  "name": "tia_get_library_type_instances",
+  "description": "Read instances of an exact project-library type in one exact PLC scope. Optionally select an exact type-version GUID and/or exact OriginalLibrary source string; omitted version/source selectors include all versions of the unique selected type.",
+  "parameters": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "project_path": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Exact full path of a project already open in the connected TIA Portal instance."
+      },
+      "plc_name": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Exact, ordinal-case-sensitive PLC software name providing the IInstanceSearchScope."
+      },
+      "library_type_id": {
+        "type": "string",
+        "pattern": "^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$",
+        "description": "Exact GUID of a LibraryType visible in the selected project's ProjectLibrary."
+      },
+      "version_id": {
+        "type": "string",
+        "pattern": "^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$",
+        "description": "Optional exact LibraryTypeVersion GUID. If omitted, instances are queried for all matching versions."
+      },
+      "source_library": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Optional exact, ordinal-case-sensitive LibraryTypeVersion.OriginalLibrary value."
+      }
+    },
+    "required": [
+      "project_path",
+      "plc_name",
+      "library_type_id"
+    ]
+  }
+}

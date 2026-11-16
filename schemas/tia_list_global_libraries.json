@@ -1,0 +1,22 @@
+{
+  "name": "tia_list_global_libraries",
+  "description": "List accessible global-library metadata from the connected TIA Portal instance with bounded paging.",
+  "parameters": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "name_filter": {
+        "type": "string",
+        "description": "Optional case-insensitive substring filter for library names."
+      },
+      "offset": {
+        "type": "integer",
+        "description": "Zero-based result offset (default 0)."
+      },
+      "page_size": {
+        "type": "integer",
+        "description": "Maximum results, from 1 through 200 (default 50)."
+      }
+    }
+  }
+}

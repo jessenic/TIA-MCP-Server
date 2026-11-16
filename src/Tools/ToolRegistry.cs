@@ -1315,6 +1315,25 @@ namespace TiaOpennessMcp.Tools
                     return CallToolResult.Text(res);
                 });
 
+            // 37. hmi_create_tag_table
+            Register("hmi_create_tag_table", "Create an HMI tag table without overwriting an existing table.",
+                schema =>
+                {
+                    schema.Properties["table_name"] = new ToolProperty { Type = "string", Description = "Name for the new HMI tag table; '/' and '\\' are not allowed." };
+                    schema.Properties["target_name"] = new ToolProperty { Type = "string", Description = "Exact HMI software name (optional when one target resolves uniquely)." };
+                    schema.Properties["on_conflict"] = new ToolProperty { Type = "string", Enum = new List<string> { "fail" }, Description = "Required conflict behavior; only 'fail' is supported." };
+                    schema.Required = new List<string> { "table_name", "on_conflict" };
+                },
+                args =>
+                {
+                    string tableName = GetStringProp(args, "table_name") ?? throw new ArgumentException("table_name is required.");
+                    string onConflict = GetStringProp(args, "on_conflict") ?? throw new ArgumentException("on_conflict is required.");
+                    var result = TiaManager.Instance.CreateHmiTagTable(
+                        GetStringProp(args, "target_name") ?? TiaManager.Instance.FindHmiSoftware().Name,
+                        tableName, onConflict);
+                    return CallToolResult.Json(result, isError: !result.Success);
+                });
+
             // hmi_create_discrete_alarm
             Register("hmi_create_discrete_alarm", "Create or update a WinCC Unified discrete alarm with an alarm class, HMI tag trigger, and multilingual event text.",
                 schema =>
@@ -1842,6 +1861,512 @@ namespace TiaOpennessMcp.Tools
                     var report = PlcSimManager.Instance.RunSequence(seqInput, scale, timeout);
                     return CallToolResult.Json(report, isError: !report.Success);
                 });
+
+            Register("tia_get_block_info", "Get PLC block identity, language, group path, and verified metadata fields for one exact block.",
+                schema =>
+                {
+                    schema.Properties["block_name"] = new ToolProperty { Type = "string", Description = "Exact PLC block name." };
+                    schema.Properties["plc_name"] = new ToolProperty { Type = "string", Description = "Exact PLC software name; required when the project has multiple PLCs." };
+                    schema.Properties["group_path"] = new ToolProperty { Type = "string", Description = "Exact block-group path, required when the block name is duplicated. Use an empty string for the root group." };
+                    schema.Required = new List<string> { "block_name" };
+                },
+                args =>
+                {
+                    string blockName = GetStringProp(args, "block_name") ?? throw new ArgumentException("block_name is required.");
+                    return CallToolResult.Json(TiaManager.Instance.GetPlcBlockInfo(
+                        GetStringProp(args, "plc_name"), blockName, GetStringProp(args, "group_path")));
+                });
+
+            Register("tia_get_block_attributes", "Read the verified PLC block attributes IsConsistent and IsKnowHowProtected for one exact block.",
+                schema =>
+                {
+                    schema.Properties["block_name"] = new ToolProperty { Type = "string", Description = "Exact PLC block name." };
+                    schema.Properties["plc_name"] = new ToolProperty { Type = "string", Description = "Exact PLC software name; required when the project has multiple PLCs." };
+                    schema.Properties["group_path"] = new ToolProperty { Type = "string", Description = "Exact block-group path, required when the block name is duplicated. Use an empty string for the root group." };
+                    schema.Required = new List<string> { "block_name" };
+                },
+                args =>
+                {
+                    string blockName = GetStringProp(args, "block_name") ?? throw new ArgumentException("block_name is required.");
+                    return CallToolResult.Json(TiaManager.Instance.GetPlcBlockAttributes(
+                        GetStringProp(args, "plc_name"), blockName, GetStringProp(args, "group_path")));
+                });
+
+            Register("tia_get_tag_table_info", "Get the exact PLC tag-table name, group path, and contained-tag count.",
+                schema =>
+                {
+                    schema.Properties["table_name"] = new ToolProperty { Type = "string", Description = "Exact PLC tag-table name." };
+                    schema.Properties["plc_name"] = new ToolProperty { Type = "string", Description = "Exact PLC software name; required when the project has multiple PLCs." };
+                    schema.Properties["group_path"] = new ToolProperty { Type = "string", Description = "Exact tag-table-group path, required when the table name is duplicated. Use an empty string for the root group." };
+                    schema.Required = new List<string> { "table_name" };
+                },
+                args =>
+                {
+                    string tableName = GetStringProp(args, "table_name") ?? throw new ArgumentException("table_name is required.");
+                    return CallToolResult.Json(TiaManager.Instance.GetPlcTagTableInfo(
+                        GetStringProp(args, "plc_name"), tableName, GetStringProp(args, "group_path")));
+                });
+
+            Register("tia_get_type_info", "Get the exact PLC type name, group path, and verified consistency metadata.",
+                schema =>
+                {
+                    schema.Properties["type_name"] = new ToolProperty { Type = "string", Description = "Exact PLC user type name." };
+                    schema.Properties["plc_name"] = new ToolProperty { Type = "string", Description = "Exact PLC software name; required when the project has multiple PLCs." };
+                    schema.Properties["group_path"] = new ToolProperty { Type = "string", Description = "Exact PLC type-group path, required when the type name is duplicated. Use an empty string for the root group." };
+                    schema.Required = new List<string> { "type_name" };
+                },
+                args =>
+                {
+                    string typeName = GetStringProp(args, "type_name") ?? throw new ArgumentException("type_name is required.");
+                    return CallToolResult.Json(TiaManager.Instance.GetPlcTypeInfo(
+                        GetStringProp(args, "plc_name"), typeName, GetStringProp(args, "group_path")));
+                });
+
+            Register("tia_get_type_attributes", "Read the verified IsConsistent attribute for one exact PLC user type.",
+                schema =>
+                {
+                    schema.Properties["type_name"] = new ToolProperty { Type = "string", Description = "Exact PLC user type name." };
+                    schema.Properties["plc_name"] = new ToolProperty { Type = "string", Description = "Exact PLC software name; required when the project has multiple PLCs." };
+                    schema.Properties["group_path"] = new ToolProperty { Type = "string", Description = "Exact PLC type-group path, required when the type name is duplicated. Use an empty string for the root group." };
+                    schema.Required = new List<string> { "type_name" };
+                },
+                args =>
+                {
+                    string typeName = GetStringProp(args, "type_name") ?? throw new ArgumentException("type_name is required.");
+                    return CallToolResult.Json(TiaManager.Instance.GetPlcTypeAttributes(
+                        GetStringProp(args, "plc_name"), typeName, GetStringProp(args, "group_path")));
+                });
+
+            Register("tia_get_db_member_attributes", "Read the V21-reported attributes of one exact direct member of a global DB. Nested member paths and dedicated datatype/revision fields are not returned.",
+                schema =>
+                {
+                    schema.Properties["db_name"] = new ToolProperty { Type = "string", Description = "Exact global DB name." };
+                    schema.Properties["member_name"] = new ToolProperty { Type = "string", Description = "Exact name of a direct member in the selected global DB; nested member paths are unsupported." };
+                    schema.Properties["plc_name"] = new ToolProperty { Type = "string", Description = "Exact PLC software name; required when the project has multiple PLCs." };
+                    schema.Properties["group_path"] = new ToolProperty { Type = "string", Description = "Exact DB block-group path, required when the DB name is duplicated. Use an empty string for the root group." };
+                    schema.Required = new List<string> { "db_name", "member_name" };
+                },
+                args =>
+                {
+                    string dbName = GetStringProp(args, "db_name") ?? throw new ArgumentException("db_name is required.");
+                    string memberName = GetStringProp(args, "member_name") ?? throw new ArgumentException("member_name is required.");
+                    return CallToolResult.Json(TiaManager.Instance.GetDbMemberAttributes(
+                        GetStringProp(args, "plc_name"), dbName, memberName, GetStringProp(args, "group_path")));
+                });
+
+            Register("tia_list_global_libraries", "List accessible global-library metadata from the connected TIA Portal instance with bounded paging.",
+                schema =>
+                {
+                    schema.Properties["name_filter"] = new ToolProperty { Type = "string", Description = "Optional case-insensitive substring filter for library names." };
+                    schema.Properties["offset"] = new ToolProperty { Type = "integer", Description = "Zero-based result offset (default 0)." };
+                    schema.Properties["page_size"] = new ToolProperty { Type = "integer", Description = "Maximum results, from 1 through 200 (default 50)." };
+                },
+                args =>
+                {
+                    int offset = GetIntPropOrDefault(args, "offset", 0);
+                    int pageSize = GetIntPropOrDefault(args, "page_size", 50);
+                    return CallToolResult.Json(TiaManager.Instance.ListGlobalLibraries(
+                        GetStringProp(args, "name_filter"), offset, pageSize));
+                });
+
+            Register("tia_search_project_library_types", "Search or list types in the project library for one exact open project path, with bounded paging.",
+                schema =>
+                {
+                    schema.Properties["project_path"] = new ToolProperty { Type = "string", Description = "Exact full path of a project already open in the connected TIA Portal instance." };
+                    schema.Properties["query"] = new ToolProperty { Type = "string", Description = "Optional case-insensitive substring filter for type name or namespace." };
+                    schema.Properties["offset"] = new ToolProperty { Type = "integer", Description = "Zero-based result offset (default 0)." };
+                    schema.Properties["page_size"] = new ToolProperty { Type = "integer", Description = "Maximum results, from 1 through 200 (default 50)." };
+                    schema.Required = new List<string> { "project_path" };
+                },
+                args =>
+                {
+                    string projectPath = GetStringProp(args, "project_path") ?? throw new ArgumentException("project_path is required.");
+                    int offset = GetIntPropOrDefault(args, "offset", 0);
+                    int pageSize = GetIntPropOrDefault(args, "page_size", 50);
+                    return CallToolResult.Json(TiaManager.Instance.SearchProjectLibraryTypes(
+                        projectPath, GetStringProp(args, "query"), offset, pageSize));
+                });
+
+            Register("tia_list_project_faceplates", "List faceplate library types visible in one exact open project's library, with bounded paging.",
+                schema =>
+                {
+                    schema.Properties["project_path"] = new ToolProperty { Type = "string", Description = "Exact full path of a project already open in the connected TIA Portal instance." };
+                    schema.Properties["name_filter"] = new ToolProperty { Type = "string", Description = "Optional case-insensitive substring filter for faceplate names." };
+                    schema.Properties["offset"] = new ToolProperty { Type = "integer", Description = "Zero-based result offset (default 0)." };
+                    schema.Properties["page_size"] = new ToolProperty { Type = "integer", Description = "Maximum results, from 1 through 200 (default 50)." };
+                    schema.Required = new List<string> { "project_path" };
+                },
+                args =>
+                {
+                    string projectPath = GetStringProp(args, "project_path") ?? throw new ArgumentException("project_path is required.");
+                    int offset = GetIntPropOrDefault(args, "offset", 0);
+                    int pageSize = GetIntPropOrDefault(args, "page_size", 50);
+                    return CallToolResult.Json(TiaManager.Instance.ListProjectFaceplates(
+                        projectPath, GetStringProp(args, "name_filter"), offset, pageSize));
+                });
+
+            Register("tia_get_library_type_instances", "Read instances of an exact project-library type in one exact PLC scope. Optionally select an exact type-version GUID and/or exact OriginalLibrary source string; omitted version/source selectors include all versions of the unique selected type.",
+                schema =>
+                {
+                    schema.Properties["project_path"] = new ToolProperty { Type = "string", Description = "Exact full path of a project already open in the connected TIA Portal instance." };
+                    schema.Properties["plc_name"] = new ToolProperty { Type = "string", Description = "Exact, ordinal-case-sensitive PLC software name providing the IInstanceSearchScope." };
+                    schema.Properties["library_type_id"] = new ToolProperty { Type = "string", Description = "Exact GUID of a LibraryType visible in the selected project's ProjectLibrary." };
+                    schema.Properties["version_id"] = new ToolProperty { Type = "string", Description = "Optional exact LibraryTypeVersion GUID. If omitted, instances are queried for all matching versions." };
+                    schema.Properties["source_library"] = new ToolProperty { Type = "string", Description = "Optional exact, ordinal-case-sensitive LibraryTypeVersion.OriginalLibrary value." };
+                    schema.Required = new List<string> { "project_path", "plc_name", "library_type_id" };
+                },
+                args =>
+                {
+                    string projectPath = GetStringProp(args, "project_path") ?? throw new ArgumentException("project_path is required.");
+                    string plcName = GetStringProp(args, "plc_name") ?? throw new ArgumentException("plc_name is required.");
+                    string libraryTypeId = GetStringProp(args, "library_type_id") ?? throw new ArgumentException("library_type_id is required.");
+                    return CallToolResult.Json(TiaManager.Instance.GetLibraryTypeInstances(
+                        projectPath, plcName, libraryTypeId,
+                        GetStringProp(args, "version_id"), GetStringProp(args, "source_library")));
+                });
+
+            Register("tia_list_project_text_categories", "List text categories for one exact open project with optional literal filtering and bounded paging.",
+                schema =>
+                {
+                    schema.Properties["project_path"] = new ToolProperty { Type = "string", Description = "Exact full path of a project already open in the connected TIA Portal instance." };
+                    schema.Properties["query"] = new ToolProperty { Type = "string", Description = "Optional case-insensitive substring filter for category name or identifier." };
+                    schema.Properties["offset"] = new ToolProperty { Type = "integer", Description = "Zero-based result offset (default 0)." };
+                    schema.Properties["page_size"] = new ToolProperty { Type = "integer", Description = "Maximum results, from 1 through 200 (default 50)." };
+                    schema.Required = new List<string> { "project_path" };
+                },
+                args =>
+                {
+                    string projectPath = GetStringProp(args, "project_path") ?? throw new ArgumentException("project_path is required.");
+                    int offset = GetIntPropOrDefault(args, "offset", 0);
+                    int pageSize = GetIntPropOrDefault(args, "page_size", 50);
+                    return CallToolResult.Json(TiaManager.Instance.ListProjectTextCategories(
+                        projectPath, GetStringProp(args, "query"), offset, pageSize));
+                });
+
+            Register("tia_download_project_texts", "Export project texts to a new file using explicit cultures; the destination is never overwritten.",
+                schema =>
+                {
+                    schema.Properties["project_path"] = new ToolProperty { Type = "string", Description = "Exact full path of a project already open in the connected TIA Portal instance." };
+                    schema.Properties["destination_file_path"] = new ToolProperty { Type = "string", Description = "Full path for a new export file in an existing directory; an existing file is rejected." };
+                    schema.Properties["primary_culture"] = new ToolProperty { Type = "string", Description = "Valid .NET culture name used as the primary export language." };
+                    schema.Properties["reference_culture"] = new ToolProperty { Type = "string", Description = "Valid .NET culture name used as the reference export language." };
+                    schema.Required = new List<string> { "project_path", "destination_file_path", "primary_culture", "reference_culture" };
+                },
+                args =>
+                {
+                    string projectPath = GetStringProp(args, "project_path") ?? throw new ArgumentException("project_path is required.");
+                    string destination = GetStringProp(args, "destination_file_path") ?? throw new ArgumentException("destination_file_path is required.");
+                    string primaryCulture = GetStringProp(args, "primary_culture") ?? throw new ArgumentException("primary_culture is required.");
+                    string referenceCulture = GetStringProp(args, "reference_culture") ?? throw new ArgumentException("reference_culture is required.");
+                    return CallToolResult.Json(TiaManager.Instance.DownloadProjectTexts(
+                        projectPath, destination, primaryCulture, referenceCulture));
+                });
+
+            Register("hmi_list_screen_groups", "List the nested screen-group hierarchy and direct screen counts for one unambiguous HMI Unified target.",
+                schema =>
+                {
+                    schema.Properties["target_name"] = new ToolProperty { Type = "string", Description = "Exact device, device-item, or HMI software name; required when multiple HMI targets exist." };
+                },
+                args => CallToolResult.Json(TiaManager.Instance.ListHmiScreenGroups(GetStringProp(args, "target_name"))));
+
+            Register("hmi_list_graphic_lists", "List graphic-list names for one unambiguous HMI Unified target; entries and file-backed assets are not included.",
+                schema =>
+                {
+                    schema.Properties["target_name"] = new ToolProperty { Type = "string", Description = "Exact device, device-item, or HMI software name; required when multiple HMI targets exist." };
+                },
+                args => CallToolResult.Json(TiaManager.Instance.ListHmiGraphicLists(GetStringProp(args, "target_name"))));
+
+            Register("tia_create_plc_tag_table", "Create a PLC tag table in an exact tag-table group; existing names are never overwritten.",
+                schema =>
+                {
+                    schema.Properties["table_name"] = new ToolProperty { Type = "string", Description = "Name for the new PLC tag table." };
+                    schema.Properties["plc_name"] = new ToolProperty { Type = "string", Description = "Exact PLC software name; required when the project has multiple PLCs." };
+                    schema.Properties["group_path"] = new ToolProperty { Type = "string", Description = "Exact parent tag-table-group path; omit or use an empty string for the root group." };
+                    schema.Required = new List<string> { "table_name" };
+                },
+                args =>
+                {
+                    string tableName = GetStringProp(args, "table_name") ?? throw new ArgumentException("table_name is required.");
+                    var result = TiaManager.Instance.CreatePlcTagTable(
+                        GetStringProp(args, "plc_name"), tableName, GetStringProp(args, "group_path"));
+                    return CallToolResult.Json(result, isError: !result.Success);
+                });
+
+            Register("tia_create_tagtable_group", "Create a PLC tag-table group under an exact parent path; existing names are never overwritten.",
+                schema =>
+                {
+                    schema.Properties["group_name"] = new ToolProperty { Type = "string", Description = "Name for the new tag-table group." };
+                    schema.Properties["plc_name"] = new ToolProperty { Type = "string", Description = "Exact PLC software name; required when the project has multiple PLCs." };
+                    schema.Properties["parent_group_path"] = new ToolProperty { Type = "string", Description = "Exact parent group path; omit or use an empty string for the root group." };
+                    schema.Required = new List<string> { "group_name" };
+                },
+                args =>
+                {
+                    string groupName = GetStringProp(args, "group_name") ?? throw new ArgumentException("group_name is required.");
+                    var result = TiaManager.Instance.CreateTagTableGroup(
+                        GetStringProp(args, "plc_name"), groupName, GetStringProp(args, "parent_group_path"));
+                    return CallToolResult.Json(result, isError: !result.Success);
+                });
+
+            Register("tia_create_block_group", "Create a PLC block group under an exact parent path; existing groups are never overwritten.",
+                schema =>
+                {
+                    schema.Properties["group_name"] = new ToolProperty { Type = "string", Description = "Name for the new block group." };
+                    schema.Properties["plc_name"] = new ToolProperty { Type = "string", Description = "Exact PLC software name; required when the project has multiple PLCs." };
+                    schema.Properties["parent_group_path"] = new ToolProperty { Type = "string", Description = "Exact slash-separated parent block-group path; omit or use an empty string for the root group." };
+                    schema.Required = new List<string> { "group_name" };
+                },
+                args =>
+                {
+                    string groupName = GetStringProp(args, "group_name") ?? throw new ArgumentException("group_name is required.");
+                    var result = TiaManager.Instance.CreateBlockGroup(
+                        GetStringProp(args, "plc_name"), groupName, GetStringProp(args, "parent_group_path"));
+                    return CallToolResult.Json(result, isError: !result.Success);
+                });
+
+            Register("tia_create_user_constant", "Create a supported PLC user constant in an exact tag table without overwriting existing constants.",
+                schema =>
+                {
+                    schema.Properties["table_name"] = new ToolProperty { Type = "string", Description = "Exact tag-table name." };
+                    schema.Properties["constant_name"] = new ToolProperty { Type = "string", Description = "Name for the new user constant." };
+                    schema.Properties["data_type"] = new ToolProperty { Type = "string", Description = "Supported type: Bool, SInt, Int, DInt, LInt, USInt, Byte, UInt, Word, UDInt, DWord, ULInt, LWord, Real, or LReal." };
+                    schema.Properties["value"] = new ToolProperty { Type = "string", Description = "Invariant-culture literal value for the selected type." };
+                    schema.Properties["plc_name"] = new ToolProperty { Type = "string", Description = "Exact PLC software name; required when the project has multiple PLCs." };
+                    schema.Properties["group_path"] = new ToolProperty { Type = "string", Description = "Exact containing tag-table-group path; omit or use an empty string for the root group." };
+                    schema.Required = new List<string> { "table_name", "constant_name", "data_type", "value" };
+                },
+                args =>
+                {
+                    string tableName = GetStringProp(args, "table_name") ?? throw new ArgumentException("table_name is required.");
+                    string constantName = GetStringProp(args, "constant_name") ?? throw new ArgumentException("constant_name is required.");
+                    string dataType = GetStringProp(args, "data_type") ?? throw new ArgumentException("data_type is required.");
+                    string value = GetStringProp(args, "value") ?? throw new ArgumentException("value is required.");
+                    var result = TiaManager.Instance.CreateUserConstant(
+                        GetStringProp(args, "plc_name"), tableName, constantName, dataType, value, GetStringProp(args, "group_path"));
+                    return CallToolResult.Json(result, isError: !result.Success);
+                });
+
+            Register("tia_update_user_constant", "Update only the value of an exact PLC user constant using its existing datatype.",
+                schema =>
+                {
+                    schema.Properties["table_name"] = new ToolProperty { Type = "string", Description = "Exact tag-table name." };
+                    schema.Properties["constant_name"] = new ToolProperty { Type = "string", Description = "Exact user-constant name." };
+                    schema.Properties["value"] = new ToolProperty { Type = "string", Description = "Invariant-culture literal value compatible with the constant's existing datatype." };
+                    schema.Properties["plc_name"] = new ToolProperty { Type = "string", Description = "Exact PLC software name; required when the project has multiple PLCs." };
+                    schema.Properties["group_path"] = new ToolProperty { Type = "string", Description = "Exact containing tag-table-group path; omit or use an empty string for the root group." };
+                    schema.Required = new List<string> { "table_name", "constant_name", "value" };
+                },
+                args =>
+                {
+                    string tableName = GetStringProp(args, "table_name") ?? throw new ArgumentException("table_name is required.");
+                    string constantName = GetStringProp(args, "constant_name") ?? throw new ArgumentException("constant_name is required.");
+                    string value = GetStringProp(args, "value") ?? throw new ArgumentException("value is required.");
+                    var result = TiaManager.Instance.UpdateUserConstant(
+                        GetStringProp(args, "plc_name"), tableName, constantName, value, GetStringProp(args, "group_path"));
+                    return CallToolResult.Json(result, isError: !result.Success);
+                });
+
+            Register("tia_create_project", "Create a project in an existing empty directory using the connected TIA Portal instance; existing content is never overwritten.",
+                schema =>
+                {
+                    schema.Properties["destination_location"] = new ToolProperty { Type = "string", Description = "Full path to an existing empty directory." };
+                    schema.Properties["project_name"] = new ToolProperty { Type = "string", Description = "Plain project name without a path or .ap21 extension." };
+                    schema.Required = new List<string> { "destination_location", "project_name" };
+                },
+                args =>
+                {
+                    string location = GetStringProp(args, "destination_location") ?? throw new ArgumentException("destination_location is required.");
+                    string projectName = GetStringProp(args, "project_name") ?? throw new ArgumentException("project_name is required.");
+                    var result = TiaManager.Instance.CreateProject(location, projectName);
+                    return CallToolResult.Json(result, isError: !result.Success);
+                });
+
+            Register("hmi_create_screen_group", "Create a screen group under an exact parent path; on_conflict must be fail and no existing group is overwritten.",
+                schema =>
+                {
+                    schema.Properties["group_name"] = new ToolProperty { Type = "string", Description = "Name for the new group; '/' is not allowed." };
+                    schema.Properties["parent_group_path"] = new ToolProperty { Type = "string", Description = "Exact parent group path; omit or use an empty string for the root." };
+                    schema.Properties["target_name"] = new ToolProperty { Type = "string", Description = "Exact HMI device, device-item, or software name; required when multiple targets exist." };
+                    schema.Properties["on_conflict"] = new ToolProperty { Type = "string", Enum = new List<string> { "fail" }, Description = "Required conflict behavior; only 'fail' is supported." };
+                    schema.Required = new List<string> { "group_name", "on_conflict" };
+                },
+                args =>
+                {
+                    string groupName = GetStringProp(args, "group_name") ?? throw new ArgumentException("group_name is required.");
+                    string onConflict = GetStringProp(args, "on_conflict") ?? throw new ArgumentException("on_conflict is required.");
+                    var result = TiaManager.Instance.CreateHmiScreenGroup(
+                        groupName, GetStringProp(args, "parent_group_path"), GetStringProp(args, "target_name"), onConflict);
+                    return CallToolResult.Json(result, isError: !result.Success);
+                });
+
+            Register("hmi_create_screen_under_group", "Create a screen inside an existing exact screen group; on_conflict must be fail and existing screens are not overwritten.",
+                schema =>
+                {
+                    schema.Properties["parent_group_path"] = new ToolProperty { Type = "string", Description = "Exact non-empty screen-group path." };
+                    schema.Properties["screen_name"] = new ToolProperty { Type = "string", Description = "Name for the new screen." };
+                    schema.Properties["width"] = new ToolProperty { Type = "integer", Minimum = 1, Description = "Optional positive screen width in pixels." };
+                    schema.Properties["height"] = new ToolProperty { Type = "integer", Minimum = 1, Description = "Optional positive screen height in pixels." };
+                    schema.Properties["target_name"] = new ToolProperty { Type = "string", Description = "Exact HMI device, device-item, or software name; required when multiple targets exist." };
+                    schema.Properties["on_conflict"] = new ToolProperty { Type = "string", Enum = new List<string> { "fail" }, Description = "Required conflict behavior; only 'fail' is supported." };
+                    schema.Required = new List<string> { "parent_group_path", "screen_name", "on_conflict" };
+                },
+                args =>
+                {
+                    string groupPath = GetStringProp(args, "parent_group_path") ?? throw new ArgumentException("parent_group_path is required.");
+                    string screenName = GetStringProp(args, "screen_name") ?? throw new ArgumentException("screen_name is required.");
+                    string onConflict = GetStringProp(args, "on_conflict") ?? throw new ArgumentException("on_conflict is required.");
+                    var result = TiaManager.Instance.CreateHmiScreenUnderGroup(
+                        groupPath, screenName, GetOptionalUIntProp(args, "width"), GetOptionalUIntProp(args, "height"),
+                        GetStringProp(args, "target_name"), onConflict);
+                    return CallToolResult.Json(result, isError: !result.Success);
+                });
+
+            Register("hmi_create_navigation_button", "Create a new HMI button with an explicit Tapped action that navigates to an existing screen. Existing item names are never overwritten.",
+                schema =>
+                {
+                    schema.Properties["target_name"] = new ToolProperty { Type = "string", Description = "Exact HMI software name from hmi_list_targets." };
+                    schema.Properties["screen_name"] = new ToolProperty { Type = "string", Description = "Exact unique source screen name." };
+                    schema.Properties["item_name"] = new ToolProperty { Type = "string", Description = "New button item name; collisions fail without replacement." };
+                    schema.Properties["text"] = new ToolProperty { Type = "string", Description = "Plain-text button caption." };
+                    schema.Properties["destination_screen"] = new ToolProperty { Type = "string", Description = "Exact unique destination screen name in the selected HMI software." };
+                    schema.Properties["left"] = new ToolProperty { Type = "integer", Description = "Horizontal pixel position." };
+                    schema.Properties["top"] = new ToolProperty { Type = "integer", Description = "Vertical pixel position." };
+                    schema.Properties["width"] = new ToolProperty { Type = "integer", Description = "Button width in pixels." };
+                    schema.Properties["height"] = new ToolProperty { Type = "integer", Description = "Button height in pixels." };
+                    schema.Properties["back_color"] = new ToolProperty { Type = "string", Description = "Optional color: #RRGGBB, #AARRGGBB, or white, gray, grey, red, green, blue, transparent." };
+                    schema.Properties["fore_color"] = new ToolProperty { Type = "string", Description = "Optional color: #RRGGBB, #AARRGGBB, or white, gray, grey, red, green, blue, transparent." };
+                    schema.Properties["on_conflict"] = new ToolProperty { Type = "string", Enum = new List<string> { "fail" }, Description = "Only fail-on-conflict is supported." };
+                    schema.Required = new List<string>
+                    {
+                        "target_name", "screen_name", "item_name", "text", "destination_screen",
+                        "left", "top", "width", "height", "on_conflict"
+                    };
+                },
+                args =>
+                {
+                    string targetName = GetStringProp(args, "target_name") ?? throw new ArgumentException("target_name is required.");
+                    string screenName = GetStringProp(args, "screen_name") ?? throw new ArgumentException("screen_name is required.");
+                    string itemName = GetStringProp(args, "item_name") ?? throw new ArgumentException("item_name is required.");
+                    string text = GetStringProp(args, "text") ?? throw new ArgumentException("text is required.");
+                    string destinationScreen = GetStringProp(args, "destination_screen") ?? throw new ArgumentException("destination_screen is required.");
+                    int left = GetIntProp(args, "left") ?? throw new ArgumentException("left is required.");
+                    int top = GetIntProp(args, "top") ?? throw new ArgumentException("top is required.");
+                    uint width = GetUIntProp(args, "width") ?? throw new ArgumentException("width is required.");
+                    uint height = GetUIntProp(args, "height") ?? throw new ArgumentException("height is required.");
+                    string onConflict = GetStringProp(args, "on_conflict") ?? throw new ArgumentException("on_conflict is required.");
+                    var result = TiaManager.Instance.CreateHmiNavigationButton(
+                        targetName, screenName, itemName, text, destinationScreen, left, top,
+                        width, height, GetStringProp(args, "back_color"), GetStringProp(args, "fore_color"), onConflict);
+                    return CallToolResult.Json(result, isError: !result.Success);
+                });
+
+            Register("hmi_rename_screen", "Rename an exact screen in place within its group; existing siblings are never overwritten.",
+                schema =>
+                {
+                    schema.Properties["screen_name"] = new ToolProperty { Type = "string", Description = "Exact existing screen name." };
+                    schema.Properties["group_path"] = new ToolProperty { Type = "string", Description = "Exact containing group path; use an empty string for a root screen." };
+                    schema.Properties["new_name"] = new ToolProperty { Type = "string", Description = "New screen name." };
+                    schema.Properties["target_name"] = new ToolProperty { Type = "string", Description = "Exact HMI device, device-item, or software name; required when multiple targets exist." };
+                    schema.Properties["on_conflict"] = new ToolProperty { Type = "string", Enum = new List<string> { "fail" }, Description = "Required conflict behavior; only 'fail' is supported." };
+                    schema.Required = new List<string> { "screen_name", "group_path", "new_name", "on_conflict" };
+                },
+                args =>
+                {
+                    string screenName = GetStringProp(args, "screen_name") ?? throw new ArgumentException("screen_name is required.");
+                    string groupPath = GetStringProp(args, "group_path") ?? throw new ArgumentException("group_path is required.");
+                    string newName = GetStringProp(args, "new_name") ?? throw new ArgumentException("new_name is required.");
+                    string onConflict = GetStringProp(args, "on_conflict") ?? throw new ArgumentException("on_conflict is required.");
+                    var result = TiaManager.Instance.RenameHmiScreen(
+                        screenName, groupPath, newName, GetStringProp(args, "target_name"), onConflict);
+                    return CallToolResult.Json(result, isError: !result.Success);
+                });
+
+            Register("hmi_rename_screen_group", "Rename an exact screen group in place while preserving its child objects; existing siblings are never overwritten.",
+                schema =>
+                {
+                    schema.Properties["group_path"] = new ToolProperty { Type = "string", Description = "Exact non-empty current group path." };
+                    schema.Properties["new_name"] = new ToolProperty { Type = "string", Description = "New group name; '/' is not allowed." };
+                    schema.Properties["target_name"] = new ToolProperty { Type = "string", Description = "Exact HMI device, device-item, or software name; required when multiple targets exist." };
+                    schema.Properties["on_conflict"] = new ToolProperty { Type = "string", Enum = new List<string> { "fail" }, Description = "Required conflict behavior; only 'fail' is supported." };
+                    schema.Required = new List<string> { "group_path", "new_name", "on_conflict" };
+                },
+                args =>
+                {
+                    string groupPath = GetStringProp(args, "group_path") ?? throw new ArgumentException("group_path is required.");
+                    string newName = GetStringProp(args, "new_name") ?? throw new ArgumentException("new_name is required.");
+                    string onConflict = GetStringProp(args, "on_conflict") ?? throw new ArgumentException("on_conflict is required.");
+                    var result = TiaManager.Instance.RenameHmiScreenGroup(
+                        groupPath, newName, GetStringProp(args, "target_name"), onConflict);
+                    return CallToolResult.Json(result, isError: !result.Success);
+                });
+
+            Register("hmi_rename_tag_table", "Rename an HMI tag table in place and verify its tag names remain unchanged; existing tables are never overwritten.",
+                schema =>
+                {
+                    schema.Properties["table_name"] = new ToolProperty { Type = "string", Description = "Exact existing HMI tag-table name." };
+                    schema.Properties["new_name"] = new ToolProperty { Type = "string", Description = "New tag-table name." };
+                    schema.Properties["target_name"] = new ToolProperty { Type = "string", Description = "Exact HMI device, device-item, or software name; required when multiple targets exist." };
+                    schema.Properties["on_conflict"] = new ToolProperty { Type = "string", Enum = new List<string> { "fail" }, Description = "Required conflict behavior; only 'fail' is supported." };
+                    schema.Required = new List<string> { "table_name", "new_name", "on_conflict" };
+                },
+                args =>
+                {
+                    string tableName = GetStringProp(args, "table_name") ?? throw new ArgumentException("table_name is required.");
+                    string newName = GetStringProp(args, "new_name") ?? throw new ArgumentException("new_name is required.");
+                    string onConflict = GetStringProp(args, "on_conflict") ?? throw new ArgumentException("on_conflict is required.");
+                    var result = TiaManager.Instance.RenameHmiTagTable(
+                        tableName, newName, GetStringProp(args, "target_name"), onConflict);
+                    return CallToolResult.Json(result, isError: !result.Success);
+                });
+
+            Register("tia_get_plc_tag_info", "Read the supported metadata for one PLC tag, selected by exact name and tag-table scope.",
+                schema =>
+                {
+                    schema.Properties["tag_name"] = new ToolProperty { Type = "string", Description = "Exact PLC tag name." };
+                    schema.Properties["table_name"] = new ToolProperty { Type = "string", Description = "Exact PLC tag-table name containing the tag." };
+                    schema.Properties["plc_name"] = new ToolProperty { Type = "string", Description = "Exact PLC software name; required when the project has multiple PLCs." };
+                    schema.Properties["group_path"] = new ToolProperty { Type = "string", Description = "Exact tag-table-group path, required when the table name is duplicated. Use an empty string for the root group." };
+                    schema.Required = new List<string> { "tag_name", "table_name" };
+                },
+                args =>
+                {
+                    string tagName = GetStringProp(args, "tag_name") ?? throw new ArgumentException("tag_name is required.");
+                    string tableName = GetStringProp(args, "table_name") ?? throw new ArgumentException("table_name is required.");
+                    return CallToolResult.Json(TiaManager.Instance.GetPlcTagInfo(
+                        GetStringProp(args, "plc_name"), tableName, tagName, GetStringProp(args, "group_path")));
+                });
+
+            Register("tia_read_user_constant", "Read a user constant's declared type and literal value from the selected PLC.",
+                schema =>
+                {
+                    schema.Properties["constant_name"] = new ToolProperty { Type = "string", Description = "Exact user-constant name." };
+                    schema.Properties["plc_name"] = new ToolProperty { Type = "string", Description = "Exact PLC software name; required when the project has multiple PLCs." };
+                    schema.Properties["table_name"] = new ToolProperty { Type = "string", Description = "Optional exact tag-table name. Omit only when the constant name resolves uniquely within the selected PLC and group scope." };
+                    schema.Properties["group_path"] = new ToolProperty { Type = "string", Description = "Optional exact tag-table-group path. Use an empty string for the root group; may be used without table_name to scope the search." };
+                    schema.Required = new List<string> { "constant_name" };
+                },
+                args =>
+                {
+                    string constantName = GetStringProp(args, "constant_name") ?? throw new ArgumentException("constant_name is required.");
+                    return CallToolResult.Json(TiaManager.Instance.ReadUserConstant(
+                        GetStringProp(args, "plc_name"), constantName,
+                        GetStringProp(args, "table_name"), GetStringProp(args, "group_path")));
+                });
+
+            Register("tia_get_tag_table_attributes", "Read the V21-reported attributes, values, access modes, and supported types for one exact PLC tag table.",
+                schema =>
+                {
+                    schema.Properties["table_name"] = new ToolProperty { Type = "string", Description = "Exact PLC tag-table name." };
+                    schema.Properties["plc_name"] = new ToolProperty { Type = "string", Description = "Exact PLC software name; required when the project has multiple PLCs." };
+                    schema.Properties["group_path"] = new ToolProperty { Type = "string", Description = "Exact tag-table-group path, required when the table name is duplicated. Use an empty string for the root group." };
+                    schema.Required = new List<string> { "table_name" };
+                },
+                args =>
+                {
+                    string tableName = GetStringProp(args, "table_name") ?? throw new ArgumentException("table_name is required.");
+                    return CallToolResult.Json(TiaManager.Instance.GetTagTableAttributes(
+                        GetStringProp(args, "plc_name"), tableName, GetStringProp(args, "group_path")));
+                });
         }
 
         private void Register(string name, string description, Action<ToolInputSchema> schemaBuilder, Func<JsonElement?, CallToolResult> handler)
@@ -1881,6 +2406,22 @@ namespace TiaOpennessMcp.Tools
             return null;
         }
 
+        private static int GetIntPropOrDefault(JsonElement? element, string propName, int defaultValue)
+        {
+            if (!element.HasValue || element.Value.ValueKind != JsonValueKind.Object ||
+                !element.Value.TryGetProperty(propName, out var property))
+            {
+                return defaultValue;
+            }
+
+            if (property.ValueKind != JsonValueKind.Number || !property.TryGetInt32(out int value))
+            {
+                throw new ArgumentException($"'{propName}' must be a 32-bit integer.");
+            }
+
+            return value;
+        }
+
         private static long? GetLongProp(JsonElement? element, string propName)
         {
             if (element.HasValue && element.Value.ValueKind == JsonValueKind.Object &&
@@ -1901,6 +2442,18 @@ namespace TiaOpennessMcp.Tools
                     return val;
             }
             return null;
+        }
+
+        private static uint? GetOptionalUIntProp(JsonElement? element, string propName)
+        {
+            if (!element.HasValue || element.Value.ValueKind != JsonValueKind.Object ||
+                !element.Value.TryGetProperty(propName, out var property))
+                return null;
+
+            if (property.ValueKind != JsonValueKind.Number || !property.TryGetUInt32(out uint value))
+                throw new ArgumentException($"{propName} must be a non-negative 32-bit integer.");
+
+            return value;
         }
 
         private static float GetFloatProp(JsonElement? element, string propName, float defaultValue)

@@ -1,0 +1,15 @@
+{
+  "name": "hmi_rename_tag_table",
+  "description": "Rename an HMI tag table in place and verify its tag names remain unchanged; existing tables are never overwritten.",
+  "parameters": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "table_name": { "type": "string", "description": "Exact existing HMI tag-table name." },
+      "new_name": { "type": "string", "description": "New tag-table name." },
+      "target_name": { "type": "string", "description": "Exact HMI device, device-item, or software name; required when multiple targets exist." },
+      "on_conflict": { "type": "string", "enum": ["fail"], "description": "Required conflict behavior; only 'fail' is supported." }
+    },
+    "required": ["table_name", "new_name", "on_conflict"]
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "name": "tia_get_type_info",
+  "description": "Get the exact PLC type name, group path, and verified consistency metadata.",
+  "parameters": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "type_name": {
+        "type": "string",
+        "description": "Exact PLC user type name."
+      },
+      "plc_name": {
+        "type": "string",
+        "description": "Exact PLC software name; required when the project has multiple PLCs."
+      },
+      "group_path": {
+        "type": "string",
+        "description": "Exact PLC type-group path, required when the type name is duplicated. Use an empty string for the root group."
+      }
+    },
+    "required": [
+      "type_name"
+    ]
+  }
+}

@@ -1,5 +1,5 @@
 # Siemens TIA Portal V21 Openness MCP Server
-## Complete Tools Reference Dictionary (81 Tools)
+## Complete Tools Reference Dictionary (110 Tools)
 
 **Protocol Specification:** Model Context Protocol (MCP) JSON-RPC 2.0  
 **Transport Binding:** HTTP (`POST /mcp`), SSE (`GET /sse`), stdio  
@@ -14,10 +14,12 @@
 | :---: | :--- | :---: | :--- |
 | **1** | [Connection & Session Management](#category-1-connection--session-management-8-tools) | 8 | `tia_get_status`, `tia_list_processes`, `tia_connect`, `tia_disconnect`, `tia_get_project_info`, `tia_open_project`, `tia_save_project`, `tia_close_project` |
 | **2** | [Hardware & Device Topology](#category-2-hardware--device-topology-2-tools) | 2 | `tia_list_devices`, `tia_get_device_tree` |
-| **3** | [PLC Software, Blocks & Compilation](#category-3-plc-software-blocks--compilation-10-tools) | 10 | `tia_list_plcs`, `tia_list_blocks`, `tia_get_block_code`, `tia_import_block`, `tia_import_scl_block`, `tia_delete_block`, `tia_list_plc_types`, `tia_get_plc_type`, `tia_import_plc_type`, `tia_compile` |
-| **4** | [WinCC Unified HMI Engineering](#category-4-wincc-unified-hmi-screen--widget-engineering-47-tools) | 47 | `hmi_list_targets`, `hmi_list_screens`, `hmi_create_screen`, `hmi_delete_screen`, `hmi_get_screen_items`, `hmi_get_screen_item`, `hmi_update_screen_item`, `hmi_read_event_scripts`, `hmi_set_event_script`, `hmi_delete_screen_items`, `hmi_add_label`, `hmi_add_button`, `hmi_add_toggle_switch`, `hmi_add_shape`, `hmi_add_io_field`, `hmi_set_tag_dynamization`, `hmi_delete_dynamization`, `hmi_update_dynamization_entry`, `hmi_set_expression_dynamization`, `hmi_set_expression_dynamization_entries`, `hmi_get_js_type_definitions`, `hmi_update_button_scripts`, `hmi_list_tag_tables`, `hmi_list_tags`, `hmi_create_tag`, `hmi_create_discrete_alarm`, `hmi_update_tag_acquisition_cycles`, `hmi_set_tag_range`, `hmi_create_data_log`, `hmi_assign_logging_tags`, `hmi_list_connections`, `hmi_create_connection`, `hmi_delete_connection`, `hmi_list_text_lists`, `hmi_create_text_list`, `hmi_delete_text_list`, `hmi_export_text_lists`, `hmi_compile`, `tia_list_tag_tables`, `tia_get_tags`, `hmi_export_json`, `hmi_read_export_file`, `hmi_begin_import`, `hmi_upload_import_file`, `hmi_import_json`, `hmi_patch_json`, `hmi_render_json` |
+| **3** | [PLC Software, Blocks & Compilation](#category-3-plc-software-blocks--compilation-16-tools) | 16 | `tia_list_plcs`, `tia_list_blocks`, `tia_get_block_code`, `tia_get_block_info`, `tia_get_block_attributes`, `tia_import_block`, `tia_import_scl_block`, `tia_delete_block`, `tia_list_plc_types`, `tia_get_plc_type`, `tia_get_type_info`, `tia_get_type_attributes`, `tia_get_tag_table_info`, `tia_import_plc_type`, `tia_compile`, `tia_get_db_member_attributes` |
+| **4** | [WinCC Unified HMI Engineering](#category-4-wincc-unified-hmi-screen--widget-engineering-49-tools) | 49 | `hmi_list_targets`, `hmi_list_screens`, `hmi_list_screen_groups`, `hmi_list_graphic_lists`, `hmi_create_screen`, `hmi_delete_screen`, `hmi_get_screen_items`, `hmi_get_screen_item`, `hmi_update_screen_item`, `hmi_read_event_scripts`, `hmi_set_event_script`, `hmi_delete_screen_items`, `hmi_add_label`, `hmi_add_button`, `hmi_add_toggle_switch`, `hmi_add_shape`, `hmi_add_io_field`, `hmi_set_tag_dynamization`, `hmi_delete_dynamization`, `hmi_update_dynamization_entry`, `hmi_set_expression_dynamization`, `hmi_set_expression_dynamization_entries`, `hmi_get_js_type_definitions`, `hmi_update_button_scripts`, `hmi_list_tag_tables`, `hmi_list_tags`, `hmi_create_tag`, `hmi_create_discrete_alarm`, `hmi_update_tag_acquisition_cycles`, `hmi_set_tag_range`, `hmi_create_data_log`, `hmi_assign_logging_tags`, `hmi_list_connections`, `hmi_create_connection`, `hmi_delete_connection`, `hmi_list_text_lists`, `hmi_create_text_list`, `hmi_delete_text_list`, `hmi_export_text_lists`, `hmi_compile`, `tia_list_tag_tables`, `tia_get_tags`, `hmi_export_json`, `hmi_read_export_file`, `hmi_begin_import`, `hmi_upload_import_file`, `hmi_import_json`, `hmi_patch_json`, `hmi_render_json` |
 | **5** | [Siemens TestSuite Automation](#category-5-siemens-testsuite-automation-2-tools) | 2 | `tia_testsuite_list_tests`, `tia_testsuite_load_test` |
 | **6** | [S7-PLCSIM Advanced Live Simulation & Testing](#category-6-s7-plcsim-advanced-live-simulation--testing-12-tools) | 12 | `plcsim_list_instances`, `plcsim_connect`, `plcsim_disconnect`, `plcsim_get_status`, `plcsim_set_operating_state`, `plcsim_set_scale_factor`, `plcsim_read_tag`, `plcsim_write_tag`, `plcsim_read_tags`, `plcsim_write_tags`, `plcsim_run_sequence`, `plcsim_run_mixing_sequence` |
+| **7** | [Project, Library & Text Discovery](#category-7-project-library--text-discovery-6-tools) | 6 | `tia_list_global_libraries`, `tia_search_project_library_types`, `tia_list_project_faceplates`, `tia_get_library_type_instances`, `tia_list_project_text_categories`, `tia_download_project_texts` |
+| **8** | [PLC, Project & HMI Operations](#category-8-plc-project--hmi-operations-16-tools) | 16 | `tia_get_plc_tag_info`, `tia_read_user_constant`, `tia_get_tag_table_attributes`, `tia_create_plc_tag_table`, `tia_create_tagtable_group`, `tia_create_block_group`, `tia_create_user_constant`, `tia_update_user_constant`, `tia_create_project`, `hmi_create_screen_group`, `hmi_create_screen_under_group`, `hmi_create_tag_table`, `hmi_create_navigation_button`, `hmi_rename_screen`, `hmi_rename_screen_group`, `hmi_rename_tag_table` |
 
 ## MCP Documentation Resources
 
@@ -205,7 +207,7 @@ The bundled Openness assemblies cover authoring APIs, not the complete WinCC Uni
 
 ---
 
-## Category 3: PLC Software, Blocks & Compilation (10 Tools)
+## Category 3: PLC Software, Blocks & Compilation (16 Tools)
 
 ### 11. `tia_list_plcs`
 - **Description:** Lists all PLCs with block counts, UDT counts, and tag table counts.
@@ -371,7 +373,12 @@ The bundled Openness assemblies cover authoring APIs, not the complete WinCC Uni
 
 ---
 
-## Category 4: WinCC Unified HMI Screen & Widget Engineering (46 Tools)
+### `tia_get_db_member_attributes`
+- **Description:** Read the V21-reported attributes of one exact direct member of a global DB.
+- **Parameters:** Required `db_name` and `member_name`; optional exact `plc_name` and `group_path`.
+- **Returns:** Every attribute reported for the selected direct member, with values only when its V21 access mode permits reading. Nested paths, dedicated datatype, stable ID, and revision fields are not claimed.
+
+## Category 4: WinCC Unified HMI Screen & Widget Engineering (49 Tools)
 
 ### 20. `hmi_list_targets`
 - **Description:** Enumerates all WinCC Unified runtime devices and software containers.
@@ -1242,7 +1249,7 @@ The `hmi_set_expression_dynamization_entries` tool writes condition/value tables
 
 ---
 
-## Category 6: S7-PLCSIM Advanced Live Simulation & Testing (11 Tools)
+## Category 6: S7-PLCSIM Advanced Live Simulation & Testing (12 Tools)
 
 ### 56. `plcsim_list_instances`
 - **Description:** Lists all registered virtual S7-1500 controller instances managed by S7-PLCSIM Advanced runtime with ID, name, operating state, CPU type, and IP address.
@@ -1461,3 +1468,182 @@ The `hmi_set_expression_dynamization_entries` tool writes condition/value tables
     ]
   }
   ```
+
+---
+
+## Category 7: Project, Library & Text Discovery (6 Tools)
+
+All project-scoped tools require the exact full path of a project already open
+in the connected TIA Portal instance. Collection tools cap `page_size` at 200
+and return `Items`, `Offset`, `PageSize`, `TotalCount`, `HasMore`,
+`EnumerationCompleted`, and a completeness note.
+
+### `tia_list_global_libraries`
+- **Description:** List accessible global-library metadata from the connected TIA Portal instance.
+- **Parameters:** Optional `name_filter` (case-insensitive substring), `offset` (default 0), and `page_size` (default 50, maximum 200).
+- **Returns:** Library name, path, library type, open state, and read-only state. The API does not expose a stable library ID or version in this listing.
+
+### `tia_search_project_library_types`
+- **Description:** List or search types in one open project's library.
+- **Parameters:** Required `project_path`; optional `query` (literal case-insensitive substring in name or namespace), `offset`, and `page_size`.
+- **Returns:** Type and version GUIDs, names, namespace, runtime type, folder, consistency status, and exposed version metadata.
+
+### `tia_list_project_faceplates`
+- **Description:** List faceplate library types visible in one open project's library.
+- **Parameters:** Required `project_path`; optional `name_filter`, `offset`, and `page_size`.
+- **Returns:** Faceplate type/version metadata. Interface metadata is not exposed by the verified V21 API surface used here.
+
+### `tia_get_library_type_instances`
+- **Description:** Read instances of an exact project-library type in one exact PLC scope.
+- **Parameters:** Required `project_path`, `plc_name`, and `library_type_id`; optional exact `version_id` and `source_library`.
+- **Returns:** Matching instances with readable names/IDs and parent locations, plus queried version metadata and an explicit completeness note. HMI-wide instance search and inferred consistency states are not claimed.
+
+### `tia_list_project_text_categories`
+- **Description:** List project text categories.
+- **Parameters:** Required `project_path`; optional `query` (literal case-insensitive substring in category name or identifier), `offset`, and `page_size`.
+- **Returns:** Category identifiers and names. The API does not expose category text counts or per-language counts.
+
+### `tia_download_project_texts`
+- **Description:** Export project texts with explicit primary and reference cultures.
+- **Parameters:** Required `project_path`, `destination_file_path`, `primary_culture`, and `reference_culture`.
+- **Behavior:** The destination directory must already exist and the destination file must not exist. The tool will not overwrite a file.
+- **Returns:** Resolved project/output paths, normalized cultures, output byte count, and an explicit note that the API provides no exported-entry count or completeness indicator.
+
+## Additional PLC & HMI Discovery Tools (8 Tools)
+
+### `tia_get_block_info`
+- **Parameters:** Required exact `block_name`; optional `plc_name` (required if more than one PLC is present) and exact `group_path` (required for duplicate names; empty string selects the root group).
+- **Returns:** PLC/block identity, number, type, programming language, group path, and the verified `IsConsistent`/`IsKnowHowProtected` attribute read outcomes. Unsupported metadata is listed explicitly.
+
+### `tia_get_block_attributes`
+- **Parameters:** Required exact `block_name`; optional `plc_name` and `group_path`, with the same ambiguity rules as `tia_get_block_info`.
+- **Returns:** Read status/value for the verified `IsConsistent` and `IsKnowHowProtected` attributes. An attribute read failure fails the operation; this does not claim arbitrary attribute enumeration or mutability.
+
+### `tia_get_tag_table_info`
+- **Parameters:** Required exact `table_name`; optional `plc_name` and `group_path`, with the same ambiguity rules.
+- **Returns:** PLC/table identity, group path, and contained-tag count.
+
+### `tia_get_type_info`
+- **Parameters:** Required exact `type_name`; optional `plc_name` and `group_path`, with the same ambiguity rules.
+- **Returns:** PLC/type identity, group path, and verified `IsConsistent` read result. Unsupported metadata is listed explicitly.
+
+### `tia_get_type_attributes`
+- **Parameters:** Required exact `type_name`; optional `plc_name` and `group_path`, with the same ambiguity rules.
+- **Returns:** Read status/value for the verified `IsConsistent` attribute only. An attribute read failure fails the operation.
+
+### `tia_get_db_member_attributes`
+- **Parameters:** Required exact `db_name` and direct `member_name`; optional `plc_name` and `group_path`.
+- **Returns:** Complete V21-reported attribute enumeration for the selected direct global-DB member; no nested paths or inferred datatype fields.
+
+### `hmi_list_screen_groups`
+- **Parameters:** Optional `target_name`; if omitted, the project must contain exactly one HMI Unified target.
+- **Returns:** Nested screen-group hierarchy and direct screen counts. Group names are descriptive, not stable IDs.
+
+### `hmi_list_graphic_lists`
+- **Parameters:** Optional `target_name`; if omitted, the project must contain exactly one HMI Unified target.
+- **Returns:** Graphic-list names. Entries and file-backed assets are not included.
+
+The case-by-case test plans for these Siemens-facing tools are
+[PLC metadata](./plans/MCP_TOOL_TEST_PLAN_PLC.md),
+[project/library/text discovery](./plans/MCP_TOOL_TEST_PLAN_PROJECT.md),
+[PLC tag and constant reads](./plans/MCP_TOOL_TEST_PLAN_PLC_READS.md),
+[DB-member attributes](./plans/MCP_TOOL_TEST_PLAN_PLC_SLICE_READS.md),
+[tag-table attributes and block groups](./plans/MCP_TOOL_TEST_PLAN_PLC_GROUP_ATTRIBUTES.md),
+[library-type instances](./plans/MCP_TOOL_TEST_PLAN_LIBRARY_TYPE_INSTANCES.md),
+and [HMI discovery](./plans/MCP_TOOL_TEST_PLAN_HMI.md). They specify offline contract
+checks and later live disposable-project verification; no live verification is
+claimed here.
+
+## Category 8: PLC, Project & HMI Operations (15 Tools)
+
+All mutation tools reject conflicts rather than overwriting existing objects.
+PLC selection is exact and must be unambiguous; an omitted PLC name is accepted
+only when one PLC is present. HMI structure tools require
+`on_conflict: "fail"`. Mutations are not claimed to be atomic or rollback-safe.
+
+### PLC tag and user-constant reads
+
+* `tia_get_plc_tag_info`: Required `tag_name` and `table_name`; optional exact
+  `plc_name` and `group_path`. Returns supported tag type, logical address,
+  comment, and resolved PLC/table/group identity.
+* `tia_read_user_constant`: Required `constant_name`; optional exact
+  `plc_name`, `table_name`, and `group_path`. A table may be omitted only when
+  the name resolves uniquely in the selected PLC/group scope.
+
+Both operations return only V21-supported properties and explicitly list
+metadata not returned. They do not modify the project.
+
+### Tag-table attributes and block groups
+
+* `tia_get_tag_table_attributes`: Required `table_name`; optional exact
+  `plc_name` and `group_path`. Returns V21-reported attribute names, values
+  (or `not_readable` when the access mode does not permit reading), access
+  modes, create relevance, and supported types. Stable IDs and revisions are
+  not exposed.
+* `tia_create_block_group`: Required `group_name`; optional exact `plc_name`
+  and parent `parent_group_path`. Creates only under the exact selected block
+  group; existing siblings are never overwritten. Description metadata is not
+  claimed.
+
+### PLC tag-table and user-constant mutations
+
+* `tia_create_plc_tag_table`: Required `table_name`; optional exact `plc_name`
+  and parent `group_path`. Creates only in the selected exact group.
+* `tia_create_tagtable_group`: Required `group_name`; optional exact `plc_name`
+  and `parent_group_path`.
+* `tia_create_user_constant`: Required `table_name`, `constant_name`,
+  `data_type`, and `value`; optional exact `plc_name` and `group_path`.
+  Supported datatypes are Bool, the listed signed/unsigned integer types, Real,
+  and LReal; values are validated before the API call.
+* `tia_update_user_constant`: Required `table_name`, `constant_name`, and
+  `value`; optional exact `plc_name` and `group_path`. Changes only the value,
+  preserving the existing datatype.
+
+These return a structured result with `Success`, `Status`, exact target path,
+`Partial`, message, and warnings. Creation/update success is confirmed by
+in-memory read-back; saving and reopening remains a separate verification step.
+
+### Project creation
+
+* `tia_create_project`: Required `destination_location` and `project_name`.
+  The connected TIA Portal instance creates the project only in an existing
+  empty directory. Existing files are never overwritten; verify and reopen the
+  returned project path before relying on it.
+
+### WinCC Unified structure operations
+
+* `hmi_create_screen_group`: Required `group_name` and `on_conflict`; optional
+  `parent_group_path` (empty means root) and `target_name`.
+* `hmi_create_screen_under_group`: Required `parent_group_path`, `screen_name`,
+  and `on_conflict`; optional positive `width`, `height`, and `target_name`.
+* `hmi_create_tag_table`: Required `table_name` and `on_conflict: "fail"`;
+  optional exact `target_name`. Existing tables are never overwritten.
+* `hmi_rename_screen`: Required `screen_name`, `group_path`, `new_name`, and
+  `on_conflict`; optional `target_name`. Renames in place.
+* `hmi_rename_screen_group`: Required `group_path`, `new_name`, and
+  `on_conflict`; optional `target_name`. Renames in place.
+* `hmi_rename_tag_table`: Required `table_name`, `new_name`, and
+  `on_conflict`; optional `target_name`. Renames in place and verifies the tag
+  name set remains unchanged.
+
+All six HMI structure operations accept only `on_conflict: "fail"` and return the
+affected name/path plus relevant screen dimensions, item count, or tag count.
+
+### WinCC Unified navigation button
+
+* `hmi_create_navigation_button`: Requires exact `target_name`, source
+  `screen_name`, `item_name`, plain-text `text`, `destination_screen`,
+  position/dimensions, and `on_conflict: "fail"`; optional foreground and
+  background colors. Creates a new button with a Tapped handler calling
+  `HMIRuntime.UI.SysFct.ChangeScreen(destination, "~")`, wraps escaped caption
+  text in the required HTML paragraph, syntax-checks the script, and verifies
+  the button/action by read-back. Existing screen items are never replaced.
+  HMI compilation, save/reopen, and runtime navigation remain separate tests.
+The test plans for [PLC reads](./plans/MCP_TOOL_TEST_PLAN_PLC_READS.md),
+[PLC mutations](./plans/MCP_TOOL_TEST_PLAN_PLC_MUTATIONS.md),
+[tag-table attributes and block groups](./plans/MCP_TOOL_TEST_PLAN_PLC_GROUP_ATTRIBUTES.md),
+[HMI navigation buttons](./plans/MCP_TOOL_TEST_PLAN_HMI_NAVIGATION.md),
+[project creation](./plans/MCP_TOOL_TEST_PLAN_PROJECT_MUTATIONS.md), and
+[HMI structure](./plans/MCP_TOOL_TEST_PLAN_HMI_STRUCTURE.md) include case-by-case
+offline checks and live disposable-project procedures. No live mutation tests
+are claimed.

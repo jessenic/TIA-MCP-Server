@@ -1,0 +1,29 @@
+{
+  "name": "tia_read_user_constant",
+  "description": "Read a user constant's declared type and literal value from the selected PLC.",
+  "parameters": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "constant_name": {
+        "type": "string",
+        "description": "Exact user-constant name."
+      },
+      "plc_name": {
+        "type": "string",
+        "description": "Exact PLC software name; required when the project has multiple PLCs."
+      },
+      "table_name": {
+        "type": "string",
+        "description": "Optional exact tag-table name. Omit only when the constant name resolves uniquely within the selected PLC and group scope."
+      },
+      "group_path": {
+        "type": "string",
+        "description": "Optional exact tag-table-group path. Use an empty string for the root group; may be used without table_name to scope the search."
+      }
+    },
+    "required": [
+      "constant_name"
+    ]
+  }
+}

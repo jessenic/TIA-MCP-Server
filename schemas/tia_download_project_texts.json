@@ -1,0 +1,32 @@
+{
+  "name": "tia_download_project_texts",
+  "description": "Export project texts to a new file using explicit cultures; the destination is never overwritten.",
+  "parameters": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "project_path": {
+        "type": "string",
+        "description": "Exact full path of a project already open in the connected TIA Portal instance."
+      },
+      "destination_file_path": {
+        "type": "string",
+        "description": "Full path for a new export file in an existing directory; an existing file is rejected."
+      },
+      "primary_culture": {
+        "type": "string",
+        "description": "Valid .NET culture name used as the primary export language."
+      },
+      "reference_culture": {
+        "type": "string",
+        "description": "Valid .NET culture name used as the reference export language."
+      }
+    },
+    "required": [
+      "project_path",
+      "destination_file_path",
+      "primary_culture",
+      "reference_culture"
+    ]
+  }
+}

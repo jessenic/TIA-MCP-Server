@@ -92,7 +92,7 @@ namespace TiaOpennessMcp.Protocol
         public string Name { get; set; } = "tia-portal-openness-v21";
 
         [JsonPropertyName("version")]
-        public string Version { get; set; } = "2.4.0";
+        public string Version { get; set; } = "2.9.0";
     }
 
     public class ToolDefinition
@@ -130,6 +130,10 @@ namespace TiaOpennessMcp.Protocol
 
         [JsonPropertyName("description")]
         public string Description { get; set; } = "";
+
+        [JsonPropertyName("minimum")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public double? Minimum { get; set; }
 
         [JsonPropertyName("enum")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

@@ -85,6 +85,147 @@ try {
             }
         }
     }
+    $requiredDiscoveryContracts = @{
+        tia_get_block_info = @('block_name')
+        tia_get_block_attributes = @('block_name')
+        tia_get_tag_table_info = @('table_name')
+        tia_get_type_info = @('type_name')
+        tia_get_type_attributes = @('type_name')
+        tia_list_global_libraries = @()
+        tia_search_project_library_types = @('project_path')
+        tia_list_project_faceplates = @('project_path')
+        tia_list_project_text_categories = @('project_path')
+        tia_download_project_texts = @('project_path', 'destination_file_path', 'primary_culture', 'reference_culture')
+        hmi_list_screen_groups = @()
+        hmi_list_graphic_lists = @()
+    }
+    foreach ($toolName in $requiredDiscoveryContracts.Keys) {
+        $schemaPath = Join-Path $outputDirectory "$toolName.json"
+        if (-not (Test-Path -LiteralPath $schemaPath)) {
+            throw "Required discovery tool schema '$toolName' was not exported."
+        }
+        $schema = Get-Content -LiteralPath $schemaPath -Raw | ConvertFrom-Json
+        foreach ($parameter in $requiredDiscoveryContracts[$toolName]) {
+            if ($parameter -notin $schema.parameters.required) {
+                throw "$toolName must require '$parameter'."
+            }
+        }
+        if ($schema.parameters.additionalProperties -ne $false) {
+            throw "$toolName must reject undeclared parameters."
+        }
+
+        $checked = Get-Content -LiteralPath (Join-Path $PSScriptRoot "..\schemas\$toolName.json") -Raw | ConvertFrom-Json
+        if ($checked.name -ne $schema.name -or $checked.description -ne $schema.description) {
+            throw "Checked-in $toolName identity or description differs from its registered schema."
+        }
+        $exportedRequired = @($schema.parameters.required) -join ','
+        $checkedRequired = @($checked.parameters.required) -join ','
+        if ($exportedRequired -ne $checkedRequired) {
+            throw "Checked-in $toolName required fields differ from its registered schema."
+        }
+        $exportedProperties = @($schema.parameters.properties.PSObject.Properties)
+        $checkedProperties = @($checked.parameters.properties.PSObject.Properties)
+        if ($exportedProperties.Count -ne $checkedProperties.Count) {
+            throw "Checked-in $toolName parameter count differs from its registered schema."
+        }
+        foreach ($property in $exportedProperties) {
+            $checkedProperty = $checked.parameters.properties.($property.Name)
+            if ($null -eq $checkedProperty -or $checkedProperty.type -ne $property.Value.type) {
+                throw "Checked-in $toolName.$($property.Name) differs from its registered schema."
+            }
+        }
+    }
+    $requiredAdditionalContracts = @{
+        tia_get_plc_tag_info = @('tag_name', 'table_name')
+        tia_read_user_constant = @('constant_name')
+        tia_get_tag_table_attributes = @('table_name')
+        tia_create_block_group = @('group_name')
+        tia_get_db_member_attributes = @('db_name', 'member_name')
+        tia_get_library_type_instances = @('project_path', 'plc_name', 'library_type_id')
+        hmi_create_navigation_button = @('target_name', 'screen_name', 'item_name', 'text', 'destination_screen', 'left', 'top', 'width', 'height', 'on_conflict')
+        tia_create_plc_tag_table = @('table_name')
+        tia_create_tagtable_group = @('group_name')
+        tia_create_user_constant = @('table_name', 'constant_name', 'data_type', 'value')
+        tia_update_user_constant = @('table_name', 'constant_name', 'value')
+        tia_create_project = @('destination_location', 'project_name')
+        hmi_create_screen_group = @('group_name', 'on_conflict')
+        hmi_create_screen_under_group = @('parent_group_path', 'screen_name', 'on_conflict')
+        hmi_create_tag_table = @('table_name', 'on_conflict')
+        hmi_rename_screen = @('screen_name', 'group_path', 'new_name', 'on_conflict')
+        hmi_rename_screen_group = @('group_path', 'new_name', 'on_conflict')
+        hmi_rename_tag_table = @('table_name', 'new_name', 'on_conflict')
+    }
+    foreach ($toolName in $requiredAdditionalContracts.Keys) {
+        $schemaPath = Join-Path $outputDirectory "$toolName.json"
+        if (-not (Test-Path -LiteralPath $schemaPath)) {
+            throw "Required additional tool schema '$toolName' was not exported."
+        }
+        $schema = Get-Content -LiteralPath $schemaPath -Raw | ConvertFrom-Json
+        foreach ($parameter in $requiredAdditionalContracts[$toolName]) {
+            if ($parameter -notin $schema.parameters.required) {
+                throw "$toolName must require '$parameter'."
+            }
+        }
+        if ($schema.parameters.additionalProperties -ne $false) {
+            throw "$toolName must reject undeclared parameters."
+        }
+
+        $checked = Get-Content -LiteralPath (Join-Path $PSScriptRoot "..\schemas\$toolName.json") -Raw | ConvertFrom-Json
+        if ($checked.name -ne $schema.name -or $checked.description -ne $schema.description) {
+            throw "Checked-in $toolName identity or description differs from its registered schema."
+        }
+        if ((@($checked.parameters.required) -join ',') -ne (@($schema.parameters.required) -join ',')) {
+            throw "Checked-in $toolName required fields differ from its registered schema."
+        }
+        $exportedProperties = @($schema.parameters.properties.PSObject.Properties)
+        $checkedProperties = @($checked.parameters.properties.PSObject.Properties)
+        if ($exportedProperties.Count -ne $checkedProperties.Count) {
+            throw "Checked-in $toolName parameter count differs from its registered schema."
+        }
+        foreach ($property in $exportedProperties) {
+            $checkedProperty = $checked.parameters.properties.($property.Name)
+            if ($null -eq $checkedProperty -or
+                $checkedProperty.type -ne $property.Value.type -or
+                $checkedProperty.description -ne $property.Value.description -or
+                (@($checkedProperty.enum) -join ',') -ne (@($property.Value.enum) -join ',')) {
+                throw "Checked-in $toolName.$($property.Name) differs from its registered schema."
+            }
+        }
+    }
+    $screenSchema = Get-Content -LiteralPath (Join-Path $outputDirectory 'hmi_create_screen_under_group.json') -Raw | ConvertFrom-Json
+    $checkedScreenSchema = Get-Content -LiteralPath (Join-Path $PSScriptRoot "..\schemas\hmi_create_screen_under_group.json") -Raw | ConvertFrom-Json
+    foreach ($dimension in @('width', 'height')) {
+        if ($screenSchema.parameters.properties.$dimension.minimum -ne 1 -or
+            $checkedScreenSchema.parameters.properties.$dimension.minimum -ne 1) {
+            throw "hmi_create_screen_under_group.$dimension must require a minimum of 1."
+        }
+    }
+    foreach ($toolName in @(
+        'hmi_create_screen_group',
+        'hmi_create_screen_under_group',
+        'hmi_create_tag_table',
+        'hmi_rename_screen',
+        'hmi_rename_screen_group',
+        'hmi_rename_tag_table'
+    )) {
+        $schema = Get-Content -LiteralPath (Join-Path $outputDirectory "$toolName.json") -Raw | ConvertFrom-Json
+        if ((@($schema.parameters.properties.on_conflict.enum) -join ',') -ne 'fail') {
+            throw "$toolName.on_conflict must expose only the safe fail behavior."
+        }
+    }
+    foreach ($toolName in @(
+        'tia_list_global_libraries',
+        'tia_search_project_library_types',
+        'tia_list_project_faceplates',
+        'tia_list_project_text_categories'
+    )) {
+        $schema = Get-Content -LiteralPath (Join-Path $outputDirectory "$toolName.json") -Raw | ConvertFrom-Json
+        if ($schema.parameters.properties.offset.type -ne 'integer' -or
+            $schema.parameters.properties.page_size.type -ne 'integer') {
+            throw "$toolName must expose integer offset and page_size parameters."
+        }
+    }
+
     $updateSchema = Get-Content -LiteralPath (Join-Path $outputDirectory 'hmi_update_screen_item.json') -Raw | ConvertFrom-Json
     foreach ($propertyName in @('Visible', 'Top', 'Left', 'Width', 'Height')) {
         if ($null -eq $updateSchema.parameters.properties.item_properties.properties.$propertyName) {

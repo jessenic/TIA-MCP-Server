@@ -1,0 +1,30 @@
+{
+  "name": "tia_get_plc_tag_info",
+  "description": "Read the supported metadata for one PLC tag, selected by exact name and tag-table scope.",
+  "parameters": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "tag_name": {
+        "type": "string",
+        "description": "Exact PLC tag name."
+      },
+      "table_name": {
+        "type": "string",
+        "description": "Exact PLC tag-table name containing the tag."
+      },
+      "plc_name": {
+        "type": "string",
+        "description": "Exact PLC software name; required when the project has multiple PLCs."
+      },
+      "group_path": {
+        "type": "string",
+        "description": "Exact tag-table-group path, required when the table name is duplicated. Use an empty string for the root group."
+      }
+    },
+    "required": [
+      "tag_name",
+      "table_name"
+    ]
+  }
+}

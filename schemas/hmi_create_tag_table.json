@@ -1,0 +1,14 @@
+{
+  "name": "hmi_create_tag_table",
+  "description": "Create an HMI tag table without overwriting an existing table.",
+  "parameters": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "table_name": { "type": "string", "description": "Name for the new HMI tag table; '/' and '\\' are not allowed." },
+      "target_name": { "type": "string", "description": "Exact HMI software name (optional when one target resolves uniquely)." },
+      "on_conflict": { "type": "string", "enum": ["fail"], "description": "Required conflict behavior; only 'fail' is supported." }
+    },
+    "required": ["table_name", "on_conflict"]
+  }
+}

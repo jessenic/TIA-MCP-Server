@@ -1,0 +1,14 @@
+{
+  "name": "hmi_list_graphic_lists",
+  "description": "List graphic-list names for one unambiguous HMI Unified target; entries and file-backed assets are not included.",
+  "parameters": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "target_name": {
+        "type": "string",
+        "description": "Exact device, device-item, or HMI software name; required when multiple HMI targets exist."
+      }
+    }
+  }
+}

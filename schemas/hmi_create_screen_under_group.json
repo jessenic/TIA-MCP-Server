@@ -1,0 +1,17 @@
+{
+  "name": "hmi_create_screen_under_group",
+  "description": "Create a screen inside an existing exact screen group; on_conflict must be fail and existing screens are not overwritten.",
+  "parameters": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "parent_group_path": { "type": "string", "description": "Exact non-empty screen-group path." },
+      "screen_name": { "type": "string", "description": "Name for the new screen." },
+      "width": { "type": "integer", "minimum": 1, "description": "Optional positive screen width in pixels." },
+      "height": { "type": "integer", "minimum": 1, "description": "Optional positive screen height in pixels." },
+      "target_name": { "type": "string", "description": "Exact HMI device, device-item, or software name; required when multiple targets exist." },
+      "on_conflict": { "type": "string", "enum": ["fail"], "description": "Required conflict behavior; only 'fail' is supported." }
+    },
+    "required": ["parent_group_path", "screen_name", "on_conflict"]
+  }
+}

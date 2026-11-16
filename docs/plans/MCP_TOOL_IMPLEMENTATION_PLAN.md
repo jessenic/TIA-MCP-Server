@@ -4,6 +4,28 @@
 
 This document is the candidate tool specification and delivery roadmap for the existing TIA MCP Server. It describes tools for engineering projects containing controllers, libraries, operator-interface screens, and related artifacts. Treat each proposed capability as subject to validation against the repository's existing tools, TIA Portal V21 Openness APIs, and supported project types; do not assume every listed operation is available or safe to implement.
 
+### Implementation status (v2.9.0)
+
+The repository currently ships staged, bounded slices rather than every
+candidate in this roadmap:
+
+- **v2.5.0:** PLC, project/library/text, and HMI discovery tools, with explicit
+  API completeness limits.
+- **v2.6.0:** PLC tag/user-constant reads and writes, project creation, and HMI
+  screen-group/screen/table structure operations.
+- **v2.7.0:** Exact PLC block-group creation and tag-table attribute reads.
+- **v2.8.0:** PLC-scoped project-library type-instance discovery and
+  syntax-checked HMI navigation-button creation.
+- **v2.9.0:** Exact direct-member attribute reads for global PLC DBs.
+
+`read_project_texts`, `get_plc_textlists`, `instantiate_library_type`, and
+`hmi_create_template` remain explicitly deferred in their case-by-case test
+plans because the bundled V21 API does not establish a safe, verifiable
+contract for those operations. Other unchecked candidates below remain
+backlog items; they are not represented as implemented or fully assessed.
+Siemens-side behavior still requires the live disposable-project tests in
+the linked plans.
+
 ### Shared behavior
 
 1. **Explicit context:** Every operation that reads or changes a project, library, device, block, screen, or other project-owned object must accept or resolve an explicit context. Reject ambiguous contexts rather than silently selecting the first open project or object.
@@ -759,10 +781,10 @@ This document is the candidate tool specification and delivery roadmap for the e
 ### Tags, tables, and text lists
 
 #### `hmi_create_tag_table`
-- **Inputs:** HMI context, table name, optional folder and metadata.
-- **Behavior:** Validate uniqueness and create an empty table or explicitly supplied initial entries.
-- **Result:** Table ID, name, and entry count.
-- **Failures:** Duplicate name or invalid metadata.
+- **Inputs:** Required `table_name` and `on_conflict: "fail"`; optional exact HMI `target_name`.
+- **Behavior:** Validate the table name and target, reject exact or case-insensitive collisions, then create and verify the table in a single transaction.
+- **Result:** `HmiStructureMutationResult` with operation, status, name, and read-back outcome.
+- **Failures:** Duplicate name or invalid input fails before mutation; API or read-back failures after mutation starts return `Partial=true` with an inspect-before-retry warning.
 
 #### `hmi_create_tag_dynamic`
 - **Inputs:** HMI tag ID, acquisition/binding configuration, and explicit trigger/condition.

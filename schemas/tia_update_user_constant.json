@@ -1,0 +1,16 @@
+{
+  "name": "tia_update_user_constant",
+  "description": "Update only the value of an exact PLC user constant using its existing datatype.",
+  "parameters": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "table_name": { "type": "string", "description": "Exact tag-table name." },
+      "constant_name": { "type": "string", "description": "Exact user-constant name." },
+      "value": { "type": "string", "description": "Invariant-culture literal value compatible with the constant's existing datatype." },
+      "plc_name": { "type": "string", "description": "Exact PLC software name; required when the project has multiple PLCs." },
+      "group_path": { "type": "string", "description": "Exact containing tag-table-group path; omit or use an empty string for the root group." }
+    },
+    "required": ["table_name", "constant_name", "value"]
+  }
+}

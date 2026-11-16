@@ -4,13 +4,13 @@
 [![Simulation](https://img.shields.io/badge/Simulation-S7--PLCSIM%20Advanced%20V8.0-008080.svg)](https://support.industry.siemens.com)
 [![Protocol](https://img.shields.io/badge/MCP-2024--11--05-blue.svg)](https://modelcontextprotocol.io)
 [![Runtime](https://img.shields.io/badge/.NET%20Framework-4.8%20x64-512BD4.svg)](https://dotnet.microsoft.com)
-[![Version](https://img.shields.io/badge/Version-v2.4.0-blue.svg)](#version-history--bug-fixes)
-[![Tools](https://img.shields.io/badge/Tools-81%20Registered-brightgreen.svg)](#complete-tools-reference-dictionary-81-tools)
+[![Version](https://img.shields.io/badge/Version-v2.9.0-blue.svg)](#version-history--bug-fixes)
+[![Tools](https://img.shields.io/badge/Tools-110%20Registered-brightgreen.svg)](#complete-tools-reference-dictionary-110-tools)
 [![License](https://img.shields.io/badge/License-MIT-orange.svg)](LICENSE)
 
 A high-performance, persistent **Model Context Protocol (MCP)** server providing AI coding agents (such as **Google Antigravity**, **Claude Desktop**, **Cursor**, and **VS Code**) with direct programmatic control over **Siemens TIA Portal V21** and **S7-PLCSIM Advanced V8.0**.
 
-Equipped with **81 specialized industrial automation tools**, this server bridges generative AI with deterministic industrial hardware and software—enabling automated PLC logic authoring, model-based architecture ingestion (Draw.io / PlantUML / Mermaid), automated design-to-HMI pipelines (Figma to WinCC Unified), live simulation memory I/O, and automated Hardware-in-the-Loop (HIL) sequence verification with telemetry report generation.
+Equipped with **110 specialized industrial automation tools**, this server bridges generative AI with deterministic industrial hardware and software—enabling automated PLC logic authoring, model-based architecture ingestion (Draw.io / PlantUML / Mermaid), automated design-to-HMI pipelines (Figma to WinCC Unified), live simulation memory I/O, and automated Hardware-in-the-Loop (HIL) sequence verification with telemetry report generation.
 
 ---
 
@@ -69,7 +69,7 @@ flowchart TD
     subgraph SERVER["⚡ TiaOpennessMcp Server (Persistent Daemon)"]
         TransportStdio["MCP stdio Handler<br/>Framing & JSON-RPC"]
         TransportHttp["HTTP / SSE Engine<br/>Port 5001"]
-        ToolRegistry["Tool Registry<br/>80 Industrial Automation Tools"]
+        ToolRegistry["Tool Registry<br/>110 Industrial Automation Tools"]
         TiaMgr["TiaManager (Singleton)<br/>Openness COM Bridge"]
         PlcSimMgr["PlcSimManager (Singleton)<br/>PLCSIM API V8.0 Bridge"]
     end
@@ -109,14 +109,14 @@ flowchart TD
     PlcSimMgr --> SIM
 ```
 
-### 1. TIA Portal Core & PLC Engineering (20 Tools)
+### 1. TIA Portal Core & PLC Engineering (26 Tools)
 - **Lifecycle & Instances**: Discover running PIDs (`tia_list_processes`), attach silently (`tia_connect`), open projects headless or with GUI (`tia_open_project`), save (`tia_save_project`), and close (`tia_close_project`).
 - **Hardware Topology**: Inspect racks, subnets, slots, CPU modules, and distributed I/O stations (`tia_list_devices`, `tia_get_device_tree`).
 - **Software Logic & Blocks**: Enumerate blocks with language and consistency state (`tia_list_blocks`), export block code as SimaticML XML with extracted SCL (`tia_get_block_code`), import/overwrite SimaticML (`tia_import_block`), import complete SCL source (`tia_import_scl_block`), and delete obsolete blocks (`tia_delete_block`). SCL replacement backs up and deletes the old block before importing; failed imports attempt restoration, while compile errors are reported without rollback.
 - **Data Types & Tags**: Author User Data Types (`tia_list_plc_types`, `tia_import_plc_type`) and manage tag tables (`tia_list_tag_tables`, `tia_get_tags`).
 - **Native Diagnostics**: Compile software containers via `ICompilable` and return exact error messages, line numbers, and warnings (`tia_compile`).
 
-### 2. WinCC Unified HMI Engineering (37 Tools)
+### 2. WinCC Unified HMI Engineering (49 Tools)
 - **Screen Management**: Create and delete Unified screens, and list or target screens recursively through nested screen groups (`hmi_list_screens`, `hmi_create_screen`, `hmi_delete_screen`).
 - **Widgets & UI Elements**: Programmatically position labels with HTML typography (`hmi_add_label`), pushbuttons (`hmi_add_button`), tag-bound toggle switches (`hmi_add_toggle_switch`), geometric shapes (`hmi_add_shape`), and process I/O fields (`hmi_add_io_field`).
 - **Discrete Alarms**: Create or update discrete alarms with validated trigger tags, alarm classes, trigger modes, and multilingual event text (`hmi_create_discrete_alarm`).
@@ -192,14 +192,25 @@ fill patterns and compositing approximations are disclosed in each report. Insta
 the original fonts for reliable text metrics. `textOverflow` is a heuristic, not a
 runtime compiler verdict. Use runtime validation for final visual sign-off.
 
-### 3. S7-PLCSIM Advanced Live Simulation & Testing (12 Tools)
+### 3. Project, Library & Text Discovery (6 Tools)
+- **Libraries**: Enumerate global libraries and search project-library types or faceplates using bounded results and exact open-project scope; discover PLC instances of exact project-library types.
+- **Project Texts**: Discover project text categories and export project texts using explicit cultures without overwriting an existing file.
+
+### 4. PLC, Project & HMI Operations (15 Tools)
+- **Read-only PLC Data**: Inspect exact tag/member/table attributes and user-constant type/value data with exact PLC/table/group resolution.
+- **PLC Structure & Constants**: Create block/tag-table groups and tag tables, and create/update supported user constants with exact target resolution and read-back.
+- **Project Setup**: Create a project only in an existing empty directory using the connected TIA Portal instance.
+- **HMI Structure & Navigation**: Create screen groups/screens, add verified navigation buttons, and rename screens, groups, or tag tables in place with explicit fail-on-conflict behavior.
+- **Verification**: Each mutation has a case-by-case disposable-project test plan; live TIA verification remains for the operator.
+
+### 5. S7-PLCSIM Advanced Live Simulation & Testing (12 Tools)
 - **Direct Runtime Link**: Connects to virtual S7-1500 controllers via shared memory API V8.0 (`plcsim_connect`).
 - **Operating Modes**: Query status (`plcsim_get_status`) and switch CPU operating modes (`plcsim_set_operating_state`: `Run`, `Stop`, `MemoryReset`).
 - **Clock Scaling**: Accelerate simulation deterministically (`plcsim_set_scale_factor`: e.g. `2.0x` or `5.0x` speed).
 - **Zero-Overhead Memory I/O**: High-speed symbolic tag reading and writing (`plcsim_read_tag`, `plcsim_write_tag`, `plcsim_read_tags`, `plcsim_write_tags`).
 - **Universal Sequence Validation**: Execute parameterized sequence tests on any state machine (`plcsim_run_sequence`), sample 80ms telemetry, verify state transitions, and generate validation reports.
 
-### 4. Siemens TestSuite Automation (2 Tools)
+### 6. Siemens TestSuite Automation (2 Tools)
 - Enumerate configured project test cases (`tia_testsuite_list_tests`).
 - Import and reload `.tat` rule files with `ImportOptions.Override` (`tia_testsuite_load_test`).
 
@@ -341,7 +352,7 @@ stateDiagram-v2
 
 ---
 
-## Complete Tools Reference Dictionary (81 Tools)
+## Complete Tools Reference Dictionary (110 Tools)
 
 | # | Tool Name | Category | Primary Parameters | Description |
 |:---:|:---|:---:|:---|:---|
@@ -398,9 +409,6 @@ stateDiagram-v2
 | 50 | `tia_list_tag_tables` | PLC Tags | `plc_name` | List PLC tag tables. |
 | 51 | `tia_get_tags` | PLC Tags | `table_name`, `plc_name` | Read PLC tags with `%I`, `%Q`, `%M` addresses. |
 | 52 | `hmi_export_json` | HMI JSON | `output_directory` (optional), `compact`, `script_files`, `include_library`, `target_name` | Export hashed JSON and native faceplate/SVG library definitions; omit destination for remote transfer. |
-| — | `hmi_read_export_file` | HMI JSON | `transfer_id`, `relative_path`, `offset`, `chunk_bytes` | Fetch a staged export file in bounded Base64 chunks. |
-| — | `hmi_begin_import` | HMI JSON | *(none)* | Create a staged remote HMI JSON import. |
-| — | `hmi_upload_import_file` | HMI JSON | `transfer_id`, `relative_path`, `content_base64`, `offset`, `total_bytes` | Upload a file in bounded sequential Base64 chunks. |
 | 53 | `hmi_import_json` | HMI JSON | `input_directory` or `transfer_id`, `prune_items`, `dry_run`, `verify_hashes`, `target_name` | Validate and transactionally import HMI JSON; compile without saving. |
 | 54 | `hmi_patch_json` | HMI JSON | `file_path`, `dry_run`, `target_name` | Apply a guarded JSON patch to Unified HMI objects. |
 | 55 | `tia_testsuite_list_tests`| TestSuite | `plc_name` | List configured Siemens TestSuite test cases. |
@@ -418,6 +426,9 @@ stateDiagram-v2
 | 67 | `plcsim_run_sequence` | Verification | `start_command_tag`, `step_number_tag`, `done_tag`, ... | Universal automated sequence testing for any state machine. |
 | 68 | `plcsim_run_mixing_sequence`| Verification | Recipe parameters, `scale_factor` | Automated multi-parameter batch testing runner. |
 | 69 | `hmi_render_json` | HMI Preview | `input_directory`, `output_directory`, `screen_name`, `language`, `scale` | Offline PNGs, numbered overlays, and layout reports with nested screens. |
+| 70 | `hmi_read_export_file` | HMI JSON | `transfer_id`, `relative_path`, `offset`, `chunk_bytes` | Fetch a staged export file in bounded Base64 chunks. |
+| 71 | `hmi_begin_import` | HMI JSON | *(none)* | Create a staged remote HMI JSON import. |
+| 72 | `hmi_upload_import_file` | HMI JSON | `transfer_id`, `relative_path`, `content_base64`, `offset`, `total_bytes` | Upload a file in bounded sequential Base64 chunks. |
 | 73 | `hmi_get_screen_item` | HMI Screen | `screen_name`, `item_name` | Read all supported properties, event scripts, and full dynamization state for one item. |
 | 74 | `hmi_update_screen_item` | HMI Screen | `screen_name`, `item_name`, `item_properties` | Update allowlisted item properties in place and verify readback. |
 | 75 | `hmi_read_event_scripts` | HMI Logic | `screen_name`, `item_name` (opt) | Read screen or item event scripts and supported event names. |
@@ -425,6 +436,37 @@ stateDiagram-v2
 | 77 | `hmi_set_expression_dynamization` | HMI Logic | `screen_name`, `item_name`, `property_name`, `expression`, `result_type` | Set an expression formula while preserving existing mappings and other dynamizations. |
 | 78 | `hmi_get_js_type_definitions` | HMI Logic | *(none)* | Return the server-bundled, documented subset of WinCC Unified JavaScript declarations. |
 | 79 | `hmi_set_expression_dynamization_entries` | HMI Logic | `screen_name`, `item_name`, `property_name`, `entries` | Replace ordered condition/value rows for one expression dynamization. |
+| 80 | `tia_import_scl_block` | PLC Import | `scl_code`, `plc_name`, `folder`, `compile_after_import`, `open_after_import` | Import a complete SCL block with backup/restore behavior for same-name blocks. |
+| 81 | `hmi_delete_dynamization` | HMI Logic | `screen_name`, `item_name`, `property_name`, `target_name` | Delete one property dynamization in place without replacing the item. |
+| 82 | `tia_get_block_info` | PLC Discovery | `block_name`, `plc_name`, `group_path` | Read exact block identity and verified metadata without fabricating IDs or revisions. |
+| 83 | `tia_get_block_attributes` | PLC Discovery | `block_name`, `plc_name`, `group_path` | Read supported consistency/protection attributes with per-attribute status. |
+| 84 | `tia_get_tag_table_info` | PLC Discovery | `table_name`, `plc_name`, `group_path` | Read exact table scope and contained-tag count. |
+| 85 | `tia_get_type_info` | PLC Discovery | `type_name`, `plc_name`, `group_path` | Read exact PLC type identity and verified consistency metadata. |
+| 86 | `tia_get_type_attributes` | PLC Discovery | `type_name`, `plc_name`, `group_path` | Read the verified PLC type consistency attribute. |
+| 87 | `tia_list_global_libraries` | Library Discovery | `name_filter`, `offset`, `page_size` | List accessible global-library metadata with bounded paging. |
+| 88 | `tia_search_project_library_types` | Library Discovery | `project_path`, `query`, `offset`, `page_size` | Search project-library types within one exact open project. |
+| 89 | `tia_list_project_faceplates` | Library Discovery | `project_path`, `name_filter`, `offset`, `page_size` | List faceplate library types visible in the selected project library. |
+| 90 | `tia_list_project_text_categories` | Project Text | `project_path`, `query`, `offset`, `page_size` | List project text category identifiers and names. |
+| 91 | `tia_download_project_texts` | Project Text | `project_path`, `destination_file_path`, `primary_culture`, `reference_culture` | Export to a new file without overwriting existing output. |
+| 92 | `hmi_list_screen_groups` | HMI Discovery | `target_name` | List the selected HMI's nested screen groups and direct screen counts. |
+| 93 | `hmi_list_graphic_lists` | HMI Discovery | `target_name` | List graphic-list names without claiming entry or asset coverage. |
+| 94 | `tia_create_plc_tag_table` | PLC Mutation | `table_name`, `plc_name`, `group_path` | Create a tag table in an exact PLC group without overwriting. |
+| 95 | `tia_create_tagtable_group` | PLC Mutation | `group_name`, `plc_name`, `parent_group_path` | Create a tag-table group at an exact path. |
+| 96 | `tia_create_user_constant` | PLC Mutation | `table_name`, `constant_name`, `data_type`, `value` | Create a validated supported user constant. |
+| 97 | `tia_update_user_constant` | PLC Mutation | `table_name`, `constant_name`, `value` | Update only an existing user constant's value. |
+| 98 | `tia_create_project` | Project Mutation | `destination_location`, `project_name` | Create a project in an existing empty directory. |
+| 99 | `hmi_create_screen_group` | HMI Mutation | `group_name`, `parent_group_path`, `on_conflict` | Create a screen group with fail-on-conflict behavior. |
+| 100 | `hmi_create_screen_under_group` | HMI Mutation | `parent_group_path`, `screen_name`, `on_conflict` | Create a screen inside an existing group. |
+| 101 | `hmi_rename_screen` | HMI Mutation | `screen_name`, `group_path`, `new_name`, `on_conflict` | Rename a screen in place. |
+| 102 | `hmi_rename_screen_group` | HMI Mutation | `group_path`, `new_name`, `on_conflict` | Rename a screen group in place. |
+| 103 | `hmi_rename_tag_table` | HMI Mutation | `table_name`, `new_name`, `on_conflict` | Rename an HMI tag table in place and verify its tag set. |
+| 104 | `tia_get_plc_tag_info` | PLC Read | `tag_name`, `table_name`, `plc_name`, `group_path` | Read exact tag type, address, comment, and table scope. |
+| 105 | `tia_read_user_constant` | PLC Read | `constant_name`, `plc_name`, `table_name`, `group_path` | Read a constant's type and literal, rejecting ambiguous matches. |
+| 106 | `tia_create_block_group` | PLC Mutation | `group_name`, `plc_name`, `parent_group_path` | Create a block group under an exact parent path. |
+| 107 | `tia_get_tag_table_attributes` | PLC Read | `table_name`, `plc_name`, `group_path` | Read API-reported tag-table attributes and values. |
+| 108 | `hmi_create_navigation_button` | HMI Mutation | `target_name`, `screen_name`, `item_name`, `text`, `destination_screen`, `left`, `top`, `width`, `height`, `on_conflict` | Create a button with an explicit screen-navigation action. |
+| 109 | `tia_get_library_type_instances` | Library Read | `project_path`, `plc_name`, `library_type_id`, `version_id`, `source_library` | List instances of an exact project-library type in one PLC scope. |
+| 110 | `tia_get_db_member_attributes` | PLC Read | `db_name`, `member_name`, `plc_name`, `group_path` | Read V21-reported attributes for one direct global-DB member. |
 
 ---
 
@@ -504,6 +546,12 @@ From the repository root, validate generated MCP schemas without connecting to T
 .\scripts\Test-ToolSchemas.ps1 -ExecutablePath .\src\bin\Release\net48\TiaOpennessMcp.exe
 ```
 This checks that every array parameter declares an `items` schema and that its item definition matches the checked-in schema. After updating the server binary, restart the MCP server/client connection to reload the tool definitions.
+
+The Siemens-facing read tools have per-case plans for [PLC metadata](docs/plans/MCP_TOOL_TEST_PLAN_PLC.md), [PLC tag and constant reads](docs/plans/MCP_TOOL_TEST_PLAN_PLC_READS.md), [DB-member attributes](docs/plans/MCP_TOOL_TEST_PLAN_PLC_SLICE_READS.md), [tag-table attributes and block groups](docs/plans/MCP_TOOL_TEST_PLAN_PLC_GROUP_ATTRIBUTES.md), [library-type instances](docs/plans/MCP_TOOL_TEST_PLAN_LIBRARY_TYPE_INSTANCES.md), [project/library/text discovery](docs/plans/MCP_TOOL_TEST_PLAN_PROJECT.md), and [HMI discovery](docs/plans/MCP_TOOL_TEST_PLAN_HMI.md). Mutation tools have separate plans for [PLC mutations](docs/plans/MCP_TOOL_TEST_PLAN_PLC_MUTATIONS.md), [project creation](docs/plans/MCP_TOOL_TEST_PLAN_PROJECT_MUTATIONS.md), [PLC group operations](docs/plans/MCP_TOOL_TEST_PLAN_PLC_GROUP_ATTRIBUTES.md), [HMI structure](docs/plans/MCP_TOOL_TEST_PLAN_HMI_STRUCTURE.md), and [HMI navigation buttons](docs/plans/MCP_TOOL_TEST_PLAN_HMI_NAVIGATION.md). Project-text reads ([deferred read plan](docs/plans/MCP_TOOL_TEST_PLAN_READ_PROJECT_TEXTS.md)), PLC text-list discovery, library-type instantiation, and HMI template creation remain deferred with acceptance cases in their respective plans. Selected live checks were run; see the [live-test runbook](docs/MCP_TOOL_LIVE_TEST_RUNBOOK.md) for results and gaps.
+
+For the ordered Windows server update, disposable-project test passes, safety
+gates, and a copyable prompt for an MCP-connected test agent, see the
+[live-test runbook](docs/MCP_TOOL_LIVE_TEST_RUNBOOK.md).
 
 Run HMI JSON regression checks after building (Debug by default):
 ```powershell
@@ -591,7 +639,7 @@ Open or create your Antigravity MCP configuration file at:
 *(Replace `C:\\path\\to\\TIA-MCP-Server\\release` with your actual absolute path using escaped backslashes `\\`)*.
 
 #### B. Tool Schema Registration (Lazy Loading)
-To enable Antigravity to lazy-load all 78 tools on demand, copy the JSON schemas from the repository's `schemas/` folder into your Antigravity MCP directory:
+To enable Antigravity to lazy-load all 110 tools on demand, copy the JSON schemas from the repository's `schemas/` folder into your Antigravity MCP directory:
 ```powershell
 New-Item -ItemType Directory -Path "$env:USERPROFILE\.gemini\antigravity\mcp\tia-portal-v21" -Force
 Copy-Item -Path ".\schemas\*.json" -Destination "$env:USERPROFILE\.gemini\antigravity\mcp\tia-portal-v21\" -Force
@@ -639,7 +687,7 @@ Launch Claude Code and check registered tools:
 claude
 > /mcp
 ```
-All 78 tools (`tia_*`, `hmi_*`, `plcsim_*`) will appear in the active MCP tools list. You can immediately ask:
+All 110 tools (`tia_*`, `hmi_*`, `plcsim_*`) will appear in the active MCP tools list. You can immediately ask:
 > *"Inspect the device tree of the active PLC and compile the software."*
 
 ---
@@ -657,7 +705,7 @@ All 78 tools (`tia_*`, `hmi_*`, `plcsim_*`) will appear in the active MCP tools 
   }
 }
 ```
-Restart Claude Desktop. The hammer icon (🛠️) in the input bar will display all 78 tools.
+Restart Claude Desktop. The hammer icon (🛠️) in the input bar will display all 110 tools.
 
 ---
 
@@ -727,7 +775,7 @@ Options:
   --pid <pid>                            Attach to specific TIA Portal process ID
   --config <path>, -c <path>             Load specific config.json file
   --test                                 Execute rapid TIA Portal connectivity test
-  --export-schemas [dir]                 Export all 80 MCP tool JSON schemas
+  --export-schemas [dir]                 Export all 110 MCP tool JSON schemas
   --render-hmi INPUT --output OUTPUT     Offline PNG/overlay/layout JSON rendering
     [--screen GROUP/NAME] [--language en-US] [--scale 2]
   --register-whitelist                   Register SHA-256 hash in Siemens AllowList
@@ -750,6 +798,30 @@ This repository includes 3 turnkey agent skills located in `.agents/skills/`:
 ---
 
 ## Version History & Bug Fixes
+
+### [v2.9.0] - 2026-11-13
+* Added direct global-DB member attribute reads with exact PLC/DB/member targeting and explicit metadata limits; PLC text-list inventory remains deferred because no complete V21 API contract was verified.
+* Updated the reported MCP server version and assembly metadata to v2.9.0. No live TIA tests were run.
+
+### [v2.8.0] - 2026-11-13
+* Added PLC-scoped project-library instance discovery and HMI navigation-button creation with exact selection, script validation, and case-by-case test plans.
+* Deferred library-type instantiation and HMI template creation because the bundled V21 APIs do not establish safe, type-independent creation contracts.
+* Updated the reported MCP server version and assembly metadata to v2.8.0. No live TIA or HMI runtime tests were run.
+
+### [v2.7.0] - 2026-11-13
+* Added exact PLC block-group creation and read-only tag-table attribute inspection, with API-reported metadata boundaries and case-by-case test plans.
+* Updated the reported MCP server version and assembly metadata to v2.7.0.
+* No live TIA Portal tests were run; verify the new tools against a disposable project before production use.
+
+### [v2.6.0] - 2026-11-13
+* Added twelve bounded PLC read/mutation, project-creation, and HMI-structure tools with exact targeting, conflict rejection, read-back, and case-by-case test plans.
+* Added read-back checks for PLC mutations and updated the reported MCP server version and assembly metadata to v2.6.0.
+* No live TIA Portal or HMI mutation tests were run; use the disposable-project plans before production use.
+
+### [v2.5.0] - 2026-11-13
+* Added scoped PLC metadata, library/project-text discovery, and HMI screen-group/graphic-list discovery tools with bounded results and explicit completeness limits.
+* Added case-by-case test plans for the new Siemens-facing read operations; live disposable-project verification remains pending.
+* Updated the reported MCP server version and assembly metadata to v2.5.0.
 
 ### [v2.4.0] - 2026-11-13
 * Added `hmi_set_expression_dynamization_entries` for replacing ordered WinCC Unified condition/value rows in place with typed values, conflict checks, and read-back verification.

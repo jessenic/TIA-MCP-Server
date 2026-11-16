@@ -1,0 +1,25 @@
+{
+  "name": "tia_create_block_group",
+  "description": "Create a PLC block group under an exact parent path; existing groups are never overwritten.",
+  "parameters": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "group_name": {
+        "type": "string",
+        "description": "Name for the new block group."
+      },
+      "plc_name": {
+        "type": "string",
+        "description": "Exact PLC software name; required when the project has multiple PLCs."
+      },
+      "parent_group_path": {
+        "type": "string",
+        "description": "Exact slash-separated parent block-group path; omit or use an empty string for the root group."
+      }
+    },
+    "required": [
+      "group_name"
+    ]
+  }
+}

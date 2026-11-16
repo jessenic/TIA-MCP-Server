@@ -1,0 +1,14 @@
+{
+  "name": "tia_create_tagtable_group",
+  "description": "Create a PLC tag-table group under an exact parent path; existing names are never overwritten.",
+  "parameters": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "group_name": { "type": "string", "description": "Name for the new tag-table group." },
+      "plc_name": { "type": "string", "description": "Exact PLC software name; required when the project has multiple PLCs." },
+      "parent_group_path": { "type": "string", "description": "Exact parent group path; omit or use an empty string for the root group." }
+    },
+    "required": ["group_name"]
+  }
+}

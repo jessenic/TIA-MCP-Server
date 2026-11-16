@@ -1,0 +1,30 @@
+{
+  "name": "tia_get_db_member_attributes",
+  "description": "Read the V21-reported attributes of one exact direct member of a global DB. Nested member paths and dedicated datatype/revision fields are not returned.",
+  "parameters": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "db_name": {
+        "type": "string",
+        "description": "Exact global DB name."
+      },
+      "member_name": {
+        "type": "string",
+        "description": "Exact name of a direct member in the selected global DB; nested member paths are unsupported."
+      },
+      "plc_name": {
+        "type": "string",
+        "description": "Exact PLC software name; required when the project has multiple PLCs."
+      },
+      "group_path": {
+        "type": "string",
+        "description": "Exact DB block-group path, required when the DB name is duplicated. Use an empty string for the root group."
+      }
+    },
+    "required": [
+      "db_name",
+      "member_name"
+    ]
+  }
+}

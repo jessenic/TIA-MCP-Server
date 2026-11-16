@@ -1,0 +1,29 @@
+{
+  "name": "tia_list_project_faceplates",
+  "description": "List faceplate library types visible in one exact open project's library, with bounded paging.",
+  "parameters": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "project_path": {
+        "type": "string",
+        "description": "Exact full path of a project already open in the connected TIA Portal instance."
+      },
+      "name_filter": {
+        "type": "string",
+        "description": "Optional case-insensitive substring filter for faceplate names."
+      },
+      "offset": {
+        "type": "integer",
+        "description": "Zero-based result offset (default 0)."
+      },
+      "page_size": {
+        "type": "integer",
+        "description": "Maximum results, from 1 through 200 (default 50)."
+      }
+    },
+    "required": [
+      "project_path"
+    ]
+  }
+}

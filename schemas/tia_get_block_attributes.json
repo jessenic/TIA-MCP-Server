@@ -1,0 +1,25 @@
+{
+  "name": "tia_get_block_attributes",
+  "description": "Read the verified PLC block attributes IsConsistent and IsKnowHowProtected for one exact block.",
+  "parameters": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "block_name": {
+        "type": "string",
+        "description": "Exact PLC block name."
+      },
+      "plc_name": {
+        "type": "string",
+        "description": "Exact PLC software name; required when the project has multiple PLCs."
+      },
+      "group_path": {
+        "type": "string",
+        "description": "Exact block-group path, required when the block name is duplicated. Use an empty string for the root group."
+      }
+    },
+    "required": [
+      "block_name"
+    ]
+  }
+}

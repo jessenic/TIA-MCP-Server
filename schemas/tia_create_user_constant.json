@@ -1,0 +1,17 @@
+{
+  "name": "tia_create_user_constant",
+  "description": "Create a supported PLC user constant in an exact tag table without overwriting existing constants.",
+  "parameters": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "table_name": { "type": "string", "description": "Exact tag-table name." },
+      "constant_name": { "type": "string", "description": "Name for the new user constant." },
+      "data_type": { "type": "string", "description": "Supported type: Bool, SInt, Int, DInt, LInt, USInt, Byte, UInt, Word, UDInt, DWord, ULInt, LWord, Real, or LReal." },
+      "value": { "type": "string", "description": "Invariant-culture literal value for the selected type." },
+      "plc_name": { "type": "string", "description": "Exact PLC software name; required when the project has multiple PLCs." },
+      "group_path": { "type": "string", "description": "Exact containing tag-table-group path; omit or use an empty string for the root group." }
+    },
+    "required": ["table_name", "constant_name", "data_type", "value"]
+  }
+}

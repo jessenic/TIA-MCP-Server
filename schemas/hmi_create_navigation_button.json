@@ -1,0 +1,80 @@
+{
+  "name": "hmi_create_navigation_button",
+  "description": "Create a new HMI button with an explicit Tapped action that navigates to an existing screen. Existing item names are never overwritten.",
+  "parameters": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "target_name": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Exact HMI software name from hmi_list_targets."
+      },
+      "screen_name": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Exact unique source screen name."
+      },
+      "item_name": {
+        "type": "string",
+        "minLength": 1,
+        "description": "New button item name; collisions fail without replacement."
+      },
+      "text": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Plain-text button caption."
+      },
+      "destination_screen": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Exact unique destination screen name in the selected HMI software."
+      },
+      "left": {
+        "type": "integer",
+        "minimum": 0,
+        "description": "Horizontal pixel position."
+      },
+      "top": {
+        "type": "integer",
+        "minimum": 0,
+        "description": "Vertical pixel position."
+      },
+      "width": {
+        "type": "integer",
+        "minimum": 1,
+        "description": "Button width in pixels."
+      },
+      "height": {
+        "type": "integer",
+        "minimum": 1,
+        "description": "Button height in pixels."
+      },
+      "back_color": {
+        "type": "string",
+        "description": "Optional color: #RRGGBB, #AARRGGBB, or white, gray, grey, red, green, blue, transparent."
+      },
+      "fore_color": {
+        "type": "string",
+        "description": "Optional color: #RRGGBB, #AARRGGBB, or white, gray, grey, red, green, blue, transparent."
+      },
+      "on_conflict": {
+        "type": "string",
+        "enum": ["fail"],
+        "description": "Only fail-on-conflict is supported."
+      }
+    },
+    "required": [
+      "target_name",
+      "screen_name",
+      "item_name",
+      "text",
+      "destination_screen",
+      "left",
+      "top",
+      "width",
+      "height",
+      "on_conflict"
+    ]
+  }
+}

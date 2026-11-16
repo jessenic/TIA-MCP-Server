@@ -1,0 +1,15 @@
+{
+  "name": "hmi_rename_screen_group",
+  "description": "Rename an exact screen group in place while preserving its child objects; existing siblings are never overwritten.",
+  "parameters": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "group_path": { "type": "string", "description": "Exact non-empty current group path." },
+      "new_name": { "type": "string", "description": "New group name; '/' is not allowed." },
+      "target_name": { "type": "string", "description": "Exact HMI device, device-item, or software name; required when multiple targets exist." },
+      "on_conflict": { "type": "string", "enum": ["fail"], "description": "Required conflict behavior; only 'fail' is supported." }
+    },
+    "required": ["group_path", "new_name", "on_conflict"]
+  }
+}

@@ -1,7 +1,7 @@
 # Siemens TIA Portal V21 Openness MCP Server
 ## Complete Skills & Tools Reference Manual
 
-**Version:** 2.4.0
+**Version:** 2.9.0
 **Target Platform:** Siemens TIA Portal V21 (PublicAPI .NET Framework 4.8 x64)  
 **Supported Transports:** HTTP JSON-RPC 2.0, Server-Sent Events (SSE), stdio MCP  
 **Default Endpoints:** `http://localhost:5001/mcp`, `http://localhost:5001/sse`, `http://localhost:5001/status`
@@ -144,7 +144,7 @@ The `tia-portal-openness` skill instructs AI agents on standard operating proced
 
 ---
 
-## 4. Complete Tool Reference (50 Tools)
+## 4. Complete Tool Reference (110 Tools)
 
 ---
 
@@ -216,7 +216,7 @@ The `tia-portal-openness` skill instructs AI agents on standard operating proced
 
 ---
 
-### Category 3: PLC Software, Blocks & Compilation (10 Tools)
+### Category 3: PLC Software, Blocks & Compilation (16 Tools)
 
 #### 11. `tia_list_plcs`
 - **Description:** List all CPU devices and summarize their software metrics (block counts, UDT counts, tag table counts).
@@ -299,7 +299,7 @@ The `tia-portal-openness` skill instructs AI agents on standard operating proced
 
 ---
 
-### Category 4: WinCC Unified HMI Screen & Widget Engineering (18 Tools)
+### Category 4: WinCC Unified HMI Screen & Widget Engineering (49 Tools)
 
 #### 20. `hmi_list_targets`
 - **Description:** Discover all HMI runtime devices and software containers in the project.
@@ -716,6 +716,82 @@ Use `hmi_get_js_type_definitions` or the read-only resource `tia://docs/hmi-java
 
 ---
 
+### Category 7: Project, Library & Text Discovery (6 Tools)
+
+#### `tia_list_global_libraries`
+- Lists accessible global-library metadata from the connected TIA Portal instance. Optional `name_filter`, `offset`, and `page_size` parameters; page size is limited to 200.
+
+#### `tia_search_project_library_types`
+- Lists or searches library types in the project selected by exact open `project_path`; optional literal `query`, `offset`, and `page_size`.
+
+#### `tia_list_project_faceplates`
+- Lists faceplate library types in the exact open project's library; optional `name_filter`, `offset`, and `page_size`.
+
+#### `tia_get_library_type_instances`
+- Lists instances of an exact project-library type in one exact PLC scope; optional exact version and source-library selectors narrow the query. HMI-wide instance search is not claimed.
+
+#### `tia_list_project_text_categories`
+- Lists category identifiers and names for an exact open `project_path`; optional literal query and bounded paging.
+
+#### `tia_download_project_texts`
+- Exports texts from an exact open project with explicit `primary_culture` and `reference_culture`. Requires a new destination file in an existing directory and never overwrites an existing file.
+
+### Additional PLC & HMI Discovery (8 Tools)
+
+- `tia_get_block_info` / `tia_get_block_attributes`: exact PLC block metadata and supported attribute reads.
+- `tia_get_tag_table_info`: exact PLC tag-table scope and tag count.
+- `tia_get_type_info` / `tia_get_type_attributes`: exact PLC type metadata and supported consistency read.
+- `tia_get_db_member_attributes`: V21-reported attributes for one exact direct global-DB member; nested paths and inferred datatype fields are not claimed.
+- `hmi_list_screen_groups`: nested screen-group hierarchy and direct screen counts for one unambiguous HMI Unified target.
+- `hmi_list_graphic_lists`: graphic-list names for one unambiguous HMI Unified target.
+
+The tools report only V21 metadata verified by this implementation. See the
+[PLC](./plans/MCP_TOOL_TEST_PLAN_PLC.md),
+[DB-member attributes](./plans/MCP_TOOL_TEST_PLAN_PLC_SLICE_READS.md),
+[project/library/text](./plans/MCP_TOOL_TEST_PLAN_PROJECT.md), and
+[HMI](./plans/MCP_TOOL_TEST_PLAN_HMI.md) test plans for per-case offline checks and
+later live disposable-project verification.
+
+### Category 8: PLC, Project & HMI Operations (15 Tools)
+
+- `tia_get_plc_tag_info` / `tia_read_user_constant`: Read exact PLC tag
+  metadata or a constant's declared type and literal, rejecting ambiguous
+  targets.
+- `tia_get_tag_table_attributes`: Read V21-reported table attributes,
+  including values where permitted, access modes, and supported types.
+- `tia_create_plc_tag_table` / `tia_create_tagtable_group`: Create tag tables
+  and groups in exact PLC group paths without replacing existing objects.
+- `tia_create_block_group`: Create a block group under an exact parent path
+  without replacing an existing group.
+- `tia_create_user_constant` / `tia_update_user_constant`: Create supported
+  constants or update only an existing constant's value, with validation and
+  read-back.
+- `tia_create_project`: Create a project in an existing empty destination
+  directory through the connected TIA Portal instance.
+- `hmi_create_screen_group` / `hmi_create_screen_under_group`: Create HMI
+  structure under exact group paths.
+- `hmi_create_tag_table`: Create a tag table without overwriting an existing
+  table; accepts only `on_conflict: "fail"`.
+- `hmi_create_navigation_button`: Create a new button with a syntax-checked
+  Tapped action that navigates to an exact existing screen. Captions are
+  escaped and wrapped in the required HTML paragraph; existing items are not
+  overwritten.
+- `hmi_rename_screen`, `hmi_rename_screen_group`, and `hmi_rename_tag_table`:
+  Rename existing objects in place. All HMI writes require explicit
+  `on_conflict: "fail"`.
+
+Mutations are non-transactional and have not been tested against a live TIA
+project here. Use the per-case plans:
+[PLC reads](./plans/MCP_TOOL_TEST_PLAN_PLC_READS.md),
+[library-type instances](./plans/MCP_TOOL_TEST_PLAN_LIBRARY_TYPE_INSTANCES.md),
+[PLC mutations](./plans/MCP_TOOL_TEST_PLAN_PLC_MUTATIONS.md),
+[tag-table attributes and block groups](./plans/MCP_TOOL_TEST_PLAN_PLC_GROUP_ATTRIBUTES.md),
+[project creation](./plans/MCP_TOOL_TEST_PLAN_PROJECT_MUTATIONS.md),
+[HMI structure](./plans/MCP_TOOL_TEST_PLAN_HMI_STRUCTURE.md), and
+[HMI navigation buttons](./plans/MCP_TOOL_TEST_PLAN_HMI_NAVIGATION.md).
+
+---
+
 ## 5. Skills Overview
 
 ### 1. `figma-to-wincc-unified`
@@ -737,8 +813,8 @@ Use `hmi_get_js_type_definitions` or the read-only resource `tia://docs/hmi-java
 | Test Item | Verification Procedure | Expected Result | Status |
 | :--- | :--- | :--- | :---: |
 | **Server Startup** | `.\TiaOpennessMcp.exe` | Loads `config.json`, starts HTTP on port 5001 | **PASSED** |
-| **Health Check** | `GET http://localhost:5001/status` | Returns `connected: true`, PID, toolCount: 62 | **PASSED** |
-| **Tool Registry** | `POST /mcp` with `tools/list` | Returns all 62 tool definitions | **PASSED** |
+| **Health Check** | `GET http://localhost:5001/status` | Returns connection state, PID, and the registered tool count (110 in v2.9.0). | **Runtime check pending** |
+| **Tool Registry** | `POST /mcp` with `tools/list` | Lists all 110 registered tool definitions in v2.9.0. | **Runtime check pending** |
 | **PLCSIM Live Connect** | `plcsim_connect` on `PLC_1` | Attaches to virtual S7-1500 controller, caches tags | **PASSED** |
 | **Live Tag I/O** | `plcsim_read_tag` & `write_tag` | Reads/writes DB variables with zero COM overhead | **PASSED** |
 | **Online Sequence Testing** | `.\TiaOpennessMcp.exe --run-sequence-test` | Executes parameterized sequence validation | **PASSED** |

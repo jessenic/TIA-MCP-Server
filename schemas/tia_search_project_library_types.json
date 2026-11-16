@@ -1,0 +1,29 @@
+{
+  "name": "tia_search_project_library_types",
+  "description": "Search or list types in the project library for one exact open project path, with bounded paging.",
+  "parameters": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "project_path": {
+        "type": "string",
+        "description": "Exact full path of a project already open in the connected TIA Portal instance."
+      },
+      "query": {
+        "type": "string",
+        "description": "Optional case-insensitive substring filter for type name or namespace."
+      },
+      "offset": {
+        "type": "integer",
+        "description": "Zero-based result offset (default 0)."
+      },
+      "page_size": {
+        "type": "integer",
+        "description": "Maximum results, from 1 through 200 (default 50)."
+      }
+    },
+    "required": [
+      "project_path"
+    ]
+  }
+}
