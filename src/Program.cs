@@ -284,7 +284,11 @@ namespace TiaOpennessMcp
                 byte[] bytes = File.ReadAllBytes(exePath);
                 using var sha256 = SHA256.Create();
                 string hash = Convert.ToBase64String(sha256.ComputeHash(bytes));
-                string dateModified = File.GetLastWriteTime(exePath).ToString("yyyy/MM/dd HH:mm:ss.fff");
+                // Same format TIA Portal writes when a user accepts its Openness prompt: last write time in UTC,
+                // invariant culture. Local time or the current culture (e.g. Finnish "2026.10.26 21.21.30.848")
+                // gives an entry TIA ignores.
+                string dateModified = File.GetLastWriteTimeUtc(exePath)
+                    .ToString("yyyy/MM/dd HH:mm:ss.fff", System.Globalization.CultureInfo.InvariantCulture);
 
                 const string basePath = @"SOFTWARE\Siemens\Automation\Openness\AllowList";
                 using var baseKey = Registry.LocalMachine.CreateSubKey(basePath);
@@ -295,12 +299,30 @@ namespace TiaOpennessMcp
                 }
 
                 using var appKey = baseKey.CreateSubKey(exeName);
-                using var entryKey = appKey.CreateSubKey("Entry");
+                // TIA keeps one subkey per accepted build (Entry, Entry (1), ...), possibly for other paths. Update
+                // the entry for this path and drop its outdated duplicates; otherwise take the first free name
+                // instead of overwriting another path's Entry.
+                string? entryName = null;
+                foreach (string name in appKey.GetSubKeyNames().OrderBy(n => n, StringComparer.Ordinal))
+                {
+                    using var existing = appKey.OpenSubKey(name);
+                    if (!string.Equals(existing?.GetValue("Path") as string, exePath, StringComparison.OrdinalIgnoreCase)) continue;
+                    if (entryName == null) entryName = name;
+                    else appKey.DeleteSubKeyTree(name);
+                }
+                if (entryName == null)
+                {
+                    var taken = new HashSet<string>(appKey.GetSubKeyNames(), StringComparer.OrdinalIgnoreCase);
+                    entryName = "Entry";
+                    for (int i = 1; taken.Contains(entryName); i++) entryName = $"Entry ({i})";
+                }
+
+                using var entryKey = appKey.CreateSubKey(entryName);
                 entryKey.SetValue("Path", exePath);
                 entryKey.SetValue("DateModified", dateModified);
                 entryKey.SetValue("FileHash", hash);
 
-                Console.WriteLine("SUCCESS: Registered in HKLM\\" + basePath + "\\" + exeName);
+                Console.WriteLine("SUCCESS: Registered in HKLM\\" + basePath + "\\" + exeName + "\\" + entryName);
                 Console.WriteLine($"  FileHash: {hash}");
                 Console.WriteLine($"  DateModified: {dateModified}");
             }
