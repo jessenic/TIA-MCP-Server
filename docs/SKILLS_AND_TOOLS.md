@@ -92,6 +92,10 @@ The server reads configuration from `config.json` located in its working or exec
 - **`tia.autoConnect`** *(bool)*: Automatically attaches to a running TIA Portal instance on startup.
 - **`tia.preferredProcessId`** *(int?)*: Target PID to attach to when multiple instances are running.
 - **`tia.keepAliveConnection`** *(bool)*: Retains project instance across all client sessions.
+- **`docs.locale`** *(string)*: Default locale for the `docs_*` tools (default: `"en-US"`).
+- **`docs.extraHosts`** *(string[])*: Extra Fluid Topics documentation hosts, added after `docs.tia.siemens.cloud` and `docs.industrial-operations-x.siemens.cloud`.
+- **`docs.minIntervalSeconds`** *(number)*: Minimum seconds between requests to one documentation host (default: `0.3`).
+- The environment variables `SIEMENS_DOCS_HOSTS` (comma-separated extra hosts), `SIEMENS_DOCS_LOCALE` and `SIEMENS_DOCS_MIN_INTERVAL` override these settings.
 
 ---
 
@@ -144,7 +148,7 @@ The `tia-portal-openness` skill instructs AI agents on standard operating proced
 
 ---
 
-## 4. Complete Tool Reference (110 Tools)
+## 4. Complete Tool Reference (114 Tools)
 
 ---
 

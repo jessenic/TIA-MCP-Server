@@ -3,7 +3,8 @@ name: tia-mcp-workflow
 description: >-
   Route Siemens TIA Portal, WinCC Unified, HMI JSON, Figma-to-HMI, and
   S7-PLCSIM MCP requests to the right project skill. Use when deciding which
-  TIA MCP workflow or skill applies before operating on a project or controller.
+  TIA MCP workflow or skill applies before operating on a project or controller,
+  and when checking the official Siemens documentation with the docs_* tools.
 ---
 
 # TIA MCP Server Usage Workflow
@@ -20,6 +21,7 @@ instructions before acting, and use the live MCP tool descriptions for arguments
 | HMI export, inspection, editing, rendering, patching, or import specifically using the TIA MCP JSON format | `hmi-json` |
 | Recreate or adapt a Figma design into a WinCC Unified screen | `figma-to-wincc-unified`; also read `hmi-json` only if the user explicitly requests JSON export/import/patch work |
 | Connect to S7-PLCSIM, inspect or write simulated tags, control the virtual CPU, or run an online sequence verification | `plcsim-sequence-tester` |
+| Look up how a Siemens API, system function, SCL instruction, or setting works in the official documentation | This skill, section 5 below (no TIA connection needed) |
 
 The skills are located at `.opencode/skills/<skill-name>/SKILL.md` for OpenCode
 and `.agents/skills/<skill-name>/SKILL.md` for compatible agent tooling. When a
@@ -77,3 +79,21 @@ resources when more context is useful:
 
 If a documented tool is absent from the live tool list, verify the configured
 server and tool availability instead of assuming a substitute.
+
+## 5. Check the official Siemens documentation
+
+The `docs_*` tools read the public Siemens documentation sites and need no TIA
+Portal connection. Use them before relying on an Openness class or method, a
+WinCC Unified `SysFct` or JavaScript API, or an SCL instruction you are not
+sure about, and when a compile or import error names an API you do not know.
+
+1. `docs_search` with a focused `query` and, when known, `product` and
+   `version` (`TIAPortal` for the Openness API, `WinCC Unified`, `STEP 7`;
+   `V21`). Use `docs_list_publications` if a filter value is rejected.
+2. `docs_read_page` with the hit's reference and `mode: "outline"` first for
+   long pages, then `section` or `mode: "code"` to read only what you need.
+3. Narrow a follow-up search to one publication or chapter with `scope`.
+
+Quote what the documentation says and cite the reference; if the documentation
+and the server's own tool descriptions disagree, report the difference instead
+of guessing.

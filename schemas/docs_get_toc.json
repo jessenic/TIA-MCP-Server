@@ -1,0 +1,31 @@
+{
+  "name": "docs_get_toc",
+  "description": "Show the table of contents of a Siemens documentation publication, or of the subtree under a topic: an indented outline with one title and reference per line. Pass a compact reference (\u003Cprefix\u003E:\u003CmapId\u003E or \u003Cprefix\u003E:\u003CmapId\u003E/\u003CcontentId\u003E; prefixes tia=docs.tia.siemens.cloud, iox=docs.industrial-operations-x.siemens.cloud) or a reader URL copied from a tool result or the browser. Results use compact references by default; set reference_format=\u0027url\u0027 for reader URLs.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "url": {
+        "type": "string",
+        "description": "Publication or topic reference, or a reader URL. Pass a compact reference (\u003Cprefix\u003E:\u003CmapId\u003E or \u003Cprefix\u003E:\u003CmapId\u003E/\u003CcontentId\u003E; prefixes tia=docs.tia.siemens.cloud, iox=docs.industrial-operations-x.siemens.cloud) or a reader URL copied from a tool result or the browser."
+      },
+      "depth": {
+        "type": "integer",
+        "description": "Levels to show, 1-6. Default 2.",
+        "minimum": 1,
+        "default": 2
+      },
+      "reference_format": {
+        "type": "string",
+        "description": "\u0027compact\u0027 (default) for short references or \u0027url\u0027 for full reader URLs.",
+        "enum": [
+          "compact",
+          "url"
+        ]
+      }
+    },
+    "required": [
+      "url"
+    ],
+    "additionalProperties": false
+  }
+}

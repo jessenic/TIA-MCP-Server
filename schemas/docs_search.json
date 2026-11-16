@@ -1,0 +1,51 @@
+{
+  "name": "docs_search",
+  "description": "Full-text search of the online Siemens documentation (TIA Portal, STEP 7, WinCC Unified, Openness API, PLCSIM, Industrial Operations X). Returns a numbered Markdown list: title, publication and version, breadcrumb, excerpt and reference to pass to docs_read_page or docs_get_toc. Use it to check Openness classes, SCL instructions or WinCC Unified SysFct/JavaScript APIs before relying on them. Set scope to a publication or topic reference to search only inside it (product and version must then be omitted). Results use compact references by default; set reference_format=\u0027url\u0027 for reader URLs. product (e.g. \u0027TIAPortal\u0027 for the Openness API, \u0027STEP 7\u0027, \u0027WinCC Unified\u0027) and version (e.g. \u0027V21\u0027) are matched against the catalog; call docs_list_publications to see valid values.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "query": {
+        "type": "string",
+        "description": "Search text, e.g. \u0027OpenScreenInPopup\u0027 or \u0027PlcBlockGroup CreateFromTemplate\u0027."
+      },
+      "product": {
+        "type": "string",
+        "description": "Optional product filter, e.g. \u0027TIAPortal\u0027 (Openness API), \u0027STEP 7\u0027, \u0027WinCC Unified\u0027."
+      },
+      "version": {
+        "type": "string",
+        "description": "Optional version filter, e.g. \u0027V21\u0027."
+      },
+      "host": {
+        "type": "string",
+        "description": "Documentation host; default docs.tia.siemens.cloud. Other allowed host: docs.industrial-operations-x.siemens.cloud."
+      },
+      "locale": {
+        "type": "string",
+        "description": "Content locale, e.g. \u0027en-US\u0027 (default) or \u0027de-DE\u0027."
+      },
+      "limit": {
+        "type": "integer",
+        "description": "Number of hits, 1-50. Default 10.",
+        "minimum": 1,
+        "default": 10
+      },
+      "scope": {
+        "type": "string",
+        "description": "Optional publication or topic reference to search within. Pass a compact reference (\u003Cprefix\u003E:\u003CmapId\u003E or \u003Cprefix\u003E:\u003CmapId\u003E/\u003CcontentId\u003E; prefixes tia=docs.tia.siemens.cloud, iox=docs.industrial-operations-x.siemens.cloud) or a reader URL copied from a tool result or the browser."
+      },
+      "reference_format": {
+        "type": "string",
+        "description": "\u0027compact\u0027 (default) for short references or \u0027url\u0027 for full reader URLs.",
+        "enum": [
+          "compact",
+          "url"
+        ]
+      }
+    },
+    "required": [
+      "query"
+    ],
+    "additionalProperties": false
+  }
+}

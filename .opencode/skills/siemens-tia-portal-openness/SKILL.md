@@ -347,6 +347,15 @@ Always compile the HMI target after modifying screens or tags to ensure runtime 
 
 All system functions can be called directly in JavaScript scripts configured on buttons (Tapped event), screen events (Loaded, Unloaded), or cyclic tasks.
 
+### Siemens Documentation Lookup
+
+This catalog is a summary. Before writing SCL, Openness-driven changes, or
+WinCC Unified scripts that use an instruction or API you have not verified,
+check it with the `docs_*` tools (no TIA connection needed): `docs_search`
+(for example `{ "query": "SysFct.OpenScreenInPopup", "product": "WinCC Unified", "version": "V21" }`),
+then `docs_read_page` with `mode: "outline"`, `section`, or `mode: "code"`.
+Use the documented parameter order and types rather than recalling them.
+
 ### 5.1 Tag System Functions (`Tags.SysFct.*`)
 - **`Tags.SysFct.InvertBitInTag(tagName, bitNumber)`**: Invert (toggle) specific bit and send to PLC. Ideal for Start/Stop toggle buttons.
 - **`Tags.SysFct.SetBitInTag(tagName, bitNumber)`**: Set specific bit to 1 (true).

@@ -2367,6 +2367,123 @@ namespace TiaOpennessMcp.Tools
                     return CallToolResult.Json(TiaManager.Instance.GetTagTableAttributes(
                         GetStringProp(args, "plc_name"), tableName, GetStringProp(args, "group_path")));
                 });
+
+            RegisterDocsTools();
+        }
+
+        // Siemens online documentation (docs.tia.siemens.cloud and docs.industrial-operations-x.siemens.cloud).
+        // These tools need internet access but no TIA Portal connection.
+        private void RegisterDocsTools()
+        {
+            const string urlDoc = "Pass a compact reference (<prefix>:<mapId> or <prefix>:<mapId>/<contentId>; prefixes tia=docs.tia.siemens.cloud, iox=docs.industrial-operations-x.siemens.cloud) or a reader URL copied from a tool result or the browser.";
+            const string referenceDoc = "Results use compact references by default; set reference_format='url' for reader URLs.";
+            const string filterDoc = "product (e.g. 'TIAPortal' for the Openness API, 'STEP 7', 'WinCC Unified') and version (e.g. 'V21') are matched against the catalog; call docs_list_publications to see valid values.";
+            var referenceFormat = new ToolProperty
+            {
+                Type = "string",
+                Description = "'compact' (default) for short references or 'url' for full reader URLs.",
+                Enum = new List<string> { "compact", "url" }
+            };
+            var host = new ToolProperty { Type = "string", Description = "Documentation host; default docs.tia.siemens.cloud. Other allowed host: docs.industrial-operations-x.siemens.cloud." };
+            var locale = new ToolProperty { Type = "string", Description = "Content locale, e.g. 'en-US' (default) or 'de-DE'." };
+            var product = new ToolProperty { Type = "string", Description = "Optional product filter, e.g. 'TIAPortal' (Openness API), 'STEP 7', 'WinCC Unified'." };
+            var version = new ToolProperty { Type = "string", Description = "Optional version filter, e.g. 'V21'." };
+
+            Register("docs_search",
+                "Full-text search of the online Siemens documentation (TIA Portal, STEP 7, WinCC Unified, Openness API, PLCSIM, Industrial Operations X). Returns a numbered Markdown list: title, publication and version, breadcrumb, excerpt and reference to pass to docs_read_page or docs_get_toc. Use it to check Openness classes, SCL instructions or WinCC Unified SysFct/JavaScript APIs before relying on them. Set scope to a publication or topic reference to search only inside it (product and version must then be omitted). " + referenceDoc + " " + filterDoc,
+                schema =>
+                {
+                    schema.Properties["query"] = new ToolProperty { Type = "string", Description = "Search text, e.g. 'OpenScreenInPopup' or 'PlcBlockGroup CreateFromTemplate'." };
+                    schema.Properties["product"] = product;
+                    schema.Properties["version"] = version;
+                    schema.Properties["host"] = host;
+                    schema.Properties["locale"] = locale;
+                    schema.Properties["limit"] = new ToolProperty { Type = "integer", Description = "Number of hits, 1-50. Default 10.", Default = 10, Minimum = 1 };
+                    schema.Properties["scope"] = new ToolProperty { Type = "string", Description = "Optional publication or topic reference to search within. " + urlDoc };
+                    schema.Properties["reference_format"] = referenceFormat;
+                    schema.Required = new List<string> { "query" };
+                },
+                args => CallToolResult.Text(Docs.DocsTools.Instance.Search(
+                    GetStringProp(args, "query") ?? throw new ArgumentException("query is required."),
+                    GetStringProp(args, "host"), GetStringProp(args, "product"), GetStringProp(args, "version"),
+                    GetStringProp(args, "locale"), GetDocsInt(args, "limit", 10),
+                    GetStringProp(args, "reference_format"), GetStringProp(args, "scope"))));
+
+            Register("docs_read_page",
+                "Read one Siemens documentation page as Markdown, with a header naming the publication, version, path and source reference. mode='outline' lists numbered headings with sizes; section takes an outline number or heading text (e.g. 'Example', which also matches 'Example: ...') and returns only those sections; mode='code' returns only code blocks under their headings. Long results end with the exact arguments to fetch the next part. " + urlDoc + " " + referenceDoc,
+                schema =>
+                {
+                    schema.Properties["url"] = new ToolProperty { Type = "string", Description = "Page reference or reader URL. " + urlDoc };
+                    schema.Properties["mode"] = new ToolProperty
+                    {
+                        Type = "string",
+                        Description = "'full' (default), 'outline' (headings with sizes) or 'code' (code blocks only).",
+                        Enum = new List<string> { "full", "outline", "code" }
+                    };
+                    schema.Properties["section"] = new ToolProperty { Type = "string", Description = "Optional outline number (e.g. '3') or heading text from mode='outline'." };
+                    schema.Properties["offset"] = new ToolProperty { Type = "integer", Description = "Character offset to continue a long result; use the value the previous part gives.", Default = 0, Minimum = 0 };
+                    schema.Properties["max_chars"] = new ToolProperty { Type = "integer", Description = "Maximum characters returned, 1000-100000. Default 20000.", Default = 20000, Minimum = 1000 };
+                    schema.Properties["reference_format"] = referenceFormat;
+                    schema.Required = new List<string> { "url" };
+                },
+                args => CallToolResult.Text(Docs.DocsTools.Instance.ReadPage(
+                    GetStringProp(args, "url") ?? throw new ArgumentException("url is required."),
+                    GetDocsInt(args, "offset", 0), GetDocsInt(args, "max_chars", 20000),
+                    GetStringProp(args, "reference_format"), GetDocsSection(args), GetStringProp(args, "mode"))));
+
+            Register("docs_get_toc",
+                "Show the table of contents of a Siemens documentation publication, or of the subtree under a topic: an indented outline with one title and reference per line. " + urlDoc + " " + referenceDoc,
+                schema =>
+                {
+                    schema.Properties["url"] = new ToolProperty { Type = "string", Description = "Publication or topic reference, or a reader URL. " + urlDoc };
+                    schema.Properties["depth"] = new ToolProperty { Type = "integer", Description = "Levels to show, 1-6. Default 2.", Default = 2, Minimum = 1 };
+                    schema.Properties["reference_format"] = referenceFormat;
+                    schema.Required = new List<string> { "url" };
+                },
+                args => CallToolResult.Text(Docs.DocsTools.Instance.GetToc(
+                    GetStringProp(args, "url") ?? throw new ArgumentException("url is required."),
+                    GetDocsInt(args, "depth", 2), GetStringProp(args, "reference_format"))));
+
+            Register("docs_list_publications",
+                "List Siemens documentation publications (up to 50): title, product, version, locale and reference. Use it to find valid product and version values for docs_search, or a publication to open with docs_get_toc. " + filterDoc + " " + referenceDoc,
+                schema =>
+                {
+                    schema.Properties["title_contains"] = new ToolProperty { Type = "string", Description = "Optional case-insensitive text the title must contain, e.g. 'Openness'." };
+                    schema.Properties["product"] = product;
+                    schema.Properties["version"] = version;
+                    schema.Properties["host"] = host;
+                    schema.Properties["locale"] = locale;
+                    schema.Properties["reference_format"] = referenceFormat;
+                },
+                args => CallToolResult.Text(Docs.DocsTools.Instance.ListPublications(
+                    GetStringProp(args, "host"), GetStringProp(args, "product"), GetStringProp(args, "version"),
+                    GetStringProp(args, "locale"), GetStringProp(args, "title_contains"), GetStringProp(args, "reference_format"))));
+        }
+
+        private static int GetDocsInt(JsonElement? element, string propName, int defaultValue)
+        {
+            if (!element.HasValue || element.Value.ValueKind != JsonValueKind.Object ||
+                !element.Value.TryGetProperty(propName, out var property) || property.ValueKind == JsonValueKind.Null)
+                return defaultValue;
+            if (property.ValueKind == JsonValueKind.Number && property.TryGetInt32(out int value)) return value;
+            if (property.ValueKind == JsonValueKind.String && int.TryParse(property.GetString(), System.Globalization.NumberStyles.Integer,
+                    System.Globalization.CultureInfo.InvariantCulture, out value))
+                return value;
+            throw new ArgumentException($"'{propName}' must be an integer.");
+        }
+
+        private static object? GetDocsSection(JsonElement? element)
+        {
+            if (!element.HasValue || element.Value.ValueKind != JsonValueKind.Object ||
+                !element.Value.TryGetProperty("section", out var property))
+                return null;
+            switch (property.ValueKind)
+            {
+                case JsonValueKind.Null: return null;
+                case JsonValueKind.String: return property.GetString();
+                case JsonValueKind.Number when property.TryGetInt32(out int n): return n;
+                default: throw new ArgumentException("'section' must be an outline number or heading text.");
+            }
         }
 
         private void Register(string name, string description, Action<ToolInputSchema> schemaBuilder, Func<JsonElement?, CallToolResult> handler)

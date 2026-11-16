@@ -1,0 +1,50 @@
+{
+  "name": "docs_read_page",
+  "description": "Read one Siemens documentation page as Markdown, with a header naming the publication, version, path and source reference. mode=\u0027outline\u0027 lists numbered headings with sizes; section takes an outline number or heading text (e.g. \u0027Example\u0027, which also matches \u0027Example: ...\u0027) and returns only those sections; mode=\u0027code\u0027 returns only code blocks under their headings. Long results end with the exact arguments to fetch the next part. Pass a compact reference (\u003Cprefix\u003E:\u003CmapId\u003E or \u003Cprefix\u003E:\u003CmapId\u003E/\u003CcontentId\u003E; prefixes tia=docs.tia.siemens.cloud, iox=docs.industrial-operations-x.siemens.cloud) or a reader URL copied from a tool result or the browser. Results use compact references by default; set reference_format=\u0027url\u0027 for reader URLs.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "url": {
+        "type": "string",
+        "description": "Page reference or reader URL. Pass a compact reference (\u003Cprefix\u003E:\u003CmapId\u003E or \u003Cprefix\u003E:\u003CmapId\u003E/\u003CcontentId\u003E; prefixes tia=docs.tia.siemens.cloud, iox=docs.industrial-operations-x.siemens.cloud) or a reader URL copied from a tool result or the browser."
+      },
+      "mode": {
+        "type": "string",
+        "description": "\u0027full\u0027 (default), \u0027outline\u0027 (headings with sizes) or \u0027code\u0027 (code blocks only).",
+        "enum": [
+          "full",
+          "outline",
+          "code"
+        ]
+      },
+      "section": {
+        "type": "string",
+        "description": "Optional outline number (e.g. \u00273\u0027) or heading text from mode=\u0027outline\u0027."
+      },
+      "offset": {
+        "type": "integer",
+        "description": "Character offset to continue a long result; use the value the previous part gives.",
+        "minimum": 0,
+        "default": 0
+      },
+      "max_chars": {
+        "type": "integer",
+        "description": "Maximum characters returned, 1000-100000. Default 20000.",
+        "minimum": 1000,
+        "default": 20000
+      },
+      "reference_format": {
+        "type": "string",
+        "description": "\u0027compact\u0027 (default) for short references or \u0027url\u0027 for full reader URLs.",
+        "enum": [
+          "compact",
+          "url"
+        ]
+      }
+    },
+    "required": [
+      "url"
+    ],
+    "additionalProperties": false
+  }
+}

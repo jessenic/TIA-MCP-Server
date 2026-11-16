@@ -121,6 +121,7 @@ namespace TiaOpennessMcp
                 }
             }
 
+            TiaOpennessMcp.Docs.DocsTools.Configure(config.Docs);
             var toolRegistry = new ToolRegistry();
             HttpMcpServer? httpServer = null;
 

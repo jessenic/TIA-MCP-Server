@@ -1,0 +1,38 @@
+{
+  "name": "docs_list_publications",
+  "description": "List Siemens documentation publications (up to 50): title, product, version, locale and reference. Use it to find valid product and version values for docs_search, or a publication to open with docs_get_toc. product (e.g. \u0027TIAPortal\u0027 for the Openness API, \u0027STEP 7\u0027, \u0027WinCC Unified\u0027) and version (e.g. \u0027V21\u0027) are matched against the catalog; call docs_list_publications to see valid values. Results use compact references by default; set reference_format=\u0027url\u0027 for reader URLs.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "title_contains": {
+        "type": "string",
+        "description": "Optional case-insensitive text the title must contain, e.g. \u0027Openness\u0027."
+      },
+      "product": {
+        "type": "string",
+        "description": "Optional product filter, e.g. \u0027TIAPortal\u0027 (Openness API), \u0027STEP 7\u0027, \u0027WinCC Unified\u0027."
+      },
+      "version": {
+        "type": "string",
+        "description": "Optional version filter, e.g. \u0027V21\u0027."
+      },
+      "host": {
+        "type": "string",
+        "description": "Documentation host; default docs.tia.siemens.cloud. Other allowed host: docs.industrial-operations-x.siemens.cloud."
+      },
+      "locale": {
+        "type": "string",
+        "description": "Content locale, e.g. \u0027en-US\u0027 (default) or \u0027de-DE\u0027."
+      },
+      "reference_format": {
+        "type": "string",
+        "description": "\u0027compact\u0027 (default) for short references or \u0027url\u0027 for full reader URLs.",
+        "enum": [
+          "compact",
+          "url"
+        ]
+      }
+    },
+    "additionalProperties": false
+  }
+}

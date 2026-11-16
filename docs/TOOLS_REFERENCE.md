@@ -1,5 +1,5 @@
 # Siemens TIA Portal V21 Openness MCP Server
-## Complete Tools Reference Dictionary (110 Tools)
+## Complete Tools Reference Dictionary (114 Tools)
 
 **Protocol Specification:** Model Context Protocol (MCP) JSON-RPC 2.0  
 **Transport Binding:** HTTP (`POST /mcp`), SSE (`GET /sse`), stdio  
@@ -20,6 +20,7 @@
 | **6** | [S7-PLCSIM Advanced Live Simulation & Testing](#category-6-s7-plcsim-advanced-live-simulation--testing-12-tools) | 12 | `plcsim_list_instances`, `plcsim_connect`, `plcsim_disconnect`, `plcsim_get_status`, `plcsim_set_operating_state`, `plcsim_set_scale_factor`, `plcsim_read_tag`, `plcsim_write_tag`, `plcsim_read_tags`, `plcsim_write_tags`, `plcsim_run_sequence`, `plcsim_run_mixing_sequence` |
 | **7** | [Project, Library & Text Discovery](#category-7-project-library--text-discovery-6-tools) | 6 | `tia_list_global_libraries`, `tia_search_project_library_types`, `tia_list_project_faceplates`, `tia_get_library_type_instances`, `tia_list_project_text_categories`, `tia_download_project_texts` |
 | **8** | [PLC, Project & HMI Operations](#category-8-plc-project--hmi-operations-16-tools) | 16 | `tia_get_plc_tag_info`, `tia_read_user_constant`, `tia_get_tag_table_attributes`, `tia_create_plc_tag_table`, `tia_create_tagtable_group`, `tia_create_block_group`, `tia_create_user_constant`, `tia_update_user_constant`, `tia_create_project`, `hmi_create_screen_group`, `hmi_create_screen_under_group`, `hmi_create_tag_table`, `hmi_create_navigation_button`, `hmi_rename_screen`, `hmi_rename_screen_group`, `hmi_rename_tag_table` |
+| **9** | [Siemens Online Documentation](#category-9-siemens-online-documentation-4-tools) | 4 | `docs_search`, `docs_read_page`, `docs_get_toc`, `docs_list_publications` |
 
 ## MCP Documentation Resources
 
@@ -1647,3 +1648,69 @@ The test plans for [PLC reads](./plans/MCP_TOOL_TEST_PLAN_PLC_READS.md),
 [HMI structure](./plans/MCP_TOOL_TEST_PLAN_HMI_STRUCTURE.md) include case-by-case
 offline checks and live disposable-project procedures. No live mutation tests
 are claimed.
+
+---
+
+## Category 9: Siemens Online Documentation (4 Tools)
+
+These tools search and read the public Siemens documentation sites
+`docs.tia.siemens.cloud` (TIA Portal, STEP 7, WinCC Unified, Openness API,
+PLCSIM) and `docs.industrial-operations-x.siemens.cloud` through their Fluid
+Topics REST API. They need internet access but no TIA Portal connection, and
+return Markdown text. Publication lists and tables of contents are cached in
+memory for 24 hours.
+
+**References.** Results name pages with compact references:
+`tia:<mapId>` for a publication and `tia:<mapId>/<contentId>` for a topic
+(`iox:` for the Industrial Operations X site). Every `url` and `scope`
+argument also accepts a reader URL copied from the browser. Set
+`reference_format: "url"` to get reader URLs instead.
+
+**Filters.** `product` and `version` are matched case-insensitively against
+the catalog; an unknown value fails with the closest valid values. The
+Openness API publications use product `TIAPortal`; WinCC Unified runtime
+scripting uses `WinCC Unified`. Use `docs_list_publications` to see the rest.
+
+### `docs_search`
+- **Parameters:** `query` (required); optional `product`, `version`, `scope`,
+  `limit` (1-50, default 10), `host`, `locale` (default `en-US`),
+  `reference_format`.
+- `scope` limits the search to one publication or one chapter subtree; host
+  and locale then come from the scope, and `product`/`version` must be omitted.
+  A chapter search reads at most 300 publication hits and says when its count
+  may be incomplete.
+- **Example:** `{ "query": "OpenScreenInPopup", "product": "WinCC Unified", "limit": 3 }`
+  returns numbered hits with title, publication and version, breadcrumb,
+  excerpt and reference.
+
+### `docs_read_page`
+- **Parameters:** `url` (required); optional `mode` (`full`, `outline`,
+  `code`), `section`, `offset`, `max_chars` (1000-100000, default 20000),
+  `reference_format`.
+- The result starts with a header naming the publication, version, path and
+  source reference. `mode: "outline"` lists numbered headings with their sizes
+  and code-block counts. `section` takes an outline number or heading text;
+  `"Example"` also matches `"Example: ..."` headings. `mode: "code"` returns
+  only code blocks under their headings and combines with `section`.
+- Long results are cut between blocks (a long code block or table is split at
+  a line with its fence or header repeated) and end with
+  `[truncated — call again with ..., offset=N]`.
+- Links to other topics become compact references; images keep only their
+  alt text.
+
+### `docs_get_toc`
+- **Parameters:** `url` (required, publication or topic); optional `depth`
+  (1-6, default 2), `reference_format`.
+- Returns an indented outline, one `- Title — reference` line per node, capped
+  at 500 lines.
+
+### `docs_list_publications`
+- **Parameters:** all optional: `title_contains`, `product`, `version`,
+  `host`, `locale`, `reference_format`.
+- Returns up to 50 rows of `- **Title** — Product Version [locale] reference`,
+  sorted by title.
+
+Configuration: `docs.locale`, `docs.extraHosts` and `docs.minIntervalSeconds`
+in `config.json`, or the `SIEMENS_DOCS_LOCALE`, `SIEMENS_DOCS_HOSTS` and
+`SIEMENS_DOCS_MIN_INTERVAL` environment variables. Ported from
+[siemens-docs-mcp](https://github.com/Czarnak/siemens-docs-mcp) (MIT).

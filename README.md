@@ -214,6 +214,12 @@ runtime compiler verdict. Use runtime validation for final visual sign-off.
 - Enumerate configured project test cases (`tia_testsuite_list_tests`).
 - Import and reload `.tat` rule files with `ImportOptions.Override` (`tia_testsuite_load_test`).
 
+### 7. Siemens Online Documentation (4 Tools)
+- **Search and read the official docs**: `docs_search`, `docs_read_page`, `docs_get_toc` and `docs_list_publications` read the public Siemens documentation sites (`docs.tia.siemens.cloud` and `docs.industrial-operations-x.siemens.cloud`) through their Fluid Topics REST API. They cover TIA Portal, STEP 7, WinCC Unified (system functions and the JavaScript object model), the Openness API and more.
+- **Token-efficient reading**: Pages come back as Markdown. `mode: "outline"` lists numbered headings with sizes, `section` returns only the chosen sections, `mode: "code"` returns only code blocks, and long pages are split into parts with the exact arguments for the next one. References are compact (`tia:<mapId>/<contentId>`).
+- **No TIA Portal needed**: These tools need internet access only. Publications and tables of contents are cached in memory for 24 hours.
+- Ported to C# from [siemens-docs-mcp](https://github.com/Czarnak/siemens-docs-mcp) (MIT). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
 ---
 
 ## Figma to WinCC Unified Workflow
@@ -352,7 +358,7 @@ stateDiagram-v2
 
 ---
 
-## Complete Tools Reference Dictionary (110 Tools)
+## Complete Tools Reference Dictionary (114 Tools)
 
 | # | Tool Name | Category | Primary Parameters | Description |
 |:---:|:---|:---:|:---|:---|
@@ -467,6 +473,10 @@ stateDiagram-v2
 | 108 | `hmi_create_navigation_button` | HMI Mutation | `target_name`, `screen_name`, `item_name`, `text`, `destination_screen`, `left`, `top`, `width`, `height`, `on_conflict` | Create a button with an explicit screen-navigation action. |
 | 109 | `tia_get_library_type_instances` | Library Read | `project_path`, `plc_name`, `library_type_id`, `version_id`, `source_library` | List instances of an exact project-library type in one PLC scope. |
 | 110 | `tia_get_db_member_attributes` | PLC Read | `db_name`, `member_name`, `plc_name`, `group_path` | Read V21-reported attributes for one direct global-DB member. |
+| 111 | `docs_search` | Siemens Docs | `query`, `product`, `version`, `scope`, `limit`, `host`, `locale`, `reference_format` | Full-text search of the online Siemens documentation, optionally inside one publication or chapter. |
+| 112 | `docs_read_page` | Siemens Docs | `url`, `mode`, `section`, `offset`, `max_chars`, `reference_format` | Read a documentation page as Markdown: whole, outline, chosen sections or code only. |
+| 113 | `docs_get_toc` | Siemens Docs | `url`, `depth`, `reference_format` | Table of contents of a publication or of a chapter. |
+| 114 | `docs_list_publications` | Siemens Docs | `title_contains`, `product`, `version`, `host`, `locale`, `reference_format` | List publications and the valid product and version filter values. |
 
 ---
 
@@ -552,6 +562,12 @@ The Siemens-facing read tools have per-case plans for [PLC metadata](docs/plans/
 For the ordered Windows server update, disposable-project test passes, safety
 gates, and a copyable prompt for an MCP-connected test agent, see the
 [live-test runbook](docs/MCP_TOOL_LIVE_TEST_RUNBOOK.md).
+
+Run the Siemens documentation tool checks (offline, with a fake documentation site; `-Live` also queries `docs.tia.siemens.cloud`):
+```powershell
+.\scripts\Test-Docs.ps1
+.\scripts\Test-Docs.ps1 -Live
+```
 
 Run HMI JSON regression checks after building (Debug by default):
 ```powershell
@@ -639,7 +655,7 @@ Open or create your Antigravity MCP configuration file at:
 *(Replace `C:\\path\\to\\TIA-MCP-Server\\release` with your actual absolute path using escaped backslashes `\\`)*.
 
 #### B. Tool Schema Registration (Lazy Loading)
-To enable Antigravity to lazy-load all 110 tools on demand, copy the JSON schemas from the repository's `schemas/` folder into your Antigravity MCP directory:
+To enable Antigravity to lazy-load all 114 tools on demand, copy the JSON schemas from the repository's `schemas/` folder into your Antigravity MCP directory:
 ```powershell
 New-Item -ItemType Directory -Path "$env:USERPROFILE\.gemini\antigravity\mcp\tia-portal-v21" -Force
 Copy-Item -Path ".\schemas\*.json" -Destination "$env:USERPROFILE\.gemini\antigravity\mcp\tia-portal-v21\" -Force
@@ -687,7 +703,7 @@ Launch Claude Code and check registered tools:
 claude
 > /mcp
 ```
-All 110 tools (`tia_*`, `hmi_*`, `plcsim_*`) will appear in the active MCP tools list. You can immediately ask:
+All 114 tools (`tia_*`, `hmi_*`, `plcsim_*`, `docs_*`) will appear in the active MCP tools list. You can immediately ask:
 > *"Inspect the device tree of the active PLC and compile the software."*
 
 ---
@@ -705,7 +721,7 @@ All 110 tools (`tia_*`, `hmi_*`, `plcsim_*`) will appear in the active MCP tools
   }
 }
 ```
-Restart Claude Desktop. The hammer icon (🛠️) in the input bar will display all 110 tools.
+Restart Claude Desktop. The hammer icon (🛠️) in the input bar will display all 114 tools.
 
 ---
 
