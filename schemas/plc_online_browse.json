@@ -1,0 +1,31 @@
+{
+  "name": "plc_online_browse",
+  "description": "List variables in the connected PLC with their data types: data block members (\u0027DB_Name.Member.Sub\u0027), inputs, outputs and memory. An array of a simple type is one row with its bounds in \u0027array\u0027; read it whole by name or one element as \u0027Name[3]\u0027. The full list is read once and cached until refresh is true; filter narrows it by name text. Use the names with plc_online_read_tags.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "filter": {
+        "type": "string",
+        "description": "Optional case-insensitive text the variable name must contain, e.g. \u0027DB_Process.\u0027 or \u0027Speed\u0027."
+      },
+      "offset": {
+        "type": "integer",
+        "description": "Rows to skip, for paging. Default 0.",
+        "minimum": 0,
+        "default": 0
+      },
+      "limit": {
+        "type": "integer",
+        "description": "Maximum rows, 1-1000. Default 200.",
+        "minimum": 1,
+        "default": 200
+      },
+      "refresh": {
+        "type": "boolean",
+        "description": "Browse the PLC again instead of using the cached list (after a download). Default false.",
+        "default": false
+      }
+    },
+    "additionalProperties": false
+  }
+}

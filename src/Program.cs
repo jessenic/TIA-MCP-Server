@@ -145,6 +145,8 @@ namespace TiaOpennessMcp
                 mcpServer.Run();
 
                 httpServer?.Stop();
+                // The S7CommPlus driver's receive thread keeps the process alive while a PLC connection is open.
+                PlcOnline.PlcOnlineManager.ShutdownIfOpen();
             }
             else
             {
@@ -158,6 +160,7 @@ namespace TiaOpennessMcp
                 };
                 exitEvent.WaitOne();
                 httpServer?.Stop();
+                PlcOnline.PlcOnlineManager.ShutdownIfOpen();
             }
         }
 

@@ -145,7 +145,7 @@ The `tia-portal-openness` skill instructs AI agents on standard operating proced
 
 ---
 
-## 4. Complete Tool Reference (114 Tools)
+## 4. Complete Tool Reference (120 Tools)
 
 ---
 

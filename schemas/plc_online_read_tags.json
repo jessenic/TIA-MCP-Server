@@ -1,0 +1,21 @@
+{
+  "name": "plc_online_read_tags",
+  "description": "Read current values from the connected PLC by full symbolic name (e.g. \u0027DB_Process.Level\u0027 or a PLC tag name). Returns value, data type and quality for each tag; names that cannot be resolved get an error without failing the others. At most 200 tags per call.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "tags": {
+        "type": "array",
+        "description": "Symbolic variable names as listed by plc_online_browse.",
+        "items": {
+          "type": "string",
+          "description": "Full symbolic name."
+        }
+      }
+    },
+    "required": [
+      "tags"
+    ],
+    "additionalProperties": false
+  }
+}

@@ -36,3 +36,24 @@ SOFTWARE.
 The documentation tools parse HTML with
 [HtmlAgilityPack](https://github.com/zzzprojects/html-agility-pack)
 (NuGet package, MIT License, Copyright (c) ZZZ Projects Inc.).
+
+## DotNetProjects.S7CommPlusDriver
+
+The online PLC tools (`src/PlcOnline/`, tools `plc_online_*`) use the
+[DotNetProjects.S7CommPlusDriver](https://github.com/dotnetprojects/S7CommPlusDriver)
+NuGet package (based on [thomas-v2/S7CommPlusDriver](https://github.com/thomas-v2/S7CommPlusDriver)),
+Copyright (c) 2025, DotNetProjects, Thomas Wiens, licensed under the
+[GNU Lesser General Public License v3.0 or later](https://www.gnu.org/licenses/lgpl-3.0.html).
+It is used unmodified as a separate library (`S7CommPlusDriver.dll`), which may be replaced
+with another compatible build. Its source code is available from the repository above.
+
+The package depends on, and the server ships:
+
+- [HarpoS7](https://github.com/bonk-dev/HarpoS7) and HarpoS7.PublicKeys (MIT License,
+  Copyright (c) 2024 bonk): S7CommPlus legacy challenge authentication.
+- [BouncyCastle.Cryptography](https://github.com/bcgit/bc-csharp) (MIT License,
+  Copyright (c) The Legion of the Bouncy Castle Inc.): TLS 1.3.
+- ZlibCore (`zlib.net.dll`, BSD-style licence, Copyright (c) ComponentAce and JCraft, Inc.).
+- Microsoft.Extensions.Logging.Abstractions (MIT License, Copyright (c) .NET Foundation).
+- OpenSSL 3 native libraries (`libssl-3-x64.dll`, `libcrypto-3-x64.dll`, Apache License 2.0),
+  copied by the package for its optional OpenSSL TLS backend; this server uses the BouncyCastle backend.

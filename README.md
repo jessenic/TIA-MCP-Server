@@ -220,6 +220,13 @@ runtime compiler verdict. Use runtime validation for final visual sign-off.
 - **No TIA Portal needed**: These tools need internet access only. Publications and tables of contents are cached in memory for 24 hours.
 - Ported to C# from [siemens-docs-mcp](https://github.com/Czarnak/siemens-docs-mcp) (MIT). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
+### 8. Online PLC Values (6 Tools)
+- **Read a running PLC**: `plc_online_connect`, `plc_online_list_datablocks`, `plc_online_browse` and `plc_online_read_tags` read current values from a real S7-1200 or S7-1500 over S7CommPlus by symbolic name (`DB_Process.Tank.LevelPct`, `DB_IO.Valves[2]`), including optimized data blocks. No TIA Portal, Openness or PLC configuration change is needed.
+- **Security**: projects from TIA Portal V17 or later use TLS (managed BouncyCastle, no OpenSSL needed); older projects use the legacy challenge login from [HarpoS7](https://github.com/bonk-dev/HarpoS7). The default `security_mode: "auto"` tries TLS first. A password is needed only if the CPU's protection level requires one for reading.
+- **Status**: `plc_online_get_status` shows the CPU name, order number, firmware, project TIA version and RUN/STOP state.
+- **Read-only by design**: the driver client is created with writes disabled, and there are no write or operating-state tools. One connection stays open across calls (`plc_online_disconnect` closes it).
+- Uses [DotNetProjects.S7CommPlusDriver](https://github.com/dotnetprojects/S7CommPlusDriver) (LGPL-3.0, NuGet, separate DLL). It and HarpoS7 are community projects based on protocol analysis, not Siemens products. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
 ---
 
 ## Figma to WinCC Unified Workflow
@@ -358,7 +365,7 @@ stateDiagram-v2
 
 ---
 
-## Complete Tools Reference Dictionary (114 Tools)
+## Complete Tools Reference Dictionary (120 Tools)
 
 | # | Tool Name | Category | Primary Parameters | Description |
 |:---:|:---|:---:|:---|:---|
@@ -477,6 +484,12 @@ stateDiagram-v2
 | 112 | `docs_read_page` | Siemens Docs | `url`, `mode`, `section`, `offset`, `max_chars`, `reference_format` | Read a documentation page as Markdown: whole, outline, chosen sections or code only. |
 | 113 | `docs_get_toc` | Siemens Docs | `url`, `depth`, `reference_format` | Table of contents of a publication or of a chapter. |
 | 114 | `docs_list_publications` | Siemens Docs | `title_contains`, `product`, `version`, `host`, `locale`, `reference_format` | List publications and the valid product and version filter values. |
+| 115 | `plc_online_connect` | PLC Online | `address`, `password`, `username`, `timeout_ms`, `security_mode` | Open a read-only S7CommPlus connection (TLS or legacy login) to a real S7-1200/S7-1500. |
+| 116 | `plc_online_get_status` | PLC Online | *(none)* | Connection state, security mode, CPU identity and firmware, RUN/STOP, last error. |
+| 117 | `plc_online_disconnect` | PLC Online | *(none)* | Close the online PLC connection. |
+| 118 | `plc_online_list_datablocks` | PLC Online | *(none)* | Data block numbers and names read from the PLC. |
+| 119 | `plc_online_browse` | PLC Online | `filter`, `offset`, `limit`, `refresh` | Variable names, data types and array bounds (DBs, inputs, outputs, memory), cached. |
+| 120 | `plc_online_read_tags` | PLC Online | `tags` | Current values, types and quality by symbolic name (max 200 per call). |
 
 ---
 
@@ -549,7 +562,15 @@ git clone https://github.com/dodup/TIA-MCP-Server.git
 cd TIA-MCP-Server\src
 dotnet build -c Release
 ```
-Output binary: `src\bin\Release\net48\TiaOpennessMcp.exe`.
+Output binary: `src\bin\Release\net48\TiaOpennessMcp.exe`. Deploy the whole output folder: the online PLC tools
+need the DLLs from the `DotNetProjects.S7CommPlusDriver` NuGet package next to the exe (`S7CommPlusDriver.dll`,
+`HarpoS7*.dll`, `BouncyCastle.Cryptography.dll`, `zlib.net.dll`, `Microsoft.Extensions.Logging.Abstractions.dll`).
+
+Run the online PLC tool checks (offline; `-Address` also runs read-only live tests against that PLC):
+```powershell
+.\scripts\Test-PlcOnline.ps1
+.\scripts\Test-PlcOnline.ps1 -Address 192.168.0.10
+```
 
 From the repository root, validate generated MCP schemas without connecting to TIA Portal:
 ```powershell
@@ -655,7 +676,7 @@ Open or create your Antigravity MCP configuration file at:
 *(Replace `C:\\path\\to\\TIA-MCP-Server\\release` with your actual absolute path using escaped backslashes `\\`)*.
 
 #### B. Tool Schema Registration (Lazy Loading)
-To enable Antigravity to lazy-load all 114 tools on demand, copy the JSON schemas from the repository's `schemas/` folder into your Antigravity MCP directory:
+To enable Antigravity to lazy-load all 120 tools on demand, copy the JSON schemas from the repository's `schemas/` folder into your Antigravity MCP directory:
 ```powershell
 New-Item -ItemType Directory -Path "$env:USERPROFILE\.gemini\antigravity\mcp\tia-portal-v21" -Force
 Copy-Item -Path ".\schemas\*.json" -Destination "$env:USERPROFILE\.gemini\antigravity\mcp\tia-portal-v21\" -Force
@@ -703,7 +724,7 @@ Launch Claude Code and check registered tools:
 claude
 > /mcp
 ```
-All 114 tools (`tia_*`, `hmi_*`, `plcsim_*`, `docs_*`) will appear in the active MCP tools list. You can immediately ask:
+All 120 tools (`tia_*`, `hmi_*`, `plcsim_*`, `docs_*`, `plc_online_*`) will appear in the active MCP tools list. You can immediately ask:
 > *"Inspect the device tree of the active PLC and compile the software."*
 
 ---
@@ -721,7 +742,7 @@ All 114 tools (`tia_*`, `hmi_*`, `plcsim_*`, `docs_*`) will appear in the active
   }
 }
 ```
-Restart Claude Desktop. The hammer icon (🛠️) in the input bar will display all 114 tools.
+Restart Claude Desktop. The hammer icon (🛠️) in the input bar will display all 120 tools.
 
 ---
 

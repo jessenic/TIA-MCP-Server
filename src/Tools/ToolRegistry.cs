@@ -2375,6 +2375,74 @@ namespace TiaOpennessMcp.Tools
                 });
 
             RegisterDocsTools();
+            RegisterPlcOnlineTools();
+        }
+
+        // Read-only online access to a real S7-1200/S7-1500 over S7CommPlus with TLS (TIA V17+ projects).
+        // No TIA Portal or Openness needed. There are deliberately no write or operating-state tools.
+        private void RegisterPlcOnlineTools()
+        {
+            const string requirement = "Works with S7-1200 and S7-1500 CPUs reachable on TCP port 102: TLS for projects from TIA Portal V17 or later, legacy challenge login for older ones; no TIA Portal needed. Read-only.";
+
+            Register("plc_online_connect",
+                "Connect to a real Siemens PLC over S7CommPlus to read online values. The connection stays open across calls until plc_online_disconnect. " + requirement,
+                schema =>
+                {
+                    schema.Properties["address"] = new ToolProperty { Type = "string", Description = "IP address or host name of the PLC, e.g. '192.168.0.10'." };
+                    schema.Properties["password"] = new ToolProperty { Type = "string", Description = "Optional PLC access-protection password; only needed when the CPU's protection level requires one for reading." };
+                    schema.Properties["username"] = new ToolProperty { Type = "string", Description = "Optional user name for CPUs using user management (TIA V19+); leave empty otherwise." };
+                    schema.Properties["timeout_ms"] = new ToolProperty { Type = "integer", Description = "Connection and response timeout in milliseconds, 1000-60000. Default 8000.", Default = 8000, Minimum = 1000 };
+                    schema.Properties["security_mode"] = new ToolProperty
+                    {
+                        Type = "string",
+                        Description = "'auto' (default: try TLS, fall back to legacy login), 'tls' (TIA V17+ projects only) or 'legacy' (TIA V16 and older).",
+                        Enum = new List<string> { "auto", "tls", "legacy" }
+                    };
+                    schema.Required = new List<string> { "address" };
+                },
+                args => CallToolResult.Json(PlcOnline.PlcOnlineManager.Instance.Connect(
+                    GetStringProp(args, "address") ?? throw new ArgumentException("address is required."),
+                    GetStringProp(args, "password"), GetStringProp(args, "username"),
+                    GetDocsInt(args, "timeout_ms", 8000), GetStringProp(args, "security_mode"))));
+
+            Register("plc_online_get_status", "Show whether an online PLC connection is open: address, TLS or legacy security, CPU name, order number and firmware, current operating state (RUN/STOP), browsed variable count and the last error.",
+                schema => { },
+                args => CallToolResult.Json(PlcOnline.PlcOnlineManager.Instance.GetStatus()));
+
+            Register("plc_online_disconnect", "Close the online PLC connection opened with plc_online_connect.",
+                schema => { },
+                args => CallToolResult.Json(PlcOnline.PlcOnlineManager.Instance.Disconnect()));
+
+            Register("plc_online_list_datablocks", "List the data blocks in the connected PLC (number and name), read online.",
+                schema => { },
+                args => CallToolResult.Json(PlcOnline.PlcOnlineManager.Instance.ListDatablocks()));
+
+            Register("plc_online_browse",
+                "List variables in the connected PLC with their data types: data block members ('DB_Name.Member.Sub'), inputs, outputs and memory. An array of a simple type is one row with its bounds in 'array'; read it whole by name or one element as 'Name[3]'. The full list is read once and cached until refresh is true; filter narrows it by name text. Use the names with plc_online_read_tags.",
+                schema =>
+                {
+                    schema.Properties["filter"] = new ToolProperty { Type = "string", Description = "Optional case-insensitive text the variable name must contain, e.g. 'DB_Process.' or 'Speed'." };
+                    schema.Properties["offset"] = new ToolProperty { Type = "integer", Description = "Rows to skip, for paging. Default 0.", Default = 0, Minimum = 0 };
+                    schema.Properties["limit"] = new ToolProperty { Type = "integer", Description = "Maximum rows, 1-1000. Default 200.", Default = 200, Minimum = 1 };
+                    schema.Properties["refresh"] = new ToolProperty { Type = "boolean", Description = "Browse the PLC again instead of using the cached list (after a download). Default false.", Default = false };
+                },
+                args => CallToolResult.Json(PlcOnline.PlcOnlineManager.Instance.Browse(
+                    GetStringProp(args, "filter"), GetDocsInt(args, "offset", 0), GetDocsInt(args, "limit", 200), GetBoolProp(args, "refresh", false))));
+
+            Register("plc_online_read_tags",
+                "Read current values from the connected PLC by full symbolic name (e.g. 'DB_Process.Level' or a PLC tag name). Returns value, data type and quality for each tag; names that cannot be resolved get an error without failing the others. At most 200 tags per call.",
+                schema =>
+                {
+                    schema.Properties["tags"] = new ToolProperty
+                    {
+                        Type = "array",
+                        Description = "Symbolic variable names as listed by plc_online_browse.",
+                        Items = new ToolProperty { Type = "string", Description = "Full symbolic name." }
+                    };
+                    schema.Required = new List<string> { "tags" };
+                },
+                args => CallToolResult.Json(PlcOnline.PlcOnlineManager.Instance.ReadTags(
+                    GetStringListProp(args, "tags") ?? throw new ArgumentException("tags is required."))));
         }
 
         // Siemens online documentation (docs.tia.siemens.cloud and docs.industrial-operations-x.siemens.cloud).

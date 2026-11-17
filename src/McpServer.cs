@@ -26,6 +26,17 @@ namespace TiaOpennessMcp
 
         public void Run()
         {
+            // Stdout carries only JSON-RPC. Libraries that print with Console.WriteLine (such as the
+            // S7CommPlus driver) would corrupt the protocol, so everything else goes to stderr.
+            lock (OutputLock)
+            {
+                if (_protocolOut == null)
+                {
+                    _protocolOut = Console.Out;
+                    Console.SetOut(Console.Error);
+                }
+            }
+
             Console.Error.WriteLine("[McpServer] Siemens TIA Portal V21 Openness MCP Server started.");
             Console.Error.WriteLine("[McpServer] Listening on stdio for JSON-RPC messages...");
 
@@ -184,8 +195,15 @@ namespace TiaOpennessMcp
         private void SendResponse(JsonRpcResponse response)
         {
             string json = JsonSerializer.Serialize(response, _jsonOptions);
-            Console.Out.WriteLine(json);
-            Console.Out.Flush();
+            lock (OutputLock)
+            {
+                var output = _protocolOut ?? Console.Out;
+                output.WriteLine(json);
+                output.Flush();
+            }
         }
+
+        private static readonly object OutputLock = new object();
+        private static System.IO.TextWriter? _protocolOut;
     }
 }

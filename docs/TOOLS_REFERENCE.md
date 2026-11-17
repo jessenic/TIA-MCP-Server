@@ -1,5 +1,5 @@
 # Siemens TIA Portal V21 Openness MCP Server
-## Complete Tools Reference Dictionary (114 Tools)
+## Complete Tools Reference Dictionary (120 Tools)
 
 **Protocol Specification:** Model Context Protocol (MCP) JSON-RPC 2.0  
 **Transport Binding:** HTTP (`POST /mcp`), SSE (`GET /sse`), stdio  
@@ -21,6 +21,7 @@
 | **7** | [Project, Library & Text Discovery](#category-7-project-library--text-discovery-6-tools) | 6 | `tia_list_global_libraries`, `tia_search_project_library_types`, `tia_list_project_faceplates`, `tia_get_library_type_instances`, `tia_list_project_text_categories`, `tia_download_project_texts` |
 | **8** | [PLC, Project & HMI Operations](#category-8-plc-project--hmi-operations-16-tools) | 16 | `tia_get_plc_tag_info`, `tia_read_user_constant`, `tia_get_tag_table_attributes`, `tia_create_plc_tag_table`, `tia_create_tagtable_group`, `tia_create_block_group`, `tia_create_user_constant`, `tia_update_user_constant`, `tia_create_project`, `hmi_create_screen_group`, `hmi_create_screen_under_group`, `hmi_create_tag_table`, `hmi_create_navigation_button`, `hmi_rename_screen`, `hmi_rename_screen_group`, `hmi_rename_tag_table` |
 | **9** | [Siemens Online Documentation](#category-9-siemens-online-documentation-4-tools) | 4 | `docs_search`, `docs_read_page`, `docs_get_toc`, `docs_list_publications` |
+| **10** | [Online PLC Values](#category-10-online-plc-values-6-tools) | 6 | `plc_online_connect`, `plc_online_get_status`, `plc_online_disconnect`, `plc_online_list_datablocks`, `plc_online_browse`, `plc_online_read_tags` |
 
 ## MCP Documentation Resources
 
@@ -1714,3 +1715,64 @@ Configuration: `docs.locale`, `docs.extraHosts` and `docs.minIntervalSeconds`
 in `config.json`, or the `SIEMENS_DOCS_LOCALE`, `SIEMENS_DOCS_HOSTS` and
 `SIEMENS_DOCS_MIN_INTERVAL` environment variables. Ported from
 [siemens-docs-mcp](https://github.com/Czarnak/siemens-docs-mcp) (MIT).
+
+---
+
+## Category 10: Online PLC Values (6 Tools)
+
+Read-only online access to a real S7-1200 or S7-1500 over S7CommPlus, by
+symbolic name, including optimized data blocks. No TIA Portal or Openness
+connection is needed.
+
+**Requirements and security.** The PLC must be reachable on TCP port 102.
+Projects from TIA Portal V17 or later (secure PG/HMI communication) use TLS
+through the managed BouncyCastle library; older projects use the legacy
+challenge login implemented by HarpoS7. `security_mode: "auto"` (default)
+tries TLS first and falls back to the legacy login. A password is needed only
+when the CPU's protection level requires one for reading. The driver client is
+created with writes disabled, and there are no write or operating-state tools.
+
+**Connection.** One connection is kept open across calls, like the TIA and
+PLCSIM connections, and reconnects automatically after short network drops. It
+is closed by `plc_online_disconnect`, by connecting to a different address, or
+when the server stops.
+
+### `plc_online_connect`
+- **Parameters:** `address` (required, IP or host name); optional `password`,
+  `username` (CPUs with user management), `timeout_ms` (1000-60000, default
+  8000), `security_mode` (`auto`, `tls`, `legacy`).
+- Connecting again to the same address reuses the open session.
+- **Response:** `{ message, connected, state, address, securityMode,
+  connectedAt, cpu: { plcName, projectName, orderNumber, firmware, tiaVersion },
+  browsedVariables, lastError }`.
+
+### `plc_online_get_status`
+- No parameters. Same shape as `plc_online_connect`, plus `operatingState`
+  (`Run`, `Stop`, `Startup`, ...) read live from the CPU.
+
+### `plc_online_disconnect`
+- No parameters; closes the connection.
+
+### `plc_online_list_datablocks`
+- **Response:** `{ address, count, datablocks: [{ number, name }] }`, sorted by number.
+
+### `plc_online_browse`
+- **Parameters:** optional `filter` (case-insensitive name text), `offset`,
+  `limit` (1-1000, default 200), `refresh` (browse the PLC again after a download).
+- The first call browses the whole PLC and caches the list for the connection.
+- **Response:** `{ total, offset, returned, nextOffset, variables: [{ name, type, array }] }`.
+  Names are full symbolic paths such as `DB_Process.Tank.LevelPct` or
+  `DB_Process.Sets[0].Filters[0].Id`. An array of a simple type is one row
+  whose `array` holds its declared bounds, e.g. `[0..3]`.
+
+### `plc_online_read_tags`
+- **Parameters:** `tags` (required, 1-200 symbolic names). An array can be read
+  whole by its name or one element as `Name[3]`.
+- **Response:** `{ address, readAt, tags: [{ name, type, quality, value }] }`.
+  Bool values are `true`/`false`, numbers are numbers, strings and chars are
+  strings, arrays are JSON arrays, `Time` is milliseconds. A name that cannot be
+  resolved, or a value the PLC refuses, gets an `error` field without failing
+  the other tags.
+
+Uses [DotNetProjects.S7CommPlusDriver](https://github.com/dotnetprojects/S7CommPlusDriver)
+(LGPL-3.0) with HarpoS7 and BouncyCastle; see `THIRD_PARTY_NOTICES.md`.

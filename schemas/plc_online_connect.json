@@ -1,0 +1,40 @@
+{
+  "name": "plc_online_connect",
+  "description": "Connect to a real Siemens PLC over S7CommPlus to read online values. The connection stays open across calls until plc_online_disconnect. Works with S7-1200 and S7-1500 CPUs reachable on TCP port 102: TLS for projects from TIA Portal V17 or later, legacy challenge login for older ones; no TIA Portal needed. Read-only.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "address": {
+        "type": "string",
+        "description": "IP address or host name of the PLC, e.g. \u0027192.168.0.10\u0027."
+      },
+      "password": {
+        "type": "string",
+        "description": "Optional PLC access-protection password; only needed when the CPU\u0027s protection level requires one for reading."
+      },
+      "username": {
+        "type": "string",
+        "description": "Optional user name for CPUs using user management (TIA V19\u002B); leave empty otherwise."
+      },
+      "timeout_ms": {
+        "type": "integer",
+        "description": "Connection and response timeout in milliseconds, 1000-60000. Default 8000.",
+        "minimum": 1000,
+        "default": 8000
+      },
+      "security_mode": {
+        "type": "string",
+        "description": "\u0027auto\u0027 (default: try TLS, fall back to legacy login), \u0027tls\u0027 (TIA V17\u002B projects only) or \u0027legacy\u0027 (TIA V16 and older).",
+        "enum": [
+          "auto",
+          "tls",
+          "legacy"
+        ]
+      }
+    },
+    "required": [
+      "address"
+    ],
+    "additionalProperties": false
+  }
+}

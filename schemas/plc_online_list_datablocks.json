@@ -1,0 +1,9 @@
+{
+  "name": "plc_online_list_datablocks",
+  "description": "List the data blocks in the connected PLC (number and name), read online.",
+  "parameters": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  }
+}

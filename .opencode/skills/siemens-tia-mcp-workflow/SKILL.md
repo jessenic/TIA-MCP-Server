@@ -22,6 +22,7 @@ instructions before acting, and use the live MCP tool descriptions for arguments
 | Recreate or adapt a Figma design into a WinCC Unified screen | `siemens-figma-to-wincc-unified`; also read `siemens-hmi-json` only if the user explicitly requests JSON export/import/patch work |
 | Connect to S7-PLCSIM, inspect or write simulated tags, control the virtual CPU, or run an online sequence verification | `siemens-plcsim-sequence-tester` |
 | Look up how a Siemens API, system function, SCL instruction, or setting works in the official documentation | This skill, section 5 below (no TIA connection needed) |
+| Read current values from a running real PLC (not PLCSIM) by IP address | This skill, section 6 below (read-only, no TIA connection needed) |
 
 OpenCode skill files are located at
 `.opencode/skills/siemens-<skill-name>/SKILL.md`. Compatible agent skills remain
@@ -98,3 +99,25 @@ sure about, and when a compile or import error names an API you do not know.
 Quote what the documentation says and cite the reference; if the documentation
 and the server's own tool descriptions disagree, report the difference instead
 of guessing.
+
+## 6. Read online values from a real PLC
+
+The `plc_online_*` tools read live values from a real S7-1200 or S7-1500 over
+S7CommPlus. They need only the PLC's IP address, not TIA Portal, and are
+read-only: there is no way to write values or change the operating state with
+them. For S7-PLCSIM Advanced use the `plcsim_*` tools instead.
+
+1. `plc_online_connect` with the `address` the user gave. Pass `password` only
+   if the user provides one or the connection fails for access protection; never
+   guess passwords. Check `plc_online_get_status` for the CPU identity and
+   RUN/STOP state and confirm it is the PLC the user meant.
+2. Find exact names with `plc_online_list_datablocks` and `plc_online_browse`
+   (`filter` by data block or member name). Do not guess symbol names.
+3. `plc_online_read_tags` with up to 200 full names per call. Read arrays whole
+   or as `Name[3]`. Report each value with its quality; a `bad` quality or an
+   `error` means the value is not known.
+4. Leave the connection open for follow-up reads; `plc_online_disconnect` only
+   when the user is done or wants another PLC.
+
+Values are a snapshot at `readAt`. A production PLC may be controlling a live
+process: say so if a value looks unexpected rather than suggesting changes.

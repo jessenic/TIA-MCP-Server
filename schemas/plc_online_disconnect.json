@@ -1,0 +1,9 @@
+{
+  "name": "plc_online_disconnect",
+  "description": "Close the online PLC connection opened with plc_online_connect.",
+  "parameters": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  }
+}

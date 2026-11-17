@@ -1,0 +1,9 @@
+{
+  "name": "plc_online_get_status",
+  "description": "Show whether an online PLC connection is open: address, TLS or legacy security, CPU name, order number and firmware, current operating state (RUN/STOP), browsed variable count and the last error.",
+  "parameters": {
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+  }
+}
