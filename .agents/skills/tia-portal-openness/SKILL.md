@@ -14,7 +14,7 @@ This skill guides AI agents on controlling and automating Siemens TIA Portal V21
 ## 1. Architecture & Connection Management
 
 The TIA Openness MCP server operates as a persistent daemon process maintaining an open connection to Siemens TIA Portal (`connexion must stay`):
-- **Configuration**: Loaded from `config.json` (host, port default `5001`, mode `HttpAndStdio`, `autoConnect: true`).
+- **Configuration**: Loaded from `config.json` (host, port default `5001`, mode `HttpAndStdio`). The server never attaches to TIA Portal on its own: call `tia_list_processes`, then `tia_connect` with a `process_id`.
 - **Persistence**: Because TIA Openness instances and projects take time to initialize, the connection stays alive continuously across agent turns.
 - **Transports**:
   - Direct HTTP JSON-RPC endpoint: `POST http://localhost:5001/mcp`

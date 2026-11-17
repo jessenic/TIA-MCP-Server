@@ -1,7 +1,7 @@
 # Siemens TIA Portal V21 Openness MCP Server
 ## Complete Skills & Tools Reference Manual
 
-**Version:** 2.10.0
+**Version:** 2.10.1
 **Target Platform:** Siemens TIA Portal V21 (PublicAPI .NET Framework 4.8 x64)  
 **Supported Transports:** HTTP JSON-RPC 2.0, Server-Sent Events (SSE), stdio MCP  
 **Default Endpoints:** `http://localhost:5001/mcp`, `http://localhost:5001/sse`, `http://localhost:5001/status`
@@ -36,7 +36,7 @@ Read these through the MCP resource interface. Live tool schemas remain authorit
  |  [ServerConfig]              [HttpMcpServer]              [McpServer]          |
  |  - config.json               - Multi-client SSE Sessions  - stdio framing      |
  |  - Host:Port / Mode          - POST /rpc, POST /mcp       - stderr logging     |
- |  - AutoConnect & PID         - GET /status health check                        |
+ |  - Explicit PID attach       - GET /status health check                        |
  |                                                                                |
  |  [TiaManager Singleton]                                                        |
  |  - Holds live Openness COM object references (TiaPortal, Project)              |
@@ -74,8 +74,6 @@ The server reads configuration from `config.json` located in its working or exec
     "enableCors": true
   },
   "tia": {
-    "autoConnect": true,
-    "preferredProcessId": 16028,
     "keepAliveConnection": true,
     "apiPath": "C:\\Program Files\\Siemens\\Automation\\Portal V21\\PublicAPI\\V21\\net48"
   }
@@ -89,8 +87,7 @@ The server reads configuration from `config.json` located in its working or exec
   - `"Http"`: Standalone daemon serving HTTP/SSE only.
   - `"Stdio"`: Classic MCP stdio server only.
 - **`server.enableCors`** *(bool)*: Emits CORS headers (`*`) on all HTTP responses for web/agent browser access.
-- **`tia.autoConnect`** *(bool)*: Automatically attaches to a running TIA Portal instance on startup.
-- **`tia.preferredProcessId`** *(int?)*: Target PID to attach to when multiple instances are running.
+- **`tia.autoConnect`**, **`tia.preferredProcessId`**: obsolete and ignored. The server never attaches on its own (a busy TIA Portal, such as one running a firmware update, would otherwise stall the MCP handshake); clients call `tia_connect` with a `process_id`.
 - **`tia.keepAliveConnection`** *(bool)*: Retains project instance across all client sessions.
 - **`docs.locale`** *(string)*: Default locale for the `docs_*` tools (default: `"en-US"`).
 - **`docs.extraHosts`** *(string[])*: Extra Fluid Topics documentation hosts, added after `docs.tia.siemens.cloud` and `docs.industrial-operations-x.siemens.cloud`.
@@ -174,9 +171,9 @@ The `tia-portal-openness` skill instructs AI agents on standard operating proced
 - **Returns:** Array of process objects (`Id`, `ProjectPath`, `ProjectName`, `Mode`).
 
 #### 3. `tia_connect`
-- **Description:** Attach the MCP server to a running TIA Portal instance. If `process_id` is omitted, attaches to the first available instance.
+- **Description:** Attach the MCP server to the running TIA Portal instance with this PID (from `tia_list_processes`). The server never attaches on its own.
 - **Input Parameters:**
-  - `process_id` *(integer, optional)*: PID of the TIA Portal instance.
+  - `process_id` *(integer, required)*: PID of the TIA Portal instance.
 - **Sample Invocation:**
   ```json
   { "process_id": 16028 }

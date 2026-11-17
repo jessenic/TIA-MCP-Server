@@ -59,7 +59,8 @@ namespace TiaOpennessMcp
                         return;
 
                     case "--test":
-                        RunSelfTest();
+                        int? testPid = (i + 1 < args.Length && int.TryParse(args[i + 1], out int tp)) ? tp : (int?)null;
+                        RunSelfTest(testPid);
                         return;
 
                     case "--run-sequence-test":
@@ -104,21 +105,15 @@ namespace TiaOpennessMcp
                 config.Server.Host = $"http://localhost:{cliPort.Value}/";
             }
             if (!string.IsNullOrEmpty(cliMode)) config.Server.Mode = cliMode!;
-            if (cliPid.HasValue) config.Tia.PreferredProcessId = cliPid;
 
-            // Auto-connect to TIA Portal if configured
-            if (config.Tia.AutoConnect)
+            // The server never attaches to TIA Portal on its own. Attaching blocks while the TIA Portal
+            // instance is busy (a modal dialog, a firmware update, a long compile), and at startup that
+            // would stall the MCP handshake until the client times out. A client attaches explicitly with
+            // tia_list_processes + tia_connect(process_id).
+            if (config.Tia.AutoConnect || config.Tia.PreferredProcessId is > 0 || cliPid.HasValue)
             {
-                try
-                {
-                    Console.Error.WriteLine("[Program] Auto-connecting to TIA Portal Openness...");
-                    var conn = TiaManager.Instance.Connect(config.Tia.PreferredProcessId);
-                    Console.Error.WriteLine($"[Program] Connect status: {conn.Message}");
-                }
-                catch (Exception ex)
-                {
-                    Console.Error.WriteLine($"[Program] AutoConnect warning: {ex.Message}");
-                }
+                Console.Error.WriteLine("[Program] Tia.AutoConnect, Tia.PreferredProcessId and --pid are ignored: " +
+                    "attach with tia_connect and an explicit process_id.");
             }
 
             TiaOpennessMcp.Docs.DocsTools.Configure(config.Docs);
@@ -200,9 +195,9 @@ namespace TiaOpennessMcp
             Console.WriteLine("  TiaOpennessMcp.exe --http              Run as standalone HTTP/SSE server");
             Console.WriteLine("  TiaOpennessMcp.exe --stdio             Run as stdio MCP server");
             Console.WriteLine("  TiaOpennessMcp.exe --port 5001         Expose on custom port");
-            Console.WriteLine("  TiaOpennessMcp.exe --pid 1512          Connect to specific TIA PID");
             Console.WriteLine("  TiaOpennessMcp.exe --config mycfg.json Load specific config file");
-            Console.WriteLine("  TiaOpennessMcp.exe --test              Run quick connection test");
+            Console.WriteLine("  TiaOpennessMcp.exe --test [pid]        List TIA instances; attach to <pid> if given");
+            Console.WriteLine("  (The server never attaches on its own; clients call tia_connect with a process_id.)");
             Console.WriteLine("  TiaOpennessMcp.exe --run-sequence-test [report.md] Run online mixing sequence verification tests");
             Console.WriteLine("  TiaOpennessMcp.exe --export-schemas    Export tool JSON schemas");
             Console.WriteLine("  TiaOpennessMcp.exe --render-hmi INPUT --output OUTPUT [--screen GROUP/NAME] [--language en-US] [--scale 2]");
@@ -210,7 +205,7 @@ namespace TiaOpennessMcp
             Console.WriteLine("  TiaOpennessMcp.exe --help              Show this help message");
         }
 
-        static void RunSelfTest()
+        static void RunSelfTest(int? testPid)
         {
             Console.WriteLine("=== TIA Portal Openness V21 Self-Test ===");
             var procs = TiaManager.Instance.ListProcesses();
@@ -226,8 +221,14 @@ namespace TiaOpennessMcp
                 return;
             }
 
-            Console.WriteLine("\nConnecting to first instance...");
-            var conn = TiaManager.Instance.Connect();
+            if (testPid is not int pid)
+            {
+                Console.WriteLine("\nNot attaching: pass a PID from the list above (--test <pid>) to attach to that instance.");
+                return;
+            }
+
+            Console.WriteLine($"\nAttaching to PID {pid}...");
+            var conn = TiaManager.Instance.Connect(pid);
             Console.WriteLine($"Success: {conn.Success}, Message: {conn.Message}");
 
             if (conn.Success)

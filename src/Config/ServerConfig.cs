@@ -81,7 +81,9 @@ namespace TiaOpennessMcp.Config
 
     public class TiaSettings
     {
-        public bool AutoConnect { get; set; } = true;
+        /// <summary>Obsolete and ignored: the server only attaches through tia_connect with an explicit process_id.</summary>
+        public bool AutoConnect { get; set; } = false;
+        /// <summary>Obsolete and ignored: pass process_id to tia_connect instead.</summary>
         public int? PreferredProcessId { get; set; } = null;
         public bool KeepAliveConnection { get; set; } = true;
         public string ApiPath { get; set; } = @"C:\Program Files\Siemens\Automation\Portal V21\PublicAPI\V21\net48";

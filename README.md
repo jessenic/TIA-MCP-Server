@@ -4,7 +4,7 @@
 [![Simulation](https://img.shields.io/badge/Simulation-S7--PLCSIM%20Advanced%20V8.0-008080.svg)](https://support.industry.siemens.com)
 [![Protocol](https://img.shields.io/badge/MCP-2024--11--05-blue.svg)](https://modelcontextprotocol.io)
 [![Runtime](https://img.shields.io/badge/.NET%20Framework-4.8%20x64-512BD4.svg)](https://dotnet.microsoft.com)
-[![Version](https://img.shields.io/badge/Version-v2.10.0-blue.svg)](#version-history--bug-fixes)
+[![Version](https://img.shields.io/badge/Version-v2.10.1-blue.svg)](#version-history--bug-fixes)
 [![Tools](https://img.shields.io/badge/Tools-110%20Registered-brightgreen.svg)](#complete-tools-reference-dictionary-110-tools)
 [![License](https://img.shields.io/badge/License-MIT-orange.svg)](LICENSE)
 
@@ -29,7 +29,7 @@ Equipped with **110 specialized industrial automation tools**, this server bridg
  |                                                                                       |
  |  [ServerConfig]                 [HttpMcpServer]              [McpServer]              |
  |  - config.json (Host/Port)      - Multi-client SSE Sessions  - stdio framing          |
- |  - AutoConnect & PID binding    - POST /mcp & /status        - stderr logging         |
+ |  - Explicit PID attach only     - POST /mcp & /status        - stderr logging         |
  |                                                                                       |
  |  [TiaManager Singleton]                     [PlcSimManager Singleton]                 |
  |  - Persistent COM connection                - S7-PLCSIM Advanced API V8.0             |
@@ -814,6 +814,11 @@ This repository includes 3 turnkey agent skills located in `.agents/skills/`:
 ---
 
 ## Version History & Bug Fixes
+
+### [v2.10.1] - 2026-11-17
+* The server no longer attaches to TIA Portal on its own: not at startup and not when a project tool runs unattached. Attaching to a busy TIA Portal (for example one running a firmware update) blocked the MCP handshake until the client timed out. Call `tia_list_processes`, then `tia_connect` with a `process_id` (now required; no fallback to another instance).
+* `tia.autoConnect`, `tia.preferredProcessId` and `--pid` are ignored. `--test [pid]` attaches only to the given PID.
+* Updated the reported MCP server version and assembly metadata to v2.10.1.
 
 ### [v2.10.0] - 2026-11-16
 * Added Siemens online documentation tools (`docs_search`, `docs_read_page`, `docs_get_toc`, `docs_list_publications`) for the TIA Portal, STEP 7, WinCC Unified, Openness and PLCSIM documentation; they need internet access but no TIA connection.

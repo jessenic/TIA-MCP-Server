@@ -59,33 +59,27 @@ namespace TiaOpennessMcp.Tia
             return list;
         }
 
-        public ConnectionResult Connect(int? processId = null)
+        /// <summary>
+        /// Attaches to the TIA Portal instance with exactly this process ID. There is no fallback to another
+        /// instance: attaching is only ever done on an explicit request for a specific process.
+        /// </summary>
+        public ConnectionResult Connect(int processId)
         {
             try
             {
                 var processes = TiaPortal.GetProcesses();
-                if (processes.Count == 0)
+                var target = processes.FirstOrDefault(p => p.Id == processId);
+                if (target == null)
                 {
+                    var running = processes.Count == 0
+                        ? "No TIA Portal instances are running."
+                        : "Running instances: " + string.Join(", ", processes.Select(p =>
+                            $"PID {p.Id}" + (p.ProjectPath != null ? $" ({Path.GetFileNameWithoutExtension(p.ProjectPath.FullName)})" : "")));
                     return new ConnectionResult
                     {
                         Success = false,
-                        Message = "No running TIA Portal instances found. Please start TIA Portal V21 with your project open."
+                        Message = $"No TIA Portal instance with PID {processId}. {running} Call tia_list_processes and pass one of those PIDs."
                     };
-                }
-
-                TiaPortalProcess? target = null;
-                if (processId.HasValue && processId.Value > 0)
-                {
-                    target = processes.FirstOrDefault(p => p.Id == processId.Value);
-                    if (target == null)
-                    {
-                        Console.Error.WriteLine($"[TiaManager] Preferred PID {processId.Value} not found, falling back to process with active project...");
-                    }
-                }
-
-                if (target == null)
-                {
-                    target = processes.FirstOrDefault(p => p.ProjectPath != null) ?? processes[0];
                 }
 
                 Disconnect();
@@ -1187,12 +1181,10 @@ namespace TiaOpennessMcp.Tia
         {
             if (_tiaPortal == null || _project == null)
             {
-                // Attempt automatic reconnect if instance is running
-                var result = Connect();
-                if (!result.Success || _project == null)
-                {
-                    throw new InvalidOperationException("No TIA Portal project is currently connected. Call 'tia_connect' first.");
-                }
+                // No implicit attach: the client decides which TIA Portal process to attach to, and when.
+                throw new InvalidOperationException(_tiaPortal == null
+                    ? "Not attached to TIA Portal. Call tia_list_processes, then tia_connect with the process_id of the instance to use."
+                    : "The attached TIA Portal instance has no open project. Open one (tia_open_project) or attach to another instance with tia_connect.");
             }
         }
 

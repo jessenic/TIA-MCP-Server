@@ -58,23 +58,29 @@ namespace TiaOpennessMcp.Tools
         private void RegisterAllTools()
         {
             // 1. tia_list_processes
-            Register("tia_list_processes", "List all running Siemens TIA Portal instances on the machine with PID, open project path, and mode.",
+            Register("tia_list_processes", "List all running Siemens TIA Portal instances on the machine with PID, open project name and path, and mode. " +
+                "Does not attach, so it is safe while an instance is busy. Pick the instance whose ProjectPath is the project you are working on " +
+                "(ask the user when several match or none does), then call tia_connect with its Id as process_id.",
                 schema => { },
                 args => CallToolResult.Json(TiaManager.Instance.ListProcesses()));
 
             // 2. tia_connect
-            Register("tia_connect", "Connect/attach to a running TIA Portal instance. If process_id is omitted, connects to the first running instance.",
+            Register("tia_connect", "Attach to one running TIA Portal instance by its process ID (from tia_list_processes). " +
+                "The server never attaches on its own, so call this before any project tool. Attaching can block while that TIA Portal " +
+                "instance is busy with a modal dialog (for example a firmware update); pick an idle instance or wait.",
                 schema =>
                 {
                     schema.Properties["process_id"] = new ToolProperty
                     {
                         Type = "integer",
-                        Description = "Process ID (PID) of the TIA Portal instance to attach to (optional)."
+                        Description = "Process ID (PID) of the TIA Portal instance to attach to, as listed by tia_list_processes."
                     };
+                    schema.Required = new List<string> { "process_id" };
                 },
                 args =>
                 {
-                    int? pid = GetIntProp(args, "process_id");
+                    int pid = GetIntProp(args, "process_id")
+                        ?? throw new ArgumentException("process_id is required. Call tia_list_processes to see the running TIA Portal instances.");
                     var res = TiaManager.Instance.Connect(pid);
                     return CallToolResult.Json(res, isError: !res.Success);
                 });

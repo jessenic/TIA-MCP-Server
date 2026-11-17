@@ -8,8 +8,6 @@
     "logHttpRequestDetails": false
   },
   "tia": {
-    "autoConnect": false,
-    "preferredProcessId": 0,
     "keepAliveConnection": true,
     "apiPath": "C:\\Program Files\\Siemens\\Automation\\Portal V21\\PublicAPI\\V21\\net48"
   }

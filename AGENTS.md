@@ -7,7 +7,7 @@ These rules define the required behavioral guardrails, API constraints, and engi
 ## 1. Connection Persistence ("connexion must stay")
 - **Never Tear Down Connections**: TIA Portal Openness (`TiaPortal`, `Project`) and S7-PLCSIM Advanced (`IInstance`) COM objects are heavy resources. Keep connections alive across all turns and tool calls inside the `TiaManager` and `PlcSimManager` singletons.
 - **Check Status First**: Always call `tia_get_status` and/or `plcsim_get_status` before initiating project operations or test runs to verify active connection and CPU operating state.
-- **Auto-Attach**: If disconnected, auto-attach to the active process PID or `PLC_1` rather than launching redundant instances.
+- **Explicit Attach Only**: The server never attaches to TIA Portal on its own (not at startup, not on a project tool call). Call `tia_list_processes`, then `tia_connect` with the `process_id` of the instance to use. Attaching blocks while that instance is busy with a modal dialog (for example a firmware update), so never attach to a busy instance.
 
 ---
 

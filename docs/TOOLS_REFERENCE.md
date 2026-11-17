@@ -86,11 +86,11 @@ The bundled Openness assemblies cover authoring APIs, not the complete WinCC Uni
 ---
 
 ### 3. `tia_connect`
-- **Description:** Attaches the server to a running TIA Portal process. If `process_id` is omitted, attaches to the first running instance found.
+- **Description:** Attaches the server to the running TIA Portal process with this PID (from `tia_list_processes`). There is no fallback to another instance, and the server never attaches on its own.
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
   | :--- | :---: | :---: | :---: | :--- |
-  | `process_id` | integer | No | null | Target TIA Portal process ID (PID). |
+  | `process_id` | integer | Yes | - | Target TIA Portal process ID (PID). |
 - **Request Example:**
   ```json
   {
