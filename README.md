@@ -4,8 +4,8 @@
 [![Simulation](https://img.shields.io/badge/Simulation-S7--PLCSIM%20Advanced%20V8.0-008080.svg)](https://support.industry.siemens.com)
 [![Protocol](https://img.shields.io/badge/MCP-2024--11--05-blue.svg)](https://modelcontextprotocol.io)
 [![Runtime](https://img.shields.io/badge/.NET%20Framework-4.8%20x64-512BD4.svg)](https://dotnet.microsoft.com)
-[![Version](https://img.shields.io/badge/Version-v2.10.1-blue.svg)](#version-history--bug-fixes)
-[![Tools](https://img.shields.io/badge/Tools-110%20Registered-brightgreen.svg)](#complete-tools-reference-dictionary-110-tools)
+[![Version](https://img.shields.io/badge/Version-v2.11.0-blue.svg)](#version-history--bug-fixes)
+[![Tools](https://img.shields.io/badge/Tools-120%20Registered-brightgreen.svg)](#complete-tools-reference-dictionary-120-tools)
 [![License](https://img.shields.io/badge/License-MIT-orange.svg)](LICENSE)
 
 A high-performance, persistent **Model Context Protocol (MCP)** server providing AI coding agents (such as **Google Antigravity**, **Claude Desktop**, **Cursor**, and **VS Code**) with direct programmatic control over **Siemens TIA Portal V21** and **S7-PLCSIM Advanced V8.0**.
@@ -835,6 +835,11 @@ This repository includes 3 turnkey agent skills located in `.agents/skills/`:
 ---
 
 ## Version History & Bug Fixes
+
+### [v2.11.0] - 2026-11-17
+* Added read-only online PLC value tools (`plc_online_connect`, `plc_online_get_status`, `plc_online_disconnect`, `plc_online_list_datablocks`, `plc_online_browse`, `plc_online_read_tags`): read current values from a real S7-1200/S7-1500 over S7CommPlus by symbolic name, without TIA Portal. TLS for TIA V17+ projects, HarpoS7 legacy login for older ones (DotNetProjects.S7CommPlusDriver, LGPL-3.0). No write or operating-state tools.
+* Stdout now carries only JSON-RPC messages; other console output goes to stderr. An open PLC connection is closed when the server stops.
+* Updated the reported MCP server version and assembly metadata to v2.11.0.
 
 ### [v2.10.1] - 2026-11-17
 * The server no longer attaches to TIA Portal on its own: not at startup and not when a project tool runs unattached. Attaching to a busy TIA Portal (for example one running a firmware update) blocked the MCP handshake until the client timed out. Call `tia_list_processes`, then `tia_connect` with a `process_id` (now required; no fallback to another instance).
