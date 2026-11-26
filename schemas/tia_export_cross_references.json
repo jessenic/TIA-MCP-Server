@@ -1,0 +1,45 @@
+{
+  "name": "tia_export_cross_references",
+  "description": "Write the PLC cross-reference table (CrossReferenceService) of blocks and PLC tags to a JSONL file: one line per reference with source object and address, the referenced object (reference), location, access (Read/Write) and referenceType (Uses/UsedBy/...).",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "output_path": {
+        "type": "string",
+        "description": "Full path of the .jsonl file to write (replaced if it exists)."
+      },
+      "plc_name": {
+        "type": "string",
+        "description": "Exact PLC software name; required when the project has multiple PLCs."
+      },
+      "object_names": {
+        "type": "array",
+        "description": "Optional block or PLC tag names to limit the export.",
+        "items": {
+          "type": "string",
+          "description": ""
+        }
+      },
+      "filter": {
+        "type": "string",
+        "description": "Cross-reference filter (default: objects_with_references).",
+        "enum": [
+          "objects_with_references",
+          "all_objects",
+          "objects_without_references",
+          "unused_objects"
+        ],
+        "default": "objects_with_references"
+      },
+      "include_tags": {
+        "type": "boolean",
+        "description": "Include the PLC tags of all tag tables (default: true).",
+        "default": true
+      }
+    },
+    "required": [
+      "output_path"
+    ],
+    "additionalProperties": false
+  }
+}

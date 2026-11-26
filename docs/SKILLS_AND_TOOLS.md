@@ -145,7 +145,7 @@ The `tia-portal-openness` skill instructs AI agents on standard operating proced
 
 ---
 
-## 4. Complete Tool Reference (120 Tools)
+## 4. Complete Tool Reference (139 Tools)
 
 ---
 
@@ -790,6 +790,12 @@ project here. Use the per-case plans:
 [project creation](./plans/MCP_TOOL_TEST_PLAN_PROJECT_MUTATIONS.md),
 [HMI structure](./plans/MCP_TOOL_TEST_PLAN_HMI_STRUCTURE.md), and
 [HMI navigation buttons](./plans/MCP_TOOL_TEST_PLAN_HMI_NAVIGATION.md).
+
+### Category 11: Hardware Configuration, Networks & Project Backup (19 Tools)
+- **Devices and modules:** `tia_find_module_types`, `tia_create_device`, `tia_list_plug_locations`, `tia_plug_module`, `tia_rename_hardware`, `tia_delete_hardware`, `tia_get_io_addresses`. Creation and plugging preview by default (`dry_run`); deletion needs `confirm=true`.
+- **PROFINET:** `tia_list_network`, `tia_create_subnet`, `tia_connect_to_subnet`, `tia_create_io_system`, `tia_connect_to_io_system`, `tia_set_network_node`.
+- **Exchange and backup:** `tia_export_aml`, `tia_import_aml` (preview by default), `tia_export_project_files` (stable files for Git), `tia_archive_project`, `tia_retrieve_project`, `tia_export_cross_references` (JSONL).
+- GSD/GSDML files cannot be installed through Openness V21; install them in TIA Portal first. See `tia://docs/tools-reference`, Category 11.
 
 ---
 

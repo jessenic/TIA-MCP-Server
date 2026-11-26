@@ -1,0 +1,26 @@
+{
+  "name": "tia_export_aml",
+  "description": "Export hardware configuration as CAx/AutomationML (.aml) with CaxProvider.Export, for the whole project or one device. Siemens drives (Startdrive) and most HMI devices are not included by Siemens CAx; GSDML IO devices such as third-party drives are.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "output_path": {
+        "type": "string",
+        "description": "Full path of the .aml file to write."
+      },
+      "device_name": {
+        "type": "string",
+        "description": "Optional device to export; omit for the whole project."
+      },
+      "overwrite": {
+        "type": "boolean",
+        "description": "Replace an existing file (default: false).",
+        "default": false
+      }
+    },
+    "required": [
+      "output_path"
+    ],
+    "additionalProperties": false
+  }
+}

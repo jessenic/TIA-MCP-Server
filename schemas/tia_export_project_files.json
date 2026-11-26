@@ -1,0 +1,36 @@
+{
+  "name": "tia_export_project_files",
+  "description": "Export the project to a folder for version control: per PLC all blocks (SimaticML .xml, plus .scl source for SCL blocks), UDTs, PLC tag tables, watch and force tables, and the hardware as AML. Layout: plc/\u003CPLC\u003E/{blocks,types,tags,watch,force}/\u003Cgroup path\u003E/\u003Cname\u003E.xml, hardware/project.aml, tia-export.json (sorted file list, no timestamps). Unchanged files are left untouched and files of deleted objects are removed (remove_stale), so Git diffs stay small. Inconsistent or know-how protected blocks are reported as errors.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "output_directory": {
+        "type": "string",
+        "description": "Folder to export into (created if missing), e.g. the \u0027tia-export\u0027 folder of the project repository."
+      },
+      "plc_name": {
+        "type": "string",
+        "description": "Optional PLC software name; omit for all PLCs."
+      },
+      "include_hardware": {
+        "type": "boolean",
+        "description": "Also export hardware/project.aml (default: true).",
+        "default": true
+      },
+      "include_scl": {
+        "type": "boolean",
+        "description": "Also write .scl sources for SCL blocks (default: true).",
+        "default": true
+      },
+      "remove_stale": {
+        "type": "boolean",
+        "description": "Delete files listed in the previous tia-export.json that were not exported now (default: true).",
+        "default": true
+      }
+    },
+    "required": [
+      "output_directory"
+    ],
+    "additionalProperties": false
+  }
+}

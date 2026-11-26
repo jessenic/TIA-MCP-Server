@@ -1,0 +1,35 @@
+{
+  "name": "tia_archive_project",
+  "description": "Archive the open project to a compressed .zap21 file (Project.Archive). The project must be saved; existing archive files are never overwritten.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "target_directory": {
+        "type": "string",
+        "description": "Folder for the archive (created if missing)."
+      },
+      "file_name": {
+        "type": "string",
+        "description": "Optional file name; default \u0027\u003Cproject\u003E_\u003CyyyyMMdd_HHmm\u003E.zap21\u0027."
+      },
+      "mode": {
+        "type": "string",
+        "description": "Archive mode (default: compressed). Only compressed archives can be retrieved.",
+        "enum": [
+          "compressed",
+          "discard_restorable_data_and_compressed"
+        ],
+        "default": "compressed"
+      },
+      "save_first": {
+        "type": "boolean",
+        "description": "Save unsaved changes before archiving (default: false = refuse).",
+        "default": false
+      }
+    },
+    "required": [
+      "target_directory"
+    ],
+    "additionalProperties": false
+  }
+}

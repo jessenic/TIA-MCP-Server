@@ -1,0 +1,26 @@
+{
+  "name": "tia_connect_to_subnet",
+  "description": "Connect a device\u0027s network interface node to a subnet (Node.ConnectToSubnet).",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "device_name": {
+        "type": "string",
+        "description": "Exact device (station) name as listed by tia_list_devices, e.g. \u0027PLC_1\u0027 or \u0027ACS480_1\u0027."
+      },
+      "interface_path": {
+        "type": "string",
+        "description": "Device-item path of the network interface; omit when the device has only one Ethernet interface."
+      },
+      "subnet_name": {
+        "type": "string",
+        "description": "Exact subnet name from tia_list_network."
+      }
+    },
+    "required": [
+      "device_name",
+      "subnet_name"
+    ],
+    "additionalProperties": false
+  }
+}

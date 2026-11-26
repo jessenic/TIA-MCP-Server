@@ -1,0 +1,31 @@
+{
+  "name": "tia_create_device",
+  "description": "Create a device (station) from a catalog type identifier with Devices.CreateWithItem, e.g. \u0027OrderNumber:6ES7 214-1AG40-0XB0/V4.6\u0027 for a CPU or \u0027GSD:\u003Cgsdml file\u003E/DAP/\u003Cid\u003E\u0027 for a GSDML IO device such as a drive\u0027s fieldbus adapter. Fails if the device name already exists. dry_run=true (default) only validates the name and checks the type in the catalog.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "type_identifier": {
+        "type": "string",
+        "description": "Complete type identifier of the head module (from tia_find_module_types or the TIA catalog \u0027Article number\u0027/version)."
+      },
+      "device_item_name": {
+        "type": "string",
+        "description": "Name of the created head device item, e.g. \u0027PLC_1\u0027."
+      },
+      "device_name": {
+        "type": "string",
+        "description": "Optional station name; TIA generates one when omitted."
+      },
+      "dry_run": {
+        "type": "boolean",
+        "description": "Validate without creating (default: true).",
+        "default": true
+      }
+    },
+    "required": [
+      "type_identifier",
+      "device_item_name"
+    ],
+    "additionalProperties": false
+  }
+}

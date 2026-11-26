@@ -1,0 +1,32 @@
+{
+  "name": "tia_import_aml",
+  "description": "Import hardware from a CAx/AutomationML (.aml) file with CaxProvider.Import. dry_run=true (default) lists the AML devices and name conflicts without changing the project. The import cannot be undone through Openness; archive the project first (tia_archive_project).",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "aml_path": {
+        "type": "string",
+        "description": "Full path of the .aml file."
+      },
+      "conflict_option": {
+        "type": "string",
+        "description": "What to do with devices whose names exist: move_to_parking_lot (default, keeps both), retain_tia_device (skip AML one) or overwrite_tia_device (replace).",
+        "enum": [
+          "move_to_parking_lot",
+          "retain_tia_device",
+          "overwrite_tia_device"
+        ],
+        "default": "move_to_parking_lot"
+      },
+      "dry_run": {
+        "type": "boolean",
+        "description": "Preview only (default: true).",
+        "default": true
+      }
+    },
+    "required": [
+      "aml_path"
+    ],
+    "additionalProperties": false
+  }
+}
