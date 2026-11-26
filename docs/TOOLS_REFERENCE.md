@@ -565,6 +565,7 @@ The bundled Openness assemblies cover authoring APIs, not the complete WinCC Uni
   | `left`, `top`, `width`, `height` | integer | **Yes** | — | Geometry in pixels. |
   | `mode` | string | No | `"Output"` | `"Output"` or `"InputOutput"`. |
   | `process_tag` | string | No | null | Bound HMI tag for ProcessValue. |
+  | `output_format` | string | No | null | Output format, e.g. `"{F1} °C"` (one decimal and a unit). Omit to keep the current format. |
   | `target_name` | string | No | null | Target HMI software. |
 
 ---
@@ -1125,6 +1126,13 @@ explicitly set `verify_hashes: false`.
 A dynamization reference may be a dotted UDT member path such as
 `UnitParent_UnitData.UnitStatus.Error`; validation requires its root HMI tag to exist,
 and the full member path is preserved when assigned to TIA.
+Properties that already have the requested value are not written again. This matters for
+compact exports, whose type defaults include properties such as `HmiIOField.ShowInputHint`
+that Openness V21 can read but not set. A failing item or tag stops the import with its
+name, the property and the inner Openness message (for example
+`Item 'Sailio/TE6_IO' (HmiIOField) failed: ...`). Internal HMI tags may omit `connection`
+and `plcTag`. A tag that has a connection but no PLC tag is skipped with a `warnings`
+entry instead of failing the import; references to an existing tag of that name still resolve.
 
 ---
 
