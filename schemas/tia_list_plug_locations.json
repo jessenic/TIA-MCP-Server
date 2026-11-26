@@ -1,0 +1,21 @@
+{
+  "name": "tia_list_plug_locations",
+  "description": "List free plug locations (HardwareObject.GetPlugLocations: position number and label) and plugged items of a device or one device item. Without item_path, every hardware object of the device that has free positions is listed (racks, GSD heads with free submodule slots).",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "device_name": {
+        "type": "string",
+        "description": "Exact device (station) name as listed by tia_list_devices, e.g. \u0027PLC_1\u0027 or \u0027ACS480_1\u0027."
+      },
+      "item_path": {
+        "type": "string",
+        "description": "Slash-separated device-item path below the device, e.g. \u0027PLC_1/PROFINET interface_1\u0027 or \u0027Rail_0\u0027. A single unique item name also works. Omit for the device itself."
+      }
+    },
+    "required": [
+      "device_name"
+    ],
+    "additionalProperties": false
+  }
+}

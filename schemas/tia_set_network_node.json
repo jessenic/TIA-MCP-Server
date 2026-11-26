@@ -1,0 +1,41 @@
+{
+  "name": "tia_set_network_node",
+  "description": "Set the Ethernet node attributes of a device interface: IP address, subnet mask, router and PROFINET device name. Setting pn_device_name turns automatic name generation off unless pn_name_auto_generation is given. Only offline project data changes; nothing is sent to a device.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "device_name": {
+        "type": "string",
+        "description": "Exact device (station) name as listed by tia_list_devices, e.g. \u0027PLC_1\u0027 or \u0027ACS480_1\u0027."
+      },
+      "interface_path": {
+        "type": "string",
+        "description": "Device-item path of the network interface; omit when the device has only one Ethernet interface."
+      },
+      "ip_address": {
+        "type": "string",
+        "description": "IPv4 address, e.g. \u0027192.168.0.10\u0027."
+      },
+      "subnet_mask": {
+        "type": "string",
+        "description": "Subnet mask, e.g. \u0027255.255.255.0\u0027."
+      },
+      "router_address": {
+        "type": "string",
+        "description": "Optional router (gateway); also enables UseRouter."
+      },
+      "pn_device_name": {
+        "type": "string",
+        "description": "PROFINET device name, e.g. \u0027acs480-1\u0027."
+      },
+      "pn_name_auto_generation": {
+        "type": "boolean",
+        "description": "Generate the PROFINET device name automatically."
+      }
+    },
+    "required": [
+      "device_name"
+    ],
+    "additionalProperties": false
+  }
+}

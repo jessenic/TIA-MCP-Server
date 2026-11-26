@@ -1,0 +1,27 @@
+{
+  "name": "tia_retrieve_project",
+  "description": "Retrieve a compressed project archive (.zap21) into an empty folder and open it in the attached TIA Portal instance (Projects.Retrieve). An open project is closed only with close_current=true and only when it has no unsaved changes.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "archive_path": {
+        "type": "string",
+        "description": "Full path of the .zap21 archive."
+      },
+      "target_directory": {
+        "type": "string",
+        "description": "Empty or non-existing folder to retrieve into."
+      },
+      "close_current": {
+        "type": "boolean",
+        "description": "Close the project currently open in this instance first (default: false).",
+        "default": false
+      }
+    },
+    "required": [
+      "archive_path",
+      "target_directory"
+    ],
+    "additionalProperties": false
+  }
+}

@@ -5,7 +5,7 @@
 [![Protocol](https://img.shields.io/badge/MCP-2024--11--05-blue.svg)](https://modelcontextprotocol.io)
 [![Runtime](https://img.shields.io/badge/.NET%20Framework-4.8%20x64-512BD4.svg)](https://dotnet.microsoft.com)
 [![Version](https://img.shields.io/badge/Version-v2.11.0-blue.svg)](#version-history--bug-fixes)
-[![Tools](https://img.shields.io/badge/Tools-120%20Registered-brightgreen.svg)](#complete-tools-reference-dictionary-120-tools)
+[![Tools](https://img.shields.io/badge/Tools-139%20Registered-brightgreen.svg)](#complete-tools-reference-dictionary-139-tools)
 [![License](https://img.shields.io/badge/License-MIT-orange.svg)](LICENSE)
 
 A high-performance, persistent **Model Context Protocol (MCP)** server providing AI coding agents (such as **Google Antigravity**, **Claude Desktop**, **Cursor**, and **VS Code**) with direct programmatic control over **Siemens TIA Portal V21** and **S7-PLCSIM Advanced V8.0**.
@@ -227,6 +227,16 @@ runtime compiler verdict. Use runtime validation for final visual sign-off.
 - **Read-only by design**: the driver client is created with writes disabled, and there are no write or operating-state tools. One connection stays open across calls (`plc_online_disconnect` closes it).
 - Uses [DotNetProjects.S7CommPlusDriver](https://github.com/dotnetprojects/S7CommPlusDriver) (LGPL-3.0, NuGet, separate DLL). It and HarpoS7 are community projects based on protocol analysis, not Siemens products. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
+### 9. Hardware Configuration, Networks & Project Backup (19 Tools)
+- **Devices and modules**: Find complete type identifiers in the hardware catalog (`tia_find_module_types`), create stations from an order number or an installed GSDML (`tia_create_device`, `Devices.CreateWithItem`), list free slots (`tia_list_plug_locations`) and plug modules, GSD submodules or drive telegrams (`tia_plug_module`, `CanPlugNew` + `PlugNew`). Rename and delete devices or items (`tia_rename_hardware`, `tia_delete_hardware` with `confirm`).
+- **PROFINET**: Create subnets (`tia_create_subnet`), connect interfaces (`tia_connect_to_subnet`), create the IO system on the controller (`tia_create_io_system`), assign IO devices (`tia_connect_to_io_system`), set IP address, router and PROFINET device name (`tia_set_network_node`), and review it all with `tia_list_network`.
+- **IO addresses**: `tia_get_io_addresses` returns each item's start address and length (bits) so PLC tags can be wired to modules and drive telegrams.
+- **CAx/AutomationML**: Export the project or one device as `.aml` (`tia_export_aml`) and import it back (`tia_import_aml`, preview by default, conflict option parking lot / retain / overwrite).
+- **Backup to Git**: `tia_export_project_files` writes blocks (SimaticML and SCL), UDTs, tag tables, watch/force tables and the hardware AML to a fixed folder layout. Export timestamps are removed and AML element IDs are made stable, so an unchanged project gives an unchanged folder.
+- **Archives**: `tia_archive_project` (`Project.Archive`, compressed `.zap21`) and `tia_retrieve_project` (`Projects.Retrieve`).
+- **Cross references**: `tia_export_cross_references` writes the PLC cross-reference table of blocks and tags as JSONL.
+- **Not possible through Openness V21**: installing GSD/GSDML files (do it in TIA Portal: *Options > Manage general station description files (GSD)*), Siemens Startdrive drives in CAx files, and downloading to devices (deliberately not offered).
+
 ---
 
 ## Figma to WinCC Unified Workflow
@@ -365,7 +375,7 @@ stateDiagram-v2
 
 ---
 
-## Complete Tools Reference Dictionary (120 Tools)
+## Complete Tools Reference Dictionary (139 Tools)
 
 | # | Tool Name | Category | Primary Parameters | Description |
 |:---:|:---|:---:|:---|:---|
@@ -490,6 +500,25 @@ stateDiagram-v2
 | 118 | `plc_online_list_datablocks` | PLC Online | *(none)* | Data block numbers and names read from the PLC. |
 | 119 | `plc_online_browse` | PLC Online | `filter`, `offset`, `limit`, `refresh` | Variable names, data types and array bounds (DBs, inputs, outputs, memory), cached. |
 | 120 | `plc_online_read_tags` | PLC Online | `tags` | Current values, types and quality by symbolic name (max 200 per call). |
+| 121 | `tia_find_module_types` | Hardware | `partial_type_identifier` | Catalog lookup of complete type identifiers and container types. |
+| 122 | `tia_create_device` | Hardware | `type_identifier`, `device_item_name`, `device_name`, `dry_run` | Create a station from an order number or installed GSDML (`CreateWithItem`). |
+| 123 | `tia_list_plug_locations` | Hardware | `device_name`, `item_path` | Free slots and plugged items of a device or item. |
+| 124 | `tia_plug_module` | Hardware | `device_name`, `parent_item_path`, `type_identifier`, `name`, `position_number`, `dry_run` | Plug a module, GSD submodule or telegram (`CanPlugNew` + `PlugNew`). |
+| 125 | `tia_delete_hardware` | Hardware | `device_name`, `item_path`, `confirm` | Delete a device or item; preview unless `confirm=true`. |
+| 126 | `tia_rename_hardware` | Hardware | `device_name`, `item_path`, `new_name` | Rename a device or device item. |
+| 127 | `tia_get_io_addresses` | Hardware | `device_name` | IO start addresses and lengths (bits) of device items. |
+| 128 | `tia_list_network` | Network | `device_name` | Subnets, IO systems, interfaces, IP addresses and PROFINET names. |
+| 129 | `tia_create_subnet` | Network | `subnet_name`, `type_identifier` | Create a subnet (default Ethernet/PROFINET). |
+| 130 | `tia_connect_to_subnet` | Network | `device_name`, `interface_path`, `subnet_name` | Connect an interface node to a subnet. |
+| 131 | `tia_create_io_system` | Network | `device_name`, `interface_path`, `io_system_name` | Create a PROFINET IO system on a controller interface. |
+| 132 | `tia_connect_to_io_system` | Network | `device_name`, `interface_path`, `io_system_name` | Assign an IO device to an IO system. |
+| 133 | `tia_set_network_node` | Network | `device_name`, `ip_address`, `subnet_mask`, `router_address`, `pn_device_name` | Set IP address, router and PROFINET device name. |
+| 134 | `tia_export_aml` | Backup | `output_path`, `device_name`, `overwrite` | Export project or device hardware as AutomationML. |
+| 135 | `tia_import_aml` | Backup | `aml_path`, `conflict_option`, `dry_run` | Import hardware from AutomationML; preview by default. |
+| 136 | `tia_export_project_files` | Backup | `output_directory`, `plc_name`, `include_hardware`, `include_scl`, `remove_stale` | Deterministic export of blocks, UDTs, tags, watch tables and AML for Git. |
+| 137 | `tia_archive_project` | Backup | `target_directory`, `file_name`, `mode`, `save_first` | Archive the saved project as `.zap21`. |
+| 138 | `tia_retrieve_project` | Backup | `archive_path`, `target_directory`, `close_current` | Retrieve and open a `.zap21` archive. |
+| 139 | `tia_export_cross_references` | Backup | `output_path`, `plc_name`, `object_names`, `filter`, `include_tags` | PLC cross-reference table as JSONL. |
 
 ---
 
@@ -676,7 +705,7 @@ Open or create your Antigravity MCP configuration file at:
 *(Replace `C:\\path\\to\\TIA-MCP-Server\\release` with your actual absolute path using escaped backslashes `\\`)*.
 
 #### B. Tool Schema Registration (Lazy Loading)
-To enable Antigravity to lazy-load all 120 tools on demand, copy the JSON schemas from the repository's `schemas/` folder into your Antigravity MCP directory:
+To enable Antigravity to lazy-load all 139 tools on demand, copy the JSON schemas from the repository's `schemas/` folder into your Antigravity MCP directory:
 ```powershell
 New-Item -ItemType Directory -Path "$env:USERPROFILE\.gemini\antigravity\mcp\tia-portal-v21" -Force
 Copy-Item -Path ".\schemas\*.json" -Destination "$env:USERPROFILE\.gemini\antigravity\mcp\tia-portal-v21\" -Force
@@ -724,7 +753,7 @@ Launch Claude Code and check registered tools:
 claude
 > /mcp
 ```
-All 120 tools (`tia_*`, `hmi_*`, `plcsim_*`, `docs_*`, `plc_online_*`) will appear in the active MCP tools list. You can immediately ask:
+All 139 tools (`tia_*`, `hmi_*`, `plcsim_*`, `docs_*`, `plc_online_*`) will appear in the active MCP tools list. You can immediately ask:
 > *"Inspect the device tree of the active PLC and compile the software."*
 
 ---
@@ -742,7 +771,7 @@ All 120 tools (`tia_*`, `hmi_*`, `plcsim_*`, `docs_*`, `plc_online_*`) will appe
   }
 }
 ```
-Restart Claude Desktop. The hammer icon (🛠️) in the input bar will display all 120 tools.
+Restart Claude Desktop. The hammer icon (🛠️) in the input bar will display all 139 tools.
 
 ---
 
@@ -835,6 +864,11 @@ This repository includes 3 turnkey agent skills located in `.agents/skills/`:
 ---
 
 ## Version History & Bug Fixes
+
+### [Unreleased]
+* Added hardware configuration tools: catalog lookup, device creation from order numbers or installed GSDML, plug locations, module/submodule plugging, rename and delete (`tia_find_module_types`, `tia_create_device`, `tia_list_plug_locations`, `tia_plug_module`, `tia_rename_hardware`, `tia_delete_hardware`), and IO address reading (`tia_get_io_addresses`).
+* Added PROFINET network tools: subnets, IO systems, IO device assignment, IP addresses and PROFINET device names (`tia_list_network`, `tia_create_subnet`, `tia_connect_to_subnet`, `tia_create_io_system`, `tia_connect_to_io_system`, `tia_set_network_node`).
+* Added CAx/AutomationML export and import (`tia_export_aml`, `tia_import_aml`), a deterministic project export for version control (`tia_export_project_files`), project archive and retrieve (`tia_archive_project`, `tia_retrieve_project`) and a JSONL cross-reference export (`tia_export_cross_references`).
 
 ### [v2.11.0] - 2026-11-17
 * Added read-only online PLC value tools (`plc_online_connect`, `plc_online_get_status`, `plc_online_disconnect`, `plc_online_list_datablocks`, `plc_online_browse`, `plc_online_read_tags`): read current values from a real S7-1200/S7-1500 over S7CommPlus by symbolic name, without TIA Portal. TLS for TIA V17+ projects, HarpoS7 legacy login for older ones (DotNetProjects.S7CommPlusDriver, LGPL-3.0). No write or operating-state tools.

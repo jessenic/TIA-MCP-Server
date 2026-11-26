@@ -1,0 +1,21 @@
+{
+  "name": "tia_create_subnet",
+  "description": "Create a subnet (Subnets.Create). Default type \u0027System:Subnet.Ethernet\u0027 (PROFINET/Industrial Ethernet). Existing names are never overwritten.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "subnet_name": {
+        "type": "string",
+        "description": "Name of the subnet, e.g. \u0027PN/IE_1\u0027."
+      },
+      "type_identifier": {
+        "type": "string",
+        "description": "Optional subnet type, e.g. \u0027System:Subnet.Ethernet\u0027 (default) or \u0027System:Subnet.Profibus\u0027."
+      }
+    },
+    "required": [
+      "subnet_name"
+    ],
+    "additionalProperties": false
+  }
+}

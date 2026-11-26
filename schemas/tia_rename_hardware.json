@@ -1,0 +1,26 @@
+{
+  "name": "tia_rename_hardware",
+  "description": "Rename a device (station) or a device item. Existing device names are never overwritten.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "device_name": {
+        "type": "string",
+        "description": "Exact device (station) name as listed by tia_list_devices, e.g. \u0027PLC_1\u0027 or \u0027ACS480_1\u0027."
+      },
+      "item_path": {
+        "type": "string",
+        "description": "Item to rename; omit to rename the device."
+      },
+      "new_name": {
+        "type": "string",
+        "description": "New name."
+      }
+    },
+    "required": [
+      "device_name",
+      "new_name"
+    ],
+    "additionalProperties": false
+  }
+}

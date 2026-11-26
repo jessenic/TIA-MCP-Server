@@ -1,0 +1,17 @@
+{
+  "name": "tia_find_module_types",
+  "description": "Search the TIA hardware catalog for complete type identifiers by a partial one (Openness ModuleInformationProvider.FindModuleTypes), with their container types. OrderNumber needs one complete part (\u0027OrderNumber:6ES7 214-1AG40-0XB0\u0027), GSD at least two (\u0027GSD:GSDML-V2.4-ABB-FPNO-20220101.XML/D\u0027), System one (\u0027System:Rack.ET200SP\u0027). No wildcards. GSD/GSDML files must be installed in TIA Portal first (Options \u003E Manage general station description files); Openness cannot install them.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "partial_type_identifier": {
+        "type": "string",
+        "description": "Partial type identifier made of complete \u0027/\u0027-separated parts."
+      }
+    },
+    "required": [
+      "partial_type_identifier"
+    ],
+    "additionalProperties": false
+  }
+}

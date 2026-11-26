@@ -1,0 +1,26 @@
+{
+  "name": "tia_connect_to_io_system",
+  "description": "Assign an IO device (e.g. a drive\u0027s PROFINET adapter) to an IO system (IoConnector.ConnectToIoSystem). Connect its interface to the same subnet first.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "device_name": {
+        "type": "string",
+        "description": "IO device name."
+      },
+      "interface_path": {
+        "type": "string",
+        "description": "Device-item path of the network interface; omit when the device has only one Ethernet interface."
+      },
+      "io_system_name": {
+        "type": "string",
+        "description": "Exact IO system name from tia_list_network."
+      }
+    },
+    "required": [
+      "device_name",
+      "io_system_name"
+    ],
+    "additionalProperties": false
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "name": "tia_plug_module",
+  "description": "Create and plug a module or submodule (HardwareObject.PlugNew) into a device or device item at a position, e.g. a signal module into \u0027Rail_0\u0027 or a PROFINET telegram/GSD submodule into a drive\u0027s head module. Checks CanPlugNew first; dry_run=true (default) stops after the check.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "device_name": {
+        "type": "string",
+        "description": "Exact device (station) name as listed by tia_list_devices, e.g. \u0027PLC_1\u0027 or \u0027ACS480_1\u0027."
+      },
+      "parent_item_path": {
+        "type": "string",
+        "description": "Item to plug into (e.g. \u0027Rail_0\u0027 for an S7-1200 rack, or the GSD head module). Omit for the device itself."
+      },
+      "type_identifier": {
+        "type": "string",
+        "description": "Complete type identifier of the module/submodule."
+      },
+      "name": {
+        "type": "string",
+        "description": "Name for the new item; must be unique in its container."
+      },
+      "position_number": {
+        "type": "integer",
+        "description": "Free position number from tia_list_plug_locations."
+      },
+      "dry_run": {
+        "type": "boolean",
+        "description": "Only run CanPlugNew (default: true).",
+        "default": true
+      }
+    },
+    "required": [
+      "device_name",
+      "type_identifier",
+      "name",
+      "position_number"
+    ],
+    "additionalProperties": false
+  }
+}

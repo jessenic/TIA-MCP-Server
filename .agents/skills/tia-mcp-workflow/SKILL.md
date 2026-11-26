@@ -23,6 +23,7 @@ instructions before acting, and use the live MCP tool descriptions for arguments
 | Connect to S7-PLCSIM, inspect or write simulated tags, control the virtual CPU, or run an online sequence verification | `plcsim-sequence-tester` |
 | Look up how a Siemens API, system function, SCL instruction, or setting works in the official documentation | This skill, section 5 below (no TIA connection needed) |
 | Read current values from a running real PLC (not PLCSIM) by IP address | This skill, section 6 below (read-only, no TIA connection needed) |
+| Add or change hardware (devices, modules, GSDML drives, PROFINET, IP addresses), read IO addresses, export/import AML, back up the project to files, archive or retrieve it, or export cross references | This skill, section 7 below |
 
 The skills are located at `.opencode/skills/<skill-name>/SKILL.md` for OpenCode
 and `.agents/skills/<skill-name>/SKILL.md` for compatible agent tooling. When a
@@ -120,3 +121,30 @@ them. For S7-PLCSIM Advanced use the `plcsim_*` tools instead.
 
 Values are a snapshot at `readAt`. A production PLC may be controlling a live
 process: say so if a value looks unexpected rather than suggesting changes.
+
+## 7. Hardware, networks and project backup
+
+These tools change the offline project only; never download to a device.
+
+1. **Find the type identifier** with `tia_find_module_types` (e.g.
+   `OrderNumber:6ES7 214-1AG40-0XB0` or `GSD:<gsdml file>.XML/DAP`). A GSDML
+   device must be installed in TIA Portal first; Openness cannot install GSD
+   files, so ask the user to do it (*Options > Manage general station
+   description files*).
+2. **Create and equip devices**: `tia_create_device` and `tia_plug_module` run
+   as a preview by default (`dry_run=true`); show the result, then run with
+   `dry_run=false`. Find free positions with `tia_list_plug_locations`.
+   Deleting needs `tia_delete_hardware` with `confirm=true` after the preview.
+3. **PROFINET**: `tia_create_subnet`, `tia_connect_to_subnet` for the PLC and
+   every IO device, `tia_create_io_system` on the PLC, `tia_connect_to_io_system`
+   for each IO device, then `tia_set_network_node` for IP addresses and
+   PROFINET device names. Check with `tia_list_network`.
+4. **Wire the program**: `tia_get_io_addresses` gives start byte and length in
+   bits for modules and drive telegrams; use them for PLC tags.
+5. Save with `tia_save_project` after hardware changes.
+6. **Backup**: `tia_export_project_files` into the project repository's export
+   folder gives stable files for Git; `tia_archive_project` makes a `.zap21`.
+   Archive before `tia_import_aml`, which runs as a preview by default and
+   cannot be undone.
+7. **Cross references**: `tia_export_cross_references` writes JSONL that can be
+   searched for every use of a tag, address or block.

@@ -1,0 +1,14 @@
+{
+  "name": "tia_list_network",
+  "description": "List subnets with their IO systems and connected IO devices, and every network interface with node addresses (IP, subnet mask, router, PROFINET device name), IO controller and IO connector assignments.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "device_name": {
+        "type": "string",
+        "description": "Optional device name to limit the interface list."
+      }
+    },
+    "additionalProperties": false
+  }
+}

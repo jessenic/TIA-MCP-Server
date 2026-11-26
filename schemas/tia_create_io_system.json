@@ -1,0 +1,25 @@
+{
+  "name": "tia_create_io_system",
+  "description": "Create a PROFINET IO system on a controller interface (IoController.CreateIoSystem). The interface must already be connected to a subnet.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "device_name": {
+        "type": "string",
+        "description": "Controller device (PLC station) name."
+      },
+      "interface_path": {
+        "type": "string",
+        "description": "Device-item path of the network interface; omit when the device has only one Ethernet interface."
+      },
+      "io_system_name": {
+        "type": "string",
+        "description": "Optional IO system name; TIA generates one when omitted."
+      }
+    },
+    "required": [
+      "device_name"
+    ],
+    "additionalProperties": false
+  }
+}

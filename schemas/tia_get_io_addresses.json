@@ -1,0 +1,14 @@
+{
+  "name": "tia_get_io_addresses",
+  "description": "Read the IO addresses of device items (Address.StartAddress, Length, IoType) for one device or all devices, to wire PLC tags (%I/%Q) to modules and drive telegrams.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "device_name": {
+        "type": "string",
+        "description": "Optional device name; omit for all devices."
+      }
+    },
+    "additionalProperties": false
+  }
+}

@@ -1,5 +1,5 @@
 # Siemens TIA Portal V21 Openness MCP Server
-## Complete Tools Reference Dictionary (120 Tools)
+## Complete Tools Reference Dictionary (139 Tools)
 
 **Protocol Specification:** Model Context Protocol (MCP) JSON-RPC 2.0  
 **Transport Binding:** HTTP (`POST /mcp`), SSE (`GET /sse`), stdio  
@@ -22,6 +22,7 @@
 | **8** | [PLC, Project & HMI Operations](#category-8-plc-project--hmi-operations-16-tools) | 16 | `tia_get_plc_tag_info`, `tia_read_user_constant`, `tia_get_tag_table_attributes`, `tia_create_plc_tag_table`, `tia_create_tagtable_group`, `tia_create_block_group`, `tia_create_user_constant`, `tia_update_user_constant`, `tia_create_project`, `hmi_create_screen_group`, `hmi_create_screen_under_group`, `hmi_create_tag_table`, `hmi_create_navigation_button`, `hmi_rename_screen`, `hmi_rename_screen_group`, `hmi_rename_tag_table` |
 | **9** | [Siemens Online Documentation](#category-9-siemens-online-documentation-4-tools) | 4 | `docs_search`, `docs_read_page`, `docs_get_toc`, `docs_list_publications` |
 | **10** | [Online PLC Values](#category-10-online-plc-values-6-tools) | 6 | `plc_online_connect`, `plc_online_get_status`, `plc_online_disconnect`, `plc_online_list_datablocks`, `plc_online_browse`, `plc_online_read_tags` |
+| **11** | [Hardware Configuration, Networks & Project Backup](#category-11-hardware-configuration-networks--project-backup-19-tools) | 19 | `tia_find_module_types`, `tia_create_device`, `tia_list_plug_locations`, `tia_plug_module`, `tia_delete_hardware`, `tia_rename_hardware`, `tia_get_io_addresses`, `tia_list_network`, `tia_create_subnet`, `tia_connect_to_subnet`, `tia_create_io_system`, `tia_connect_to_io_system`, `tia_set_network_node`, `tia_export_aml`, `tia_import_aml`, `tia_export_project_files`, `tia_archive_project`, `tia_retrieve_project`, `tia_export_cross_references` |
 
 ## MCP Documentation Resources
 
@@ -1776,3 +1777,134 @@ when the server stops.
 
 Uses [DotNetProjects.S7CommPlusDriver](https://github.com/dotnetprojects/S7CommPlusDriver)
 (LGPL-3.0) with HarpoS7 and BouncyCastle; see `THIRD_PARTY_NOTICES.md`.
+
+---
+
+## Category 11: Hardware Configuration, Networks & Project Backup (19 Tools)
+
+All tools work on the offline project in the attached TIA Portal instance. Nothing is downloaded to a device.
+Hardware paths: `device_name` is the station name from `tia_list_devices`; `item_path` is the slash-separated
+item path below the device as returned by these tools (e.g. `PLC_1/PROFINET interface_1`, `Rack_0`,
+`FPNO/Interface`). Item names may contain `/` (e.g. `DI 14/DQ 10_1`); the full path still resolves. A single
+unique item name also works. Mutating tools return `{ Success, DryRun, Message, Data }` and set `isError`
+when `Success` is false.
+
+Verified live against TIA Portal V21 with an S7-1200 (CPU 1214C DC/DC/DC V4.6, SM 1223) and an ABB ACS480
+with FPNO-21 (GSDML-V2.45-ABB-DRIVES-20250423, DAP `FPNO_DAP_V6`, standard telegram 1).
+
+### `tia_find_module_types`
+- **Parameters:** `partial_type_identifier` (required). OrderNumber needs one complete part
+  (`OrderNumber:6ES7 214-1AG40-0XB0`), GSD at least two (`GSD:GSDML-V2.45-ABB-DRIVES-20250423.XML/DAP`),
+  System one (`System:Rack.ET200SP`). No wildcards.
+- **Response data:** `{ TypeIdentifiers: [...sorted], ContainerTypes: { typeId: [...] } }`
+  (`ModuleInformationProvider.FindModuleTypes` / `FindContainerTypes`).
+- GSD/GSDML files must already be installed in TIA Portal; Openness V21 has no API for installing them.
+  Useful GSD prefixes: `/DAP` (head modules for `tia_create_device`), `/M` (modules and telegrams for `tia_plug_module`).
+
+### `tia_create_device`
+- **Parameters:** `type_identifier`, `device_item_name` (required); `device_name`; `dry_run` (default `true`).
+- Calls `Devices.CreateWithItem(typeIdentifier, deviceItemName, deviceName)`. Existing device names fail without change.
+- Examples: `OrderNumber:6ES7 214-1AG40-0XB0/V4.6` (CPU 1214C), `GSD:GSDML-V2.45-ABB-DRIVES-20250423.XML/DAP/FPNO_DAP_V6` (ABB FPNO-21).
+- **Response data:** device name, type identifier and the created item paths with position numbers.
+
+### `tia_list_plug_locations`
+- **Parameters:** `device_name` (required), `item_path`.
+- Without `item_path`, lists every hardware object of the device that has free positions (`HardwareObject.GetPlugLocations`).
+- **Response data:** `[{ ItemPath, Name, TypeIdentifier, FreeLocations: [{ PositionNumber, Label }], Plugged: [{ Name, PositionNumber, TypeIdentifier }] }]`.
+
+### `tia_plug_module`
+- **Parameters:** `device_name`, `type_identifier`, `name`, `position_number` (required); `parent_item_path`; `dry_run` (default `true`).
+- Runs `CanPlugNew` and, with `dry_run=false`, `PlugNew`. S7-1200 signal modules go into `Rack_0` (positions 2-9);
+  a GSDML drive's telegram goes into its `Rack` (e.g. `GSD:...XML/M/ID_MODULE_STD_TGM1` at position 1).
+- **Response data:** new item path, position and the IO addresses of the item and its submodules.
+
+### `tia_delete_hardware`
+- **Parameters:** `device_name` (required), `item_path`, `confirm` (default `false`).
+- Without `confirm=true` returns a preview with all sub-items. Built-in items (CPU, interfaces, ports) cannot be deleted.
+
+### `tia_rename_hardware`
+- **Parameters:** `device_name`, `new_name` (required); `item_path` (omit to rename the station).
+
+### `tia_get_io_addresses`
+- **Parameters:** `device_name` (omit for all devices).
+- **Response data:** `[{ Device, ItemPath, TypeIdentifier, Addresses: [{ IoType, StartAddress, Length }] }]`.
+  `StartAddress` is the byte address (`%IB`/`%QB`); `Length` is in bits (DI 14 = 16, standard telegram 1 = 32,
+  i.e. `%IW68..%IW70` and `%QW64..%QW66`). Diagnosis addresses have `StartAddress` -1.
+
+### `tia_list_network`
+- **Parameters:** `device_name` (limits the interface list).
+- **Response data:** `{ Subnets: [{ Name, TypeIdentifier, NetType, NodeCount, IoSystems: [{ Name, Number, ConnectedIoDevices }] }],
+  Interfaces: [{ Device, InterfacePath, InterfaceOperatingMode, Nodes: [{ Name, Subnet, Address, SubnetMask, UseRouter,
+  RouterAddress, IpProtocolSelection, PnDeviceNameAutoGeneration, PnDeviceName, PnDeviceNameConverted }],
+  IoControllers: [{ IoSystem }], IoConnectors: [{ ConnectedToIoSystem, DeviceNumber }] }] }`.
+
+### `tia_create_subnet`
+- **Parameters:** `subnet_name` (required); `type_identifier` (default `System:Subnet.Ethernet`).
+
+### `tia_connect_to_subnet`
+- **Parameters:** `device_name`, `subnet_name` (required); `interface_path` (needed only when a device has several Ethernet interfaces).
+- Calls `Node.ConnectToSubnet` on the interface's first node.
+
+### `tia_create_io_system`
+- **Parameters:** `device_name` (required, the controller); `interface_path`; `io_system_name`.
+- Calls `IoController.CreateIoSystem`; connect the interface to a subnet first.
+
+### `tia_connect_to_io_system`
+- **Parameters:** `device_name`, `io_system_name` (required); `interface_path`.
+- Calls `IoConnector.ConnectToIoSystem`; the IO device's interface must be on the IO system's subnet.
+
+### `tia_set_network_node`
+- **Parameters:** `device_name` (required); `interface_path`, `ip_address`, `subnet_mask`, `router_address`,
+  `pn_device_name`, `pn_name_auto_generation`.
+- Sets the node attributes `Address`, `SubnetMask`, `UseRouter`/`RouterAddress`, `PnDeviceNameAutoGeneration`, `PnDeviceName`.
+  Values that already match are skipped. On an IO device `SubnetMask` is read-only (it follows the IO controller).
+
+### `tia_export_aml`
+- **Parameters:** `output_path` (required, `.aml`); `device_name`; `overwrite` (default `false`).
+- `CaxProvider.Export` with a `TransferResult` (V19+ overload). Siemens Startdrive drives and most HMI devices are
+  not part of CAx files; GSDML devices are.
+- **Response data:** `{ Path, State, ErrorCount, WarningCount, SizeBytes, Messages }`.
+
+### `tia_import_aml`
+- **Parameters:** `aml_path` (required); `conflict_option` (`move_to_parking_lot` default, `retain_tia_device`,
+  `overwrite_tia_device`); `dry_run` (default `true`).
+- The preview lists the AML devices and those whose names already exist. The import itself
+  (`CaxProvider.Import`) cannot be undone through Openness; archive first.
+- When the controller is kept (`retain_tia_device`) and an IO device is imported, its IP and PROFINET name are
+  restored but the IO system assignment is not; run `tia_connect_to_io_system` afterwards.
+
+### `tia_export_project_files`
+- **Parameters:** `output_directory` (required); `plc_name`; `include_hardware`, `include_scl`, `remove_stale` (all default `true`).
+- Layout:
+  ```
+  tia-export.json                      sorted file list and errors, no timestamps
+  hardware/project.aml                 CAx export of the project
+  plc/<PLC>/blocks/<group>/<name>.xml  SimaticML of every block (+ <name>.scl for SCL blocks)
+  plc/<PLC>/types/<group>/<name>.xml   PLC data types
+  plc/<PLC>/tags/<group>/<name>.xml    PLC tag tables
+  plc/<PLC>/watch|force/<group>/<name>.xml
+  ```
+- Deterministic: the SimaticML `DocumentInfo/Created` stamp and the AML `LastWritingDateTime` are removed, and the
+  random AML element IDs are replaced by name-based GUIDs (references rewritten), so re-exporting an unchanged
+  project changes no file. Normalised files still import (verified with `tia_import_block` and `tia_import_aml`).
+- Files are written only when their content changes; files of deleted objects listed in the previous
+  `tia-export.json` are removed (`remove_stale`). Inconsistent or know-how protected blocks are reported in
+  `Errors` and keep their previous file; compile first.
+
+### `tia_archive_project`
+- **Parameters:** `target_directory` (required); `file_name` (default `<project>_<yyyyMMdd_HHmm>.zap21`);
+  `mode` (`compressed` default, `discard_restorable_data_and_compressed`); `save_first` (default `false`).
+- `Project.Archive` needs a saved project; existing files are never overwritten.
+
+### `tia_retrieve_project`
+- **Parameters:** `archive_path`, `target_directory` (required, empty or missing); `close_current` (default `false`).
+- `Projects.Retrieve` opens the archive in the attached instance. An open project is closed only with
+  `close_current=true` and only when it has no unsaved changes.
+
+### `tia_export_cross_references`
+- **Parameters:** `output_path` (required, `.jsonl`); `plc_name`; `object_names`; `filter`
+  (`objects_with_references` default, `all_objects`, `objects_without_references`, `unused_objects`);
+  `include_tags` (default `true`).
+- Uses `CrossReferenceService.GetCrossReferences` on every block and PLC tag (tag tables have no such service).
+- One JSON line per reference location: `{ root, source, sourceType, sourceAddress, sourcePath, device, reference,
+  referenceTypeName, referencePath, location, referenceType, access, referencedAs, address, typeName }`.

@@ -7,7 +7,7 @@ using TiaOpennessMcp.Rendering;
 
 namespace TiaOpennessMcp.Tools
 {
-    public class ToolRegistry
+    public partial class ToolRegistry
     {
         private readonly List<ToolDefinition> _tools = new List<ToolDefinition>();
         private readonly Dictionary<string, Func<JsonElement?, CallToolResult>> _handlers =
@@ -2376,6 +2376,8 @@ namespace TiaOpennessMcp.Tools
 
             RegisterDocsTools();
             RegisterPlcOnlineTools();
+            RegisterHardwareTools();
+            RegisterBackupTools();
         }
 
         // Read-only online access to a real S7-1200/S7-1500 over S7CommPlus with TLS (TIA V17+ projects).
