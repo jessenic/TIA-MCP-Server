@@ -4,7 +4,7 @@
 [![Simulation](https://img.shields.io/badge/Simulation-S7--PLCSIM%20Advanced%20V8.0-008080.svg)](https://support.industry.siemens.com)
 [![Protocol](https://img.shields.io/badge/MCP-2024--11--05-blue.svg)](https://modelcontextprotocol.io)
 [![Runtime](https://img.shields.io/badge/.NET%20Framework-4.8%20x64-512BD4.svg)](https://dotnet.microsoft.com)
-[![Version](https://img.shields.io/badge/Version-v2.12.0-blue.svg)](#version-history--bug-fixes)
+[![Version](https://img.shields.io/badge/Version-v2.13.0-blue.svg)](#version-history--bug-fixes)
 [![Tools](https://img.shields.io/badge/Tools-139%20Registered-brightgreen.svg)](#complete-tools-reference-dictionary-139-tools)
 [![License](https://img.shields.io/badge/License-MIT-orange.svg)](LICENSE)
 
@@ -865,11 +865,12 @@ This repository includes 3 turnkey agent skills located in `.agents/skills/`:
 
 ## Version History & Bug Fixes
 
-### [Unreleased]
+### [v2.13.0] - 2026-11-26
 * Fixed `hmi_import_json` failing on every `HmiIOField` ("Exception has been thrown by the target of an invocation"): the compact type defaults include `ShowInputHint`, which Openness V21 can read but not set. Properties that already have the requested value are no longer written.
 * `hmi_import_json` errors now name the screen item or HMI tag, the property and the inner Openness exception instead of a bare `TargetInvocationException`.
 * `hmi_import_json` accepts internal HMI tags without `connection`/`plcTag`, and skips a tag that has a connection but no PLC tag with a warning instead of failing the import.
 * Added the `output_format` parameter to `hmi_add_io_field`.
+* Updated the reported MCP server version and assembly metadata to v2.13.0.
 
 ### [v2.12.0] - 2026-11-26
 * Added hardware configuration tools: catalog lookup, device creation from order numbers or installed GSDML, plug locations, module/submodule plugging, rename and delete (`tia_find_module_types`, `tia_create_device`, `tia_list_plug_locations`, `tia_plug_module`, `tia_rename_hardware`, `tia_delete_hardware`), and IO address reading (`tia_get_io_addresses`).
