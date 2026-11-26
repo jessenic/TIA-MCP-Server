@@ -746,7 +746,8 @@ namespace TiaOpennessMcp.Tia
             int left, int top, uint width, uint height,
             string mode = "Output",
             string? processTag = null,
-            string? targetName = null)
+            string? targetName = null,
+            string? outputFormat = null)
         {
             var hmiSw = FindHmiSoftware(targetName);
             var screen = FindHmiScreen(hmiSw, screenName) ?? hmiSw.Screens.Create(screenName);
@@ -761,6 +762,9 @@ namespace TiaOpennessMcp.Tia
                 io.IOFieldType = HmiIOFieldType.InputOutput;
             else
                 io.IOFieldType = HmiIOFieldType.Output;
+
+            if (outputFormat != null && io.OutputFormat != outputFormat)
+                io.OutputFormat = outputFormat;
 
             if (!string.IsNullOrEmpty(processTag))
             {

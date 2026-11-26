@@ -1018,6 +1018,7 @@ namespace TiaOpennessMcp.Tools
                     schema.Properties["height"] = new ToolProperty { Type = "integer", Description = "Height." };
                     schema.Properties["mode"] = new ToolProperty { Type = "string", Description = "'Output' or 'InputOutput' (default: Output)." };
                     schema.Properties["process_tag"] = new ToolProperty { Type = "string", Description = "HMI tag to bind to ProcessValue." };
+                    schema.Properties["output_format"] = new ToolProperty { Type = "string", Description = "Output format, e.g. '{F1} °C' for one decimal and a unit (optional; omit to keep the current format)." };
                     schema.Properties["target_name"] = new ToolProperty { Type = "string", Description = "Target HMI software name (optional)." };
                     schema.Required = new List<string> { "screen_name", "name", "left", "top", "width", "height" };
                 },
@@ -1032,8 +1033,9 @@ namespace TiaOpennessMcp.Tools
                     string mode = GetStringProp(args, "mode") ?? "Output";
                     string? processTag = GetStringProp(args, "process_tag");
                     string? target = GetStringProp(args, "target_name");
+                    string? outputFormat = GetStringProp(args, "output_format");
 
-                    var res = TiaManager.Instance.AddOrUpdateIOField(screen, name, left, top, width, height, mode, processTag, target);
+                    var res = TiaManager.Instance.AddOrUpdateIOField(screen, name, left, top, width, height, mode, processTag, target, outputFormat);
                     return CallToolResult.Text(res);
                 });
 

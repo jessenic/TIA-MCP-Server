@@ -1292,13 +1292,21 @@ namespace TiaOpennessMcp.Tia
 
         private static void ValidateHmiImportPlan(HmiSoftware hmi, HmiJsonImportPlan plan)
         {
-            foreach (HmiJsonTag tag in plan.Tags)
+            foreach (HmiJsonTag tag in plan.Tags.ToList())
             {
                 if (string.IsNullOrWhiteSpace(tag.Name))
                     throw new InvalidDataException("Every HMI tag requires a name.");
                 if (!string.IsNullOrWhiteSpace(tag.Connection) && tag.Connection != "<Internal tag>" &&
                     string.IsNullOrWhiteSpace(tag.PlcTag))
-                    throw new InvalidDataException($"HMI tag '{tag.Name}' requires a PLC tag path.");
+                {
+                    // An exported tag that is already broken in the project (connection without PLC tag) is left
+                    // untouched instead of failing the whole import; references to it still resolve.
+                    plan.Tags.Remove(tag);
+                    plan.Warnings.Add(hmi.Tags.Find(tag.Name) != null
+                        ? $"HMI tag '{tag.Name}' has connection '{tag.Connection}' but no PLC tag; it was skipped and left unchanged."
+                        : $"HMI tag '{tag.Name}' has connection '{tag.Connection}' but no PLC tag; it was skipped and not created.");
+                    continue;
+                }
                 if (string.IsNullOrWhiteSpace(tag.PlcTag) && string.IsNullOrWhiteSpace(tag.DataType))
                     throw new InvalidDataException($"Internal HMI tag '{tag.Name}' requires dataType.");
                 if (string.IsNullOrWhiteSpace(tag.Table))
@@ -1510,7 +1518,20 @@ namespace TiaOpennessMcp.Tia
             Dictionary<string, HmiJsonItem> defaults)
         {
             foreach (HmiJsonTag tagDocument in plan.Tags)
-                ApplyTagDocument(hmi, tagDocument);
+            {
+                try
+                {
+                    ApplyTagDocument(hmi, tagDocument);
+                }
+                catch (Exception error) when (!(error is HmiItemImportException))
+                {
+                    Exception cause = error;
+                    while (cause is TargetInvocationException && cause.InnerException != null)
+                        cause = cause.InnerException;
+                    throw new HmiItemImportException(
+                        $"HMI tag '{tagDocument.Name}' failed: {cause.GetType().Name}: {cause.Message}", cause);
+                }
+            }
             foreach (HmiJsonAlarm alarmDocument in plan.Alarms)
                 ApplyAlarmDocument(hmi, alarmDocument, plan.Manifest.Languages);
 
@@ -1529,28 +1550,20 @@ namespace TiaOpennessMcp.Tia
 
                 foreach (HmiJsonItem itemDocument in screenDocument.Items)
                 {
-                    HmiScreenItemBase? item = screen.ScreenItems.Find(itemDocument.Name);
-                    if (item != null && !string.Equals(item.GetType().Name, itemDocument.Type, StringComparison.Ordinal))
-                        throw new InvalidDataException(
-                            $"Existing item '{screen.Name}/{itemDocument.Name}' is '{item.GetType().Name}', not '{itemDocument.Type}'.");
-                    if (item == null)
-                        item = CreateScreenItem(screen, itemDocument.Name, ResolveHmiScreenItemType(itemDocument.Type),
-                            itemDocument.ContainedType);
-                    if (!string.Equals((item as HmiContainerBase)?.ContainedType, itemDocument.ContainedType, StringComparison.Ordinal))
-                        throw new InvalidDataException($"Container type does not match for '{screen.Name}/{item.Name}'.");
-
-                    if (plan.Manifest.Compact && itemDocument.Compact != false &&
-                        defaults.TryGetValue(GetItemIdentityKey(itemDocument), out HmiJsonItem? defaultItem))
+                    try
                     {
-                        ApplyObjectProperties(item, defaultItem.Props);
-                        ApplyTexts(item, defaultItem.Text, plan.Manifest.Languages);
+                        ApplyItemDocument(hmi, screen, itemDocument, plan, defaults);
                     }
-                    var mergedProperties = ResolveStyleProperties(plan.Styles, itemDocument);
-                    ApplyObjectProperties(item, mergedProperties);
-                    ApplyTexts(item, itemDocument.Text, plan.Manifest.Languages);
-                    ApplyInterfaceDocument(item, itemDocument.Interface);
-                    ApplyDynamizations(hmi, item, itemDocument.Dynamizations);
-                    ApplyItemEvents(item, itemDocument.Events);
+                    catch (Exception error) when (!(error is HmiItemImportException))
+                    {
+                        Exception cause = error;
+                        while (cause is TargetInvocationException && cause.InnerException != null)
+                            cause = cause.InnerException;
+                        throw new HmiItemImportException(
+                            $"Item '{screen.Name}/{itemDocument.Name}' ({itemDocument.Type}) failed: " +
+                            $"{cause.GetType().Name}: {cause.Message}",
+                            cause);
+                    }
                 }
 
                 if (pruneItems)
@@ -1560,6 +1573,37 @@ namespace TiaOpennessMcp.Tia
                         item.Delete();
                 }
             }
+        }
+
+        private static void ApplyItemDocument(
+            HmiSoftware hmi,
+            HmiScreen screen,
+            HmiJsonItem itemDocument,
+            HmiJsonImportPlan plan,
+            Dictionary<string, HmiJsonItem> defaults)
+        {
+            HmiScreenItemBase? item = screen.ScreenItems.Find(itemDocument.Name);
+            if (item != null && !string.Equals(item.GetType().Name, itemDocument.Type, StringComparison.Ordinal))
+                throw new InvalidDataException(
+                    $"Existing item '{screen.Name}/{itemDocument.Name}' is '{item.GetType().Name}', not '{itemDocument.Type}'.");
+            if (item == null)
+                item = CreateScreenItem(screen, itemDocument.Name, ResolveHmiScreenItemType(itemDocument.Type),
+                    itemDocument.ContainedType);
+            if (!string.Equals((item as HmiContainerBase)?.ContainedType, itemDocument.ContainedType, StringComparison.Ordinal))
+                throw new InvalidDataException($"Container type does not match for '{screen.Name}/{item.Name}'.");
+
+            if (plan.Manifest.Compact && itemDocument.Compact != false &&
+                defaults.TryGetValue(GetItemIdentityKey(itemDocument), out HmiJsonItem? defaultItem))
+            {
+                ApplyObjectProperties(item, defaultItem.Props);
+                ApplyTexts(item, defaultItem.Text, plan.Manifest.Languages);
+            }
+            var mergedProperties = ResolveStyleProperties(plan.Styles, itemDocument);
+            ApplyObjectProperties(item, mergedProperties);
+            ApplyTexts(item, itemDocument.Text, plan.Manifest.Languages);
+            ApplyInterfaceDocument(item, itemDocument.Interface);
+            ApplyDynamizations(hmi, item, itemDocument.Dynamizations);
+            ApplyItemEvents(item, itemDocument.Events);
         }
 
         private static Dictionary<string, JsonElement> ResolveStyleProperties(
@@ -1599,8 +1643,11 @@ namespace TiaOpennessMcp.Tia
             if (!table.Tags.Any(t => t.Name == tag.Name))
                 throw new InvalidDataException(
                     $"HMI tag '{document.Name}' already exists in table '{tag.TagTableName}', not '{table.Name}'.");
-            tag.Connection = document.Connection;
-            tag.PlcTag = document.PlcTag;
+            // Internal tags have no connection; Openness rejects null or empty values, so only set what changes.
+            if (!string.IsNullOrEmpty(document.Connection) && tag.Connection != document.Connection)
+                tag.Connection = document.Connection;
+            if (!string.IsNullOrEmpty(document.PlcTag) && tag.PlcTag != document.PlcTag)
+                tag.PlcTag = document.PlcTag;
             if (string.IsNullOrWhiteSpace(document.PlcTag) && document.DataType != null)
                 tag.DataType = document.DataType;
             ApplyLimitValue(tag.InitialMinValue, document.Min);
@@ -1638,6 +1685,11 @@ namespace TiaOpennessMcp.Tia
             alarm.AcknowledgmentControlTag = document.AcknowledgmentControlTag ?? string.Empty;
             if (document.EventText != null)
                 ApplyMultilingualText(alarm.EventText, document.EventText.Value, "alarm " + document.Name, languages);
+        }
+
+        private sealed class HmiItemImportException : InvalidOperationException
+        {
+            public HmiItemImportException(string message, Exception inner) : base(message, inner) { }
         }
 
         private static HmiScreenItemBase CreateScreenItem(HmiScreen screen, string name, Type itemType,
@@ -1693,7 +1745,35 @@ namespace TiaOpennessMcp.Tia
                 throw new InvalidDataException($"Property '{property.Name}' is read-only.");
 
             object? converted = ConvertJsonValue(propertyType, value, property.Name);
-            property.SetValue(target, converted, null);
+            // Skip values that are already set. Some Openness setters always throw even when the getter works
+            // (for example HmiIOField.ShowInputHint in V21), and the compact defaults would hit them on every item.
+            if (TryGetPropertyValue(target, property, out object? current) && Equals(current, converted))
+                return;
+            try
+            {
+                property.SetValue(target, converted, null);
+            }
+            catch (TargetInvocationException error) when (error.InnerException != null)
+            {
+                throw new InvalidDataException(
+                    $"Cannot set '{property.Name}' to {value.GetRawText()} on '{target.GetType().Name}': " +
+                    $"{error.InnerException.GetType().Name}: {error.InnerException.Message}",
+                    error.InnerException);
+            }
+        }
+
+        private static bool TryGetPropertyValue(object target, PropertyInfo property, out object? value)
+        {
+            try
+            {
+                value = property.GetValue(target, null);
+                return true;
+            }
+            catch (TargetInvocationException)
+            {
+                value = null;
+                return false;
+            }
         }
 
         private static object? ConvertJsonValue(Type targetType, JsonElement value, string propertyName)
@@ -2441,14 +2521,28 @@ namespace TiaOpennessMcp.Tia
             foreach (HmiJsonTag expected in plan.Tags)
             {
                 HmiTag? actual = hmi.Tags.Find(expected.Name);
-                if (actual == null || FindHmiTagTable(hmi, expected.Table, expected.Group)?.Tags.Find(expected.Name) == null ||
-                    actual.Connection != expected.Connection || actual.PlcTag != expected.PlcTag ||
-                    expected.DataType != null && actual.DataType != expected.DataType ||
-                    !AreNullableJsonValuesEqual(CreateLimitDocument(actual.InitialMinValue), expected.Min) ||
-                    !AreNullableJsonValuesEqual(CreateLimitDocument(actual.InitialMaxValue), expected.Max))
-                    throw new InvalidOperationException($"HMI tag '{expected.Name}' failed read-back verification.");
+                var mismatches = new List<string>();
+                if (actual == null || FindHmiTagTable(hmi, expected.Table, expected.Group)?.Tags.Find(expected.Name) == null)
+                    mismatches.Add("not found in table '" + expected.Table + "'");
+                else
+                {
+                    // Empty connection or PLC tag means an internal tag; the import leaves those values as TIA sets them.
+                    if (!string.IsNullOrEmpty(expected.Connection) && actual.Connection != expected.Connection)
+                        mismatches.Add($"Connection '{actual.Connection}' != '{expected.Connection}'");
+                    if (!string.IsNullOrEmpty(expected.PlcTag) && actual.PlcTag != expected.PlcTag)
+                        mismatches.Add($"PlcTag '{actual.PlcTag}' != '{expected.PlcTag}'");
+                    if (expected.DataType != null && actual.DataType != expected.DataType)
+                        mismatches.Add($"DataType '{actual.DataType}' != '{expected.DataType}'");
+                    if (!AreNullableJsonValuesEqual(CreateLimitDocument(actual.InitialMinValue), expected.Min))
+                        mismatches.Add("min");
+                    if (!AreNullableJsonValuesEqual(CreateLimitDocument(actual.InitialMaxValue), expected.Max))
+                        mismatches.Add("max");
+                }
+                if (mismatches.Count > 0)
+                    throw new InvalidOperationException(
+                        $"HMI tag '{expected.Name}' failed read-back verification: {string.Join(", ", mismatches)}.");
                 if (expected.Members != null && !AreJsonValuesEqual(
-                    JsonSerializer.SerializeToElement(actual.Members.Select(CreateTagMemberDocument).ToList(), HmiJsonOptions),
+                    JsonSerializer.SerializeToElement(actual!.Members.Select(CreateTagMemberDocument).ToList(), HmiJsonOptions),
                     JsonSerializer.SerializeToElement(expected.Members, HmiJsonOptions)))
                     throw new InvalidOperationException($"HMI tag '{expected.Name}' failed structured member verification.");
             }
@@ -2716,6 +2810,8 @@ namespace TiaOpennessMcp.Tia
                 ["libraryVersionCount"] = plan.Manifest.LibraryTypes.Sum(t => t.Versions.Count),
                 ["saved"] = false
             };
+            if (plan.Warnings.Count > 0)
+                result["warnings"] = plan.Warnings;
             if (compilation != null)
                 result["compilation"] = compilation;
             return result;
@@ -3051,6 +3147,7 @@ namespace TiaOpennessMcp.Tia
             public List<HmiJsonScreen> Screens { get; set; } = new List<HmiJsonScreen>();
             public List<HmiJsonTag> Tags { get; set; } = new List<HmiJsonTag>();
             public List<HmiJsonAlarm> Alarms { get; set; } = new List<HmiJsonAlarm>();
+            public List<string> Warnings { get; set; } = new List<string>();
             public Dictionary<string, Dictionary<string, JsonElement>> Styles { get; set; } =
                 new Dictionary<string, Dictionary<string, JsonElement>>(StringComparer.Ordinal);
         }

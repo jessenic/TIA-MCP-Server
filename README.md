@@ -409,7 +409,7 @@ stateDiagram-v2
 | 27 | `hmi_add_button` | HMI Widget | `screen_name`, `name`, `text`, `script` | Add pushbutton with OnClick JavaScript script. |
 | 28 | `hmi_add_toggle_switch` | HMI Widget | `screen_name`, `name`, `off_text`, `on_text`, `process_tag` | Add a two-state toggle bound to `IsAlternateState`. |
 | 29 | `hmi_add_shape` | HMI Widget | `screen_name`, `type`, `width`, `height` | Add rectangle or circle with border and fill styling. |
-| 30 | `hmi_add_io_field` | HMI Widget | `screen_name`, `name`, `process_value_tag` | Add numeric/string Input-Output field bound to tag. |
+| 30 | `hmi_add_io_field` | HMI Widget | `screen_name`, `name`, `process_tag`, `output_format` | Add numeric/string Input-Output field bound to tag. |
 | 31 | `hmi_set_tag_dynamization`| HMI Logic | `screen_name`, `item_name`, `ranges` | Bind property (e.g. `BackColor`) to tag using Range entries. |
 | 32 | `hmi_update_dynamization_entry` | HMI Logic | `screen_name`, `item_name`, `property_name`, `entry_index` | Update selected mapping-entry values or flashing settings in place. |
 | 33 | `hmi_update_button_scripts`| HMI Logic | `screen_name`, `button_name`, `script` | Update existing button scripts **in-place** with JS validation. |
@@ -864,6 +864,12 @@ This repository includes 3 turnkey agent skills located in `.agents/skills/`:
 ---
 
 ## Version History & Bug Fixes
+
+### [Unreleased]
+* Fixed `hmi_import_json` failing on every `HmiIOField` ("Exception has been thrown by the target of an invocation"): the compact type defaults include `ShowInputHint`, which Openness V21 can read but not set. Properties that already have the requested value are no longer written.
+* `hmi_import_json` errors now name the screen item or HMI tag, the property and the inner Openness exception instead of a bare `TargetInvocationException`.
+* `hmi_import_json` accepts internal HMI tags without `connection`/`plcTag`, and skips a tag that has a connection but no PLC tag with a warning instead of failing the import.
+* Added the `output_format` parameter to `hmi_add_io_field`.
 
 ### [v2.12.0] - 2026-11-26
 * Added hardware configuration tools: catalog lookup, device creation from order numbers or installed GSDML, plug locations, module/submodule plugging, rename and delete (`tia_find_module_types`, `tia_create_device`, `tia_list_plug_locations`, `tia_plug_module`, `tia_rename_hardware`, `tia_delete_hardware`), and IO address reading (`tia_get_io_addresses`).
