@@ -4,7 +4,7 @@
 [![Simulation](https://img.shields.io/badge/Simulation-S7--PLCSIM%20Advanced%20V8.0-008080.svg)](https://support.industry.siemens.com)
 [![Protocol](https://img.shields.io/badge/MCP-2024--11--05-blue.svg)](https://modelcontextprotocol.io)
 [![Runtime](https://img.shields.io/badge/.NET%20Framework-4.8%20x64-512BD4.svg)](https://dotnet.microsoft.com)
-[![Version](https://img.shields.io/badge/Version-v2.11.0-blue.svg)](#version-history--bug-fixes)
+[![Version](https://img.shields.io/badge/Version-v2.12.0-blue.svg)](#version-history--bug-fixes)
 [![Tools](https://img.shields.io/badge/Tools-139%20Registered-brightgreen.svg)](#complete-tools-reference-dictionary-139-tools)
 [![License](https://img.shields.io/badge/License-MIT-orange.svg)](LICENSE)
 
@@ -865,10 +865,11 @@ This repository includes 3 turnkey agent skills located in `.agents/skills/`:
 
 ## Version History & Bug Fixes
 
-### [Unreleased]
+### [v2.12.0] - 2026-11-26
 * Added hardware configuration tools: catalog lookup, device creation from order numbers or installed GSDML, plug locations, module/submodule plugging, rename and delete (`tia_find_module_types`, `tia_create_device`, `tia_list_plug_locations`, `tia_plug_module`, `tia_rename_hardware`, `tia_delete_hardware`), and IO address reading (`tia_get_io_addresses`).
 * Added PROFINET network tools: subnets, IO systems, IO device assignment, IP addresses and PROFINET device names (`tia_list_network`, `tia_create_subnet`, `tia_connect_to_subnet`, `tia_create_io_system`, `tia_connect_to_io_system`, `tia_set_network_node`).
 * Added CAx/AutomationML export and import (`tia_export_aml`, `tia_import_aml`), a deterministic project export for version control (`tia_export_project_files`), project archive and retrieve (`tia_archive_project`, `tia_retrieve_project`) and a JSONL cross-reference export (`tia_export_cross_references`).
+* Updated the reported MCP server version and assembly metadata to v2.12.0.
 
 ### [v2.11.0] - 2026-11-17
 * Added read-only online PLC value tools (`plc_online_connect`, `plc_online_get_status`, `plc_online_disconnect`, `plc_online_list_datablocks`, `plc_online_browse`, `plc_online_read_tags`): read current values from a real S7-1200/S7-1500 over S7CommPlus by symbolic name, without TIA Portal. TLS for TIA V17+ projects, HarpoS7 legacy login for older ones (DotNetProjects.S7CommPlusDriver, LGPL-3.0). No write or operating-state tools.

@@ -1,7 +1,7 @@
 # Siemens TIA Portal V21 Openness MCP Server
 ## Complete Skills & Tools Reference Manual
 
-**Version:** 2.11.0
+**Version:** 2.12.0
 **Target Platform:** Siemens TIA Portal V21 (PublicAPI .NET Framework 4.8 x64)  
 **Supported Transports:** HTTP JSON-RPC 2.0, Server-Sent Events (SSE), stdio MCP  
 **Default Endpoints:** `http://localhost:5001/mcp`, `http://localhost:5001/sse`, `http://localhost:5001/status`
