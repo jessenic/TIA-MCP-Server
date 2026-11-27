@@ -156,6 +156,9 @@ try {
         hmi_rename_tag_table = @('table_name', 'new_name', 'on_conflict')
         hmi_delete_tag = @('tag_name')
         hmi_rename_tag = @('tag_name', 'new_name', 'on_conflict')
+        hmi_compile = @()
+        hmi_get_runtime_settings = @()
+        hmi_set_start_screen = @('screen_name', 'on_conflict')
     }
     foreach ($toolName in $requiredAdditionalContracts.Keys) {
         $schemaPath = Join-Path $outputDirectory "$toolName.json"
@@ -209,7 +212,8 @@ try {
         'hmi_rename_screen',
         'hmi_rename_screen_group',
         'hmi_rename_tag_table',
-        'hmi_rename_tag'
+        'hmi_rename_tag',
+        'hmi_set_start_screen'
     )) {
         $schema = Get-Content -LiteralPath (Join-Path $outputDirectory "$toolName.json") -Raw | ConvertFrom-Json
         if ((@($schema.parameters.properties.on_conflict.enum) -join ',') -ne 'fail') {
@@ -226,6 +230,13 @@ try {
         if ($schema.parameters.properties.offset.type -ne 'integer' -or
             $schema.parameters.properties.page_size.type -ne 'integer') {
             throw "$toolName must expose integer offset and page_size parameters."
+        }
+    }
+
+    $compileSchema = Get-Content -LiteralPath (Join-Path $outputDirectory 'hmi_compile.json') -Raw | ConvertFrom-Json
+    foreach ($propertyName in @('target_name', 'target_device')) {
+        if ($compileSchema.parameters.properties.$propertyName.type -ne 'string') {
+            throw "hmi_compile must expose '$propertyName' (target_device is the backward-compatible alias)."
         }
     }
 

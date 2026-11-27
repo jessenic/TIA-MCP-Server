@@ -1518,15 +1518,24 @@ namespace TiaOpennessMcp.Tools
                 });
 
             // 41. hmi_compile
-            Register("hmi_compile", "Compile HMI software / runtime device using ICompilable. Returns errors, warnings, and messages.",
+            Register("hmi_compile", "Compile a WinCC Unified HMI using ICompilable. The HMI is selected like in the other HMI tools: by exact software, device item or device name, or automatically when the project has only one HMI; several HMIs without target_name fail and list them. Returns state, errors, warnings, messages, and the compiled target and object.",
                 schema =>
                 {
-                    schema.Properties["target_device"] = new ToolProperty { Type = "string", Description = "Device name (e.g. 'PC-System_1', optional)." };
+                    schema.Properties["target_name"] = new ToolProperty { Type = "string", Description = "Exact HMI software, device item, or device name, e.g. 'HMI_RT_1' or 'HMI_1'; optional when the project has exactly one HMI." };
+                    schema.Properties["target_device"] = new ToolProperty { Type = "string", Description = "Deprecated alias of target_name, kept for existing clients. If both are given they must match." };
                 },
                 args =>
                 {
-                    string? target = GetStringProp(args, "target_device");
-                    return CallToolResult.Json(TiaManager.Instance.CompileHmi(target));
+                    string? targetName = GetStringProp(args, "target_name");
+                    string? targetDevice = GetStringProp(args, "target_device");
+                    if (!string.IsNullOrWhiteSpace(targetName) && !string.IsNullOrWhiteSpace(targetDevice) &&
+                        !string.Equals(targetName, targetDevice, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return CallToolResult.Error(
+                            $"target_name '{targetName}' and target_device '{targetDevice}' differ; pass only target_name.");
+                    }
+                    string? target = string.IsNullOrWhiteSpace(targetName) ? targetDevice : targetName;
+                    return CallToolResult.Json(_hmiToolOperations.Value.CompileHmi(target));
                 });
 
             // 42. tia_testsuite_list_tests
@@ -2443,6 +2452,7 @@ namespace TiaOpennessMcp.Tools
             RegisterHardwareTools();
             RegisterBackupTools();
             RegisterHmiTagTools();
+            RegisterHmiRuntimeTools();
         }
 
         // Read-only online access to a real S7-1200/S7-1500 over S7CommPlus with TLS (TIA V17+ projects).

@@ -1,1 +1,18 @@
-{"name":"hmi_compile","description":"Compile HMI software / runtime device using ICompilable. Returns errors, warnings, and messages.","parameters":{"additionalProperties":false,"properties":{"target_device":{"description":"Device name (e.g. 'PC-System_1', optional).","type":"string"}},"type":"object"}}
+{
+  "name": "hmi_compile",
+  "description": "Compile a WinCC Unified HMI using ICompilable. The HMI is selected like in the other HMI tools: by exact software, device item or device name, or automatically when the project has only one HMI; several HMIs without target_name fail and list them. Returns state, errors, warnings, messages, and the compiled target and object.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "target_name": {
+        "type": "string",
+        "description": "Exact HMI software, device item, or device name, e.g. \u0027HMI_RT_1\u0027 or \u0027HMI_1\u0027; optional when the project has exactly one HMI."
+      },
+      "target_device": {
+        "type": "string",
+        "description": "Deprecated alias of target_name, kept for existing clients. If both are given they must match."
+      }
+    },
+    "additionalProperties": false
+  }
+}

@@ -46,5 +46,15 @@ namespace TiaOpennessMcp.Tia
             string itemName,
             string propertyName,
             string? targetName = null);
+
+        CompilationReport CompileHmi(string? targetName = null);
+
+        HmiRuntimeSettingsInfo GetHmiRuntimeSettings(string? targetName = null);
+
+        HmiStartScreenResult SetHmiStartScreen(
+            string screenName,
+            string? targetName,
+            string? expectedCurrentStartScreen,
+            string onConflict);
     }
 }
