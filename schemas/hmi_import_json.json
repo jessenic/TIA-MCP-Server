@@ -1,34 +1,34 @@
 {
   "name": "hmi_import_json",
-  "description": "Upsert a versioned Unified HMI JSON directory under an Openness transaction, verify it, compile, and never save the project. Provide exactly one of input_directory or transfer_id.",
+  "description": "Upsert a versioned Unified HMI JSON directory or staged transfer under an Openness transaction, verify it, compile, and never save the project. An item without a text, dynamizations or events key keeps those sections unchanged; an empty list removes all dynamizations or events. Existing Singlebit/Bitmask mapping tables are updated in place; a changed condition type or bit layout needs onConflict \u0027replace\u0027 on that dynamization (only the dynamization is recreated); bitmask entries must stay in TIA\u0027s exported order. A dry run reports these mapping-table refusals. Flags enum properties such as WindowFlags take one name or names separated by \u0027,\u0027 or \u0027|\u0027, or \u0027None\u0027. Script read-back ignores line endings and trailing whitespace. Import never reorders existing screen items: manifest or screen zOrder \u0027keep\u0027 (default) reports order differences in zOrderWarnings, \u0027require\u0027 fails and rolls back.",
   "parameters": {
-    "additionalProperties": false,
+    "type": "object",
     "properties": {
-      "dry_run": {
-        "description": "Validate the files and target without making changes (default: false).",
-        "type": "boolean"
-      },
       "input_directory": {
-        "description": "Server-local directory containing manifest.json and referenced files. Use this or transfer_id, not both.",
-        "type": "string"
+        "type": "string",
+        "description": "Server-local directory containing manifest.json and referenced files. Use this or transfer_id, not both."
       },
       "transfer_id": {
-        "description": "Staged import ID returned by hmi_begin_import. Use this or input_directory, not both.",
-        "type": "string"
+        "type": "string",
+        "description": "Staged import ID returned by hmi_begin_import. Use this or input_directory, not both."
       },
       "prune_items": {
-        "description": "Delete screen items absent from imported screen files (default: false).",
-        "type": "boolean"
+        "type": "boolean",
+        "description": "Delete screen items absent from imported screen files (default: false)."
       },
-      "target_name": {
-        "description": "Target HMI software/device selector (optional when only one target exists).",
-        "type": "string"
+      "dry_run": {
+        "type": "boolean",
+        "description": "Validate the files and target without making changes (default: false)."
       },
       "verify_hashes": {
-        "description": "Verify exported file hashes (default: true). Set false only when intentionally editing exported JSON without refreshing manifest hashes.",
-        "type": "boolean"
+        "type": "boolean",
+        "description": "Verify exported file hashes (default: true). Set false only when intentionally editing exported JSON without refreshing manifest hashes."
+      },
+      "target_name": {
+        "type": "string",
+        "description": "Target HMI software/device selector (optional when only one target exists)."
       }
     },
-    "type": "object"
+    "additionalProperties": false
   }
 }

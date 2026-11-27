@@ -636,7 +636,7 @@ namespace TiaOpennessMcp.Tools
                     return CallToolResult.Json(_hmiToolOperations.Value.GetHmiEventScripts(screen, item, target));
                 });
 
-            Register("hmi_set_event_script", "Create or update one supported screen or item event script in place and verify the script read-back.",
+            Register("hmi_set_event_script", "Create or update one supported screen or item event script in place and verify the script read-back (line endings and trailing whitespace are ignored in the comparison).",
                 schema =>
                 {
                     schema.Properties["screen_name"] = new ToolProperty { Type = "string", Description = "Screen name." };
@@ -780,7 +780,12 @@ namespace TiaOpennessMcp.Tools
                         GetStringProp(args, "screen_name"), GetStringProp(args, "language"), scale));
                 });
 
-            Register("hmi_import_json", "Upsert a versioned Unified HMI JSON directory or staged transfer under an Openness transaction, verify it, compile, and never save the project.",
+            Register("hmi_import_json", "Upsert a versioned Unified HMI JSON directory or staged transfer under an Openness transaction, verify it, compile, and never save the project. " +
+                "An item without a text, dynamizations or events key keeps those sections unchanged; an empty list removes all dynamizations or events. " +
+                "Existing Singlebit/Bitmask mapping tables are updated in place; a changed condition type or bit layout needs onConflict 'replace' on that dynamization (only the dynamization is recreated); bitmask entries must stay in TIA's exported order. A dry run reports these mapping-table refusals. " +
+                "Flags enum properties such as WindowFlags take one name or names separated by ',' or '|', or 'None'. " +
+                "Script read-back ignores line endings and trailing whitespace. " +
+                "Import never reorders existing screen items: manifest or screen zOrder 'keep' (default) reports order differences in zOrderWarnings, 'require' fails and rolls back.",
                 schema =>
                 {
                     schema.Properties["input_directory"] = new ToolProperty { Type = "string", Description = "Server-local directory containing manifest.json and referenced files. Use this or transfer_id, not both." };
@@ -809,10 +814,12 @@ namespace TiaOpennessMcp.Tools
                     return CallToolResult.Json(TiaManager.Instance.ImportHmiJson(importDirectory, pruneItems, dryRun, target, verifyHashes));
                 });
 
-            Register("hmi_patch_json", "Validate or apply declarative Unified HMI JSON set/bind/delete operations with require and verify guards; changes are transactional, compiled, and never saved.",
+            Register("hmi_patch_json", "Validate or apply declarative Unified HMI JSON set/bind/delete operations with require and verify guards; changes are transactional, compiled, and never saved. " +
+                "bind only changes the tag of a tag dynamization and never the mapping table; omitted readOnly/useIndirectAddressing keep their current values; expectTag guards the current tag. " +
+                "require.screens[].items must exist before any change. Unknown fields are ignored and reported in warnings. Format: hmi-json skill, section Guarded patch workflow.",
                 schema =>
                 {
-                    schema.Properties["file_path"] = new ToolProperty { Type = "string", Description = "Path to a tia-mcp-hmi-patch/1 JSON patch file." };
+                    schema.Properties["file_path"] = new ToolProperty { Type = "string", Description = "Path to a tia-mcp-hmi-patch/1 JSON patch file: {format, require?, verify?, operations: [{op: 'set'|'bind'|'delete', screen, group?, item, ...}]}." };
                     schema.Properties["dry_run"] = new ToolProperty { Type = "boolean", Description = "Validate preconditions and report operations without applying them (default: false)." };
                     schema.Properties["target_name"] = new ToolProperty { Type = "string", Description = "Target HMI software/device selector (optional when only one target exists)." };
                     schema.Required = new List<string> { "file_path" };
@@ -1047,7 +1054,9 @@ namespace TiaOpennessMcp.Tools
                 });
 
             // 32. hmi_set_tag_dynamization
-            Register("hmi_set_tag_dynamization", "Set tag dynamization on a screen item property using numeric ranges or Boolean Singlebit mapping.",
+            Register("hmi_set_tag_dynamization", "Set tag dynamization on a screen item property using numeric ranges or Boolean Singlebit mapping. " +
+                "An existing Singlebit mapping is updated in place. Switching an existing mapping table with entries to another condition type, or replacing a non-tag dynamization, fails: call hmi_delete_dynamization first. " +
+                "'None' only sets the tag and leaves an existing mapping table unchanged. All changes run in one transaction and are rolled back on failure.",
                 schema =>
                 {
                     schema.Properties["screen_name"] = new ToolProperty { Type = "string", Description = "Screen name." };

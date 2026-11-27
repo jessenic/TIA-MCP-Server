@@ -455,9 +455,13 @@ namespace TiaOpennessMcp.Tia
                 readback = GetHmiEventScripts(screen.Name, itemName, targetName);
                 updatedEvent = readback.Events.FirstOrDefault(e =>
                     string.Equals(e.EventType, eventType, StringComparison.OrdinalIgnoreCase));
-                if (updatedEvent == null || !string.Equals(updatedEvent.Script, scriptCode, StringComparison.Ordinal))
+                if (updatedEvent == null)
                     throw new InvalidOperationException(
-                        $"Event script read-back verification failed for '{targetNameForResult}.{eventType}'.");
+                        $"Event script read-back verification failed for '{targetNameForResult}.{eventType}': the event was not found.");
+                if (!AreScriptsEquivalent(scriptCode, updatedEvent.Script))
+                    throw new InvalidOperationException(
+                        $"Event script read-back verification failed for '{targetNameForResult}.{eventType}': " +
+                        DescribeScriptDifference(scriptCode, updatedEvent.Script) + ".");
 
                 errors = GetScriptDiagnostics(script, "Errors");
                 warnings = GetScriptDiagnostics(script, "Warnings");
@@ -785,6 +789,32 @@ namespace TiaOpennessMcp.Tia
             List<HmiRangeEntryInput>? ranges = null,
             string? targetName = null)
         {
+            // All changes run in one transaction: a failure in a later step (entry creation, layout or final check)
+            // rolls back the tag assignment and any deleted Range entries instead of leaving the item half changed.
+            FindHmiSoftware(targetName); // fails with the usual message when no project or HMI is available
+            using (ExclusiveAccess access = _tiaPortal!.ExclusiveAccess("Set Unified HMI tag dynamization"))
+            using (Transaction transaction = access.Transaction(_project!, "Set Unified HMI tag dynamization"))
+            {
+                string result = SetTagDynamizationInTransaction(
+                    screenName, itemName, propertyName, tagName, conditionType, ranges, targetName);
+                transaction.CommitOnDispose();
+                return result;
+            }
+        }
+
+        /// <summary>
+        /// Body of hmi_set_tag_dynamization. The caller must hold an exclusive access and an open transaction
+        /// (the rollback-only live regression test calls this directly inside its own transaction).
+        /// </summary>
+        private string SetTagDynamizationInTransaction(
+            string screenName,
+            string itemName,
+            string propertyName,
+            string tagName,
+            string conditionType,
+            List<HmiRangeEntryInput>? ranges,
+            string? targetName)
+        {
             bool isRange = conditionType.Equals("Range", StringComparison.OrdinalIgnoreCase);
             bool isSingleBit = conditionType.Equals("Singlebit", StringComparison.OrdinalIgnoreCase);
             if (!isRange && !isSingleBit && !conditionType.Equals("None", StringComparison.OrdinalIgnoreCase))
@@ -827,14 +857,34 @@ namespace TiaOpennessMcp.Tia
             var item = screen.ScreenItems.Find(itemName);
             if (item == null) throw new InvalidOperationException($"Item '{itemName}' not found on screen '{screenName}'.");
 
-            var tDyn = item.Dynamizations.Find(propertyName) as TagDynamization
+            DynamizationBase? existingDynamization = item.Dynamizations.Find(propertyName);
+            if (existingDynamization != null && !(existingDynamization is TagDynamization))
+                throw new InvalidOperationException(
+                    $"'{itemName}.{propertyName}' already has a {existingDynamization.GetType().Name}. " +
+                    "Call hmi_delete_dynamization first to replace it with a tag dynamization.");
+            if (existingDynamization is TagDynamization existingTagDynamization && (isRange || isSingleBit))
+            {
+                MappingTable existingTable = existingTagDynamization.ValueConverter.MappingTable;
+                string? conflict = DescribeTagDynamizationTypeSwitch(
+                    existingTable.ConditionType.ToString(), existingTable.Entries.Count,
+                    existingTable.Entries.OfType<MappingTableEntryBitmask>().Count(), conditionType);
+                if (conflict != null)
+                    throw new InvalidOperationException(
+                        $"'{itemName}.{propertyName}': {conflict} Call hmi_delete_dynamization first, then set the new dynamization.");
+            }
+
+            var tDyn = existingDynamization as TagDynamization
                        ?? item.Dynamizations.Create<TagDynamization>(propertyName);
             tDyn.Tag = tagName;
 
+            bool updatedInPlace = false;
             if (isRange || isSingleBit)
             {
                 var mappingTable = tDyn.ValueConverter.MappingTable;
-                while (mappingTable.Entries.Count > 0)
+                updatedInPlace = isSingleBit && mappingTable.ConditionType == ConditionType.Singlebit &&
+                    mappingTable.Entries.Count == 2 && mappingTable.Entries.OfType<MappingTableEntryBitmask>().Count() == 2;
+                // Bitmask entries cannot be deleted through Openness; an existing Singlebit table is updated in place.
+                while (!updatedInPlace && mappingTable.Entries.Count > 0)
                 {
                     mappingTable.Entries[0].Delete();
                 }
@@ -852,7 +902,8 @@ namespace TiaOpennessMcp.Tia
                 }
                 else
                 {
-                    mappingTable.ConditionType = ConditionType.Singlebit;
+                    if (!updatedInPlace)
+                        mappingTable.ConditionType = ConditionType.Singlebit;
                     var entries = mappingTable.Entries.OfType<MappingTableEntryBitmask>().ToList();
                     if (mappingTable.Entries.Count == 0)
                     {
@@ -888,7 +939,32 @@ namespace TiaOpennessMcp.Tia
                         $"TIA did not apply the requested {expectedCondition} mapping to '{itemName}.{propertyName}'.");
             }
 
-            return $"Dynamization on '{itemName}.{propertyName}' linked to '{tagName}' successfully.";
+            return $"Dynamization on '{itemName}.{propertyName}' linked to '{tagName}' successfully." +
+                (updatedInPlace ? " The existing Singlebit mapping entries were updated in place." : "");
+        }
+
+        /// <summary>
+        /// Returns why hmi_set_tag_dynamization refuses to change an existing mapping table to the requested
+        /// condition type, or null when the change is allowed. Switching the condition type of a table that has
+        /// entries is refused, and bitmask entries are only updated in place (Openness cannot delete them).
+        /// </summary>
+        private static string? DescribeTagDynamizationTypeSwitch(
+            string existingConditionType,
+            int existingEntryCount,
+            int existingBitmaskEntryCount,
+            string requestedConditionType)
+        {
+            if (existingEntryCount == 0)
+                return null;
+            if (!string.Equals(existingConditionType, requestedConditionType, StringComparison.OrdinalIgnoreCase))
+                return $"the existing dynamization has a {existingConditionType} mapping table with {existingEntryCount} " +
+                    $"entr{(existingEntryCount == 1 ? "y" : "ies")}; switching it to {requestedConditionType} is refused.";
+            if (existingBitmaskEntryCount > 0 &&
+                !(string.Equals(requestedConditionType, "Singlebit", StringComparison.OrdinalIgnoreCase) &&
+                  existingEntryCount == 2 && existingBitmaskEntryCount == 2))
+                return $"the existing {existingConditionType} mapping table has {existingBitmaskEntryCount} bitmask " +
+                    "entries that cannot be rebuilt in place.";
+            return null;
         }
 
         public object DeleteHmiDynamization(

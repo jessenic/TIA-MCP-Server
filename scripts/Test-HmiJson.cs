@@ -91,6 +91,35 @@ class HmiJsonTests
         throw new Exception("FAIL: expected invalid input rejection: " + message);
     }
 
+    static string Fails(Action action, string message)
+    {
+        try { action(); }
+        catch (InvalidOperationException error) { checks++; return error.Message; }
+        throw new Exception("FAIL: expected InvalidOperationException: " + message);
+    }
+
+    static JsonSerializerOptions HmiOptions()
+    {
+        return (JsonSerializerOptions)typeof(TiaManager).GetField("HmiJsonOptions", BindingFlags.NonPublic | BindingFlags.Static)
+            .GetValue(null);
+    }
+
+    static object Parse(string typeName, string json)
+    {
+        return JsonSerializer.Deserialize(json, typeof(TiaManager).GetNestedType(typeName, BindingFlags.NonPublic), HmiOptions());
+    }
+
+    static JsonElement JsonValue(string json)
+    {
+        return JsonDocument.Parse(json).RootElement.Clone();
+    }
+
+    static IList NewList(string elementTypeName)
+    {
+        return (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(
+            typeof(TiaManager).GetNestedType(elementTypeName, BindingFlags.NonPublic)));
+    }
+
     [MethodImpl(MethodImplOptions.NoInlining)]
     static void Run(string[] args)
     {
@@ -181,6 +210,12 @@ class HmiJsonTests
         Check(!(bool)Invoke("ContainsTagReference", memberTags,
             "UnitParent_UnitData.UnitStatus."), "malformed UDT member reference rejected");
         NewDynamizationTests();
+        FlagsEnumTests();
+        ScriptComparisonTests();
+        PartialItemTests();
+        MappingTablePlanTests();
+        ZOrderTests();
+        PatchFormatTests();
         object first = Document("HmiJsonItem");
         object second = Document("HmiJsonItem");
         Set(first, "Type", "HmiFaceplateContainer");
@@ -285,6 +320,327 @@ class HmiJsonTests
         Reject(() => Invoke("ValidateDynamizationDocument", buttonType, dynamization, tags), "missing resource-list name");
     }
 
+    // Issue #5: [Flags] enums such as HmiWindowFlag accept names separated by ',' or '|' and 'None'.
+    static void FlagsEnumTests()
+    {
+        Type flags = typeof(Siemens.Engineering.HmiUnified.UI.Enum.HmiWindowFlag);
+        string tiaDefault = "ShowCaption, ShowBorder, CanSize, CanMove, CanMaximize, CanClose";
+        Check(Convert.ToInt64(Invoke("ParseEnumValue", flags, tiaDefault, "WindowFlags")) == 123,
+            "flags default combination parses to 123");
+        Check(Convert.ToInt64(Invoke("ParseEnumValue", flags, "None", "WindowFlags")) == 0, "flags None parses to 0");
+        Check(Convert.ToInt64(Invoke("ParseEnumValue", flags, "canclose,showcaption", "WindowFlags")) == 65,
+            "flags names are case-insensitive and comma-separated");
+        Check(Convert.ToInt64(Invoke("ParseEnumValue", flags, "CanClose | ShowCaption", "WindowFlags")) == 65,
+            "flags names may be separated by '|'");
+        Check(Convert.ToInt64(Invoke("ParseEnumValue", flags, "AlwaysInParent", "WindowFlags")) == 128,
+            "single flag parses");
+        for (int value = 0; value <= 255; value++)
+        {
+            object expected = Enum.ToObject(flags, value);
+            var text = ((JsonElement)Invoke("SerializePropertyValue", expected)).GetString();
+            Check(Equals(Invoke("ParseEnumValue", flags, text, "WindowFlags"), expected),
+                "HmiWindowFlag export text round-trips: " + text);
+        }
+        foreach (Type other in new[] { typeof(Siemens.Engineering.HmiUnified.UI.Enum.HmiVisibleAlarms),
+            typeof(Siemens.Engineering.HmiUnified.UI.Enum.HmiScaleMode) })
+        {
+            long mask = 0;
+            foreach (object member in Enum.GetValues(other))
+            {
+                mask |= Convert.ToInt64(member);
+                var text = ((JsonElement)Invoke("SerializePropertyValue", member)).GetString();
+                Check(Equals(Invoke("ParseEnumValue", other, text, "x"), member), other.Name + " member round-trips");
+            }
+            object all = Enum.ToObject(other, mask);
+            var allText = ((JsonElement)Invoke("SerializePropertyValue", all)).GetString();
+            Check(Equals(Invoke("ParseEnumValue", other, allText, "x"), all), other.Name + " full mask round-trips");
+        }
+        foreach (string bad in new[] { "Bogus", "ShowCaption, Bogus", "ShowCaption,,CanClose", "", " ", "123", "ShowCaption, 4" })
+        {
+            string value = bad;
+            Reject(() => Invoke("ParseEnumValue", flags, value, "WindowFlags"), "invalid flags text '" + bad + "'");
+        }
+        Reject(() => Invoke("ParseEnumValue", typeof(Siemens.Engineering.HmiUnified.UI.Dynamization.Script.TriggerType), "99", "x"),
+            "non-flags enum still rejects undefined numbers");
+        Reject(() => Invoke("ParseEnumValue", typeof(ConditionType), "Bogus", "x"), "non-flags enum still rejects unknown names");
+        Check(Equals(Invoke("ParseEnumValue", typeof(ConditionType), "singlebit", "x"), ConditionType.Singlebit),
+            "non-flags enum still parses names");
+        Reject(() => Invoke("ValidatePropertyValue", flags, JsonValue("\"Bogus\""), "WindowFlags"),
+            "property validation rejects bad flags text");
+        Invoke("ValidatePropertyValue", flags, JsonValue("\"None\""), "WindowFlags");
+        Invoke("ValidatePropertyValue", flags, JsonValue("\"" + tiaDefault + "\""), "WindowFlags");
+        Check(true, "property validation accepts None and the TIA default combination");
+        Check(Convert.ToInt64(Invoke("ConvertJsonValue", flags, JsonValue("\"" + tiaDefault + "\""), "WindowFlags")) == 123,
+            "flags JSON value converts");
+        Check((bool)Invoke("IsPropertyValueEqual", Enum.ToObject(flags, 65), JsonValue("\"canclose|ShowCaption\""), "WindowFlags"),
+            "flags read-back compares by value, not text order");
+        Check(!(bool)Invoke("IsPropertyValueEqual", Enum.ToObject(flags, 65), JsonValue("\"CanClose\""), "WindowFlags"),
+            "flags read-back detects a different combination");
+        Check(!(bool)Invoke("IsPropertyValueEqual", Enum.ToObject(flags, 65), JsonValue("\"Bogus\""), "WindowFlags"),
+            "flags read-back treats invalid text as a mismatch");
+        Check((bool)Invoke("IsPropertyValueEqual", 12, JsonValue("12"), "Left"), "non-enum read-back unchanged");
+    }
+
+    // Issue #9: script read-back tolerates CRLF/LF and trailing whitespace only.
+    static void ScriptComparisonTests()
+    {
+        string[][] equivalent = {
+            new[] { "a\nb", "a\r\nb" }, new[] { "a\nb", "a\rb" }, new[] { "a\n\tb", "a  \n\tb\t" },
+            new[] { "a\nb", "a\nb\n" }, new[] { "a\nb", "a\r\nb\r\n\r\n" }, new[] { "a\nb", "﻿a\nb" },
+            new[] { null, "" }, new[] { "", "\r\n" }
+        };
+        foreach (string[] pair in equivalent)
+        {
+            Check((bool)Invoke("AreScriptsEquivalent", pair[0], pair[1]), "equivalent scripts: " + Json(pair));
+            Check(Invoke("DescribeScriptDifference", pair[0], pair[1]) == null, "no difference described: " + Json(pair));
+        }
+        string[][] different = {
+            new[] { "a\nb", "a\nc" }, new[] { "a\n b", "a\nb" }, new[] { "a\nb", "a\nb\nc" }, new[] { "a b", "a  b" }
+        };
+        foreach (string[] pair in different)
+            Check(!(bool)Invoke("AreScriptsEquivalent", pair[0], pair[1]), "different scripts: " + Json(pair));
+        string line3 = (string)Invoke("DescribeScriptDifference", "one\ntwo\nthree", "one\r\ntwo\r\nTHREE");
+        Check(line3 != null && line3.Contains("line 3") && line3.Contains("THREE"), "difference names line 3: " + line3);
+        string lines = (string)Invoke("DescribeScriptDifference", "one\ntwo", "one\ntwo\nthree");
+        Check(lines.Contains("2 line(s)") && lines.Contains("3 line(s)"), "difference names line counts: " + lines);
+
+        IList expected = NewList("HmiJsonEvent");
+        IList actual = NewList("HmiJsonEvent");
+        object expectedEvent = Document("HmiJsonEvent");
+        Set(expectedEvent, "Type", "Up");
+        Set(expectedEvent, "Script", "if (x) {\n  y();\n}\n");
+        expected.Add(expectedEvent);
+        object actualEvent = Document("HmiJsonEvent");
+        Set(actualEvent, "Type", "up");
+        Set(actualEvent, "Script", "if (x) {\r\n  y();  \r\n}");
+        actual.Add(actualEvent);
+        Invoke("VerifyItemEvents", actual, expected, "Main/Nav_F1");
+        Check(true, "multi-line event script with CRLF and trailing spaces passes read-back");
+        Set(actualEvent, "Script", "if (x) {\r\n  z();\r\n}");
+        string eventError = Fails(() => Invoke("VerifyItemEvents", actual, expected, "Main/Nav_F1"), "changed event script");
+        Check(eventError.Contains("line 2") && eventError.Contains("Main/Nav_F1"), "event mismatch is described: " + eventError);
+        actual.Clear();
+        string countError = Fails(() => Invoke("VerifyItemEvents", actual, expected, "Main/Nav_F1"), "missing event");
+        Check(countError.Contains("Up"), "event count mismatch lists the types: " + countError);
+
+        object expectedScript = Document("HmiJsonScriptDynamization");
+        object actualScript = Document("HmiJsonScriptDynamization");
+        Set(expectedScript, "Code", "let a = 1;\nreturn a;");
+        Set(actualScript, "Code", "let a = 1;\r\nreturn a;\r\n");
+        Set(expectedScript, "GlobalDefinitionCode", "");
+        Set(actualScript, "GlobalDefinitionCode", "\r\n");
+        Invoke("VerifyScriptDynamizationCode", actualScript, expectedScript, "Main/A/Visible");
+        Check((string)Get(actualScript, "Code") == "let a = 1;\nreturn a;", "equivalent script dynamization code is normalized for the field compare");
+        Set(actualScript, "Code", "return 2;");
+        Fails(() => Invoke("VerifyScriptDynamizationCode", actualScript, expectedScript, "Main/A/Visible"),
+            "changed script dynamization code");
+    }
+
+    // Issue #7: a missing or null text/dynamizations/events key means "leave unchanged".
+    static void PartialItemTests()
+    {
+        object missing = Parse("HmiJsonItem", "{\"name\":\"A\",\"type\":\"HmiButton\",\"props\":{\"Left\":1}}");
+        Check(Get(missing, "Text") == null && Get(missing, "Dynamizations") == null && Get(missing, "Events") == null,
+            "missing item sections deserialize as null");
+        Check(((string[])Invoke("GetUnchangedItemSections", missing)).Length == 3, "missing sections are reported");
+        object nulls = Parse("HmiJsonItem", "{\"name\":\"A\",\"type\":\"HmiButton\",\"text\":null,\"dynamizations\":null,\"events\":null}");
+        Check(Get(nulls, "Text") == null && Get(nulls, "Dynamizations") == null && Get(nulls, "Events") == null,
+            "explicit null item sections mean no change");
+        object empty = Parse("HmiJsonItem", "{\"name\":\"A\",\"type\":\"HmiButton\",\"text\":{},\"dynamizations\":[],\"events\":[]}");
+        Check(Get(empty, "Text") != null && ((IList)Get(empty, "Dynamizations")).Count == 0 && ((IList)Get(empty, "Events")).Count == 0,
+            "empty item sections stay empty (clear)");
+        Check(((string[])Invoke("GetUnchangedItemSections", empty)).Length == 0, "complete item reports no unchanged sections");
+        string serialized = JsonSerializer.Serialize(empty, empty.GetType(), HmiOptions());
+        Check(serialized.Contains("\"text\": {}") && serialized.Contains("\"dynamizations\": []") && serialized.Contains("\"events\": []"),
+            "export shape still writes text, dynamizations and events: " + serialized);
+
+        string directory = Path.Combine(Path.GetTempPath(), "tia-json-partial-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(directory, "screens"));
+        Directory.CreateDirectory(Path.Combine(directory, "alarms"));
+        try
+        {
+            File.WriteAllText(Path.Combine(directory, "manifest.json"),
+                "{\"format\":\"tia-mcp-hmi/1\",\"screenFiles\":[{\"name\":\"Main\",\"group\":null,\"path\":\"screens/main.json\"}]," +
+                "\"tagFiles\":[],\"discreteAlarmFile\":\"alarms/discrete.json\",\"zOrder\":\"keep\"}");
+            File.WriteAllText(Path.Combine(directory, "screens", "main.json"),
+                "{\"format\":\"tia-mcp-hmi/1\",\"name\":\"Main\",\"group\":null,\"zOrder\":\"require\",\"props\":{\"Width\":800,\"Height\":480}," +
+                "\"items\":[{\"name\":\"A\",\"type\":\"HmiButton\",\"props\":{\"Left\":10}}]}");
+            File.WriteAllText(Path.Combine(directory, "alarms", "discrete.json"), "{\"format\":\"tia-mcp-hmi/1\",\"discreteAlarms\":[]}");
+            object plan = InstanceInvoke(TiaManager.Instance, "ReadHmiJsonImportPlan", directory, false);
+            object screen = ((IList)Get(plan, "Screens"))[0];
+            object item = ((IList)Get(screen, "Items"))[0];
+            Check(Get(item, "Events") == null && (string)Get(screen, "ZOrder") == "require",
+                "import plan reads an item without events and the screen zOrder");
+            File.WriteAllText(Path.Combine(directory, "manifest.json"),
+                "{\"format\":\"tia-mcp-hmi/1\",\"screenFiles\":[{\"name\":\"Main\",\"group\":null,\"path\":\"screens/main.json\"}]," +
+                "\"tagFiles\":[],\"discreteAlarmFile\":\"alarms/discrete.json\",\"zOrder\":\"sideways\"}");
+            Reject(() => InstanceInvoke(TiaManager.Instance, "ReadHmiJsonImportPlan", directory, false), "unknown manifest zOrder");
+        }
+        finally { Directory.Delete(directory, true); }
+    }
+
+    static object Bitmask(string bitType, ulong condition, ulong relevant, string color)
+    {
+        object entry = Document("HmiJsonMappingEntry");
+        Set(entry, "Type", "Bitmask");
+        Set(entry, "BitDynamizationType", bitType);
+        Set(entry, "Condition", JsonSerializer.SerializeToElement(condition));
+        Set(entry, "Relevant", relevant);
+        object value = Document("HmiJsonMappingValue");
+        Set(value, "Type", "String");
+        Set(value, "Value", JsonSerializer.SerializeToElement(color));
+        Set(entry, "Value", value);
+        return entry;
+    }
+
+    static object Converter(string conditionType, params object[] entries)
+    {
+        object converter = Document("HmiJsonValueConverter");
+        Set(converter, "ConditionType", conditionType);
+        foreach (object entry in entries)
+            ((IList)Get(converter, "Entries")).Add(entry);
+        return converter;
+    }
+
+    static string PlanMode(object existing, object desired)
+    {
+        return Get(Invoke("PlanMappingTableUpdate", existing, desired), "Mode").ToString();
+    }
+
+    // Issue #6: existing Singlebit/Bitmask tables are updated in place, never by deleting bitmask entries.
+    static void MappingTablePlanTests()
+    {
+        object singlebit = Converter("Singlebit", Bitmask("SingleBit", 0, 1, "#E2E5E8"), Bitmask("SingleBit", 1, 1, "#E80000"));
+        object sameSinglebit = Converter("Singlebit", Bitmask("SingleBit", 0, 1, "#E2E5E8"), Bitmask("SingleBit", 1, 1, "#E80000"));
+        object plan = Invoke("PlanMappingTableUpdate", singlebit, sameSinglebit);
+        Check(Get(plan, "Mode").ToString() == "UpdateBitmaskInPlace" && Json(Get(plan, "Pairing")) == "[0,1]",
+            "unchanged Singlebit re-import is updated in place");
+        Check(PlanMode(singlebit, Converter("Singlebit", Bitmask("SingleBit", 0, 1, "#00FF00"), Bitmask("SingleBit", 1, 1, "#0000FF")))
+            == "UpdateBitmaskInPlace", "Singlebit colour change is updated in place");
+        object swapped = Invoke("PlanMappingTableUpdate", singlebit,
+            Converter("Singlebit", Bitmask("SingleBit", 1, 1, "#E80000"), Bitmask("SingleBit", 0, 1, "#E2E5E8")));
+        // The read-back compares entries by position, so a reordered table is refused instead of failing verification.
+        Check(Get(swapped, "Mode").ToString() == "RefuseEntryOrder" && ((string)Get(swapped, "Reason")).Contains("order"),
+            "swapped Singlebit entries are refused with an entry-order reason");
+        string orderRefusal = (string)Invoke("DescribeMappingTablePlanConflict", "Lamp_1", "BackColor", swapped, "replace");
+        Check(orderRefusal != null && orderRefusal.Contains("Lamp_1.BackColor") && orderRefusal.Contains("TIA's entry order"),
+            "entry-order refusal applies even with onConflict replace: " + orderRefusal);
+        Check(Invoke("DescribeMappingTablePlanConflict", "Lamp_1", "BackColor", plan, null) == null,
+            "in-place plan has no conflict");
+        object movedPlan = Invoke("PlanMappingTableUpdate", singlebit,
+            Converter("Singlebit", Bitmask("SingleBit", 0, 8, "#E2E5E8"), Bitmask("SingleBit", 8, 8, "#E80000")));
+        Check(Invoke("DescribeMappingTablePlanConflict", "Lamp_1", "BackColor", movedPlan, null) != null &&
+            Invoke("DescribeMappingTablePlanConflict", "Lamp_1", "BackColor", movedPlan, "Replace") == null,
+            "replace plan conflicts only without onConflict replace (dry run and apply share this check)");
+        object moved = Invoke("PlanMappingTableUpdate", singlebit,
+            Converter("Singlebit", Bitmask("SingleBit", 0, 8, "#E2E5E8"), Bitmask("SingleBit", 8, 8, "#E80000")));
+        Check(Get(moved, "Mode").ToString() == "ReplaceDynamization" && ((string)Get(moved, "Reason")).Contains("relevant"),
+            "Singlebit bit change needs a replace");
+        object range = Document("HmiJsonMappingEntry");
+        Set(range, "Type", "Range");
+        Set(range, "From", Invoke("CreateMappingValue", 0));
+        Set(range, "To", Invoke("CreateMappingValue", 1));
+        object rangeConverter = Converter("Range", range);
+        Check(PlanMode(singlebit, rangeConverter) == "ReplaceDynamization", "Singlebit to Range needs a replace");
+        Check(PlanMode(rangeConverter, rangeConverter) == "RebuildEntries", "Range to Range rebuilds the entries");
+        Check(PlanMode(Converter("None"), singlebit) == "RebuildEntries", "empty table to Singlebit uses the fresh path");
+        Check(PlanMode(singlebit, Converter("Singlebit")) == "ReplaceDynamization", "Singlebit to an empty table needs a replace");
+        object multi = Converter("Bitmask", Bitmask("MultiBit", 1, 1, "#000001"), Bitmask("MultiBit", 2, 2, "#000002"));
+        Check(PlanMode(multi, Converter("Bitmask", Bitmask("MultiBit", 0, 1, "#000003"), Bitmask("MultiBit", 2, 2, "#000004")))
+            == "UpdateBitmaskInPlace", "MultiBit with the same masks is updated in place");
+        Check(PlanMode(multi, Converter("Bitmask", Bitmask("MultiBit", 1, 1, "#000001"))) == "ReplaceDynamization",
+            "MultiBit with a different entry count needs a replace");
+        Check(PlanMode(multi, Converter("Singlebit", Bitmask("SingleBit", 0, 1, "#0"), Bitmask("SingleBit", 1, 1, "#1")))
+            == "ReplaceDynamization", "Bitmask to Singlebit needs a replace");
+        string conflict = (string)Invoke("FormatMappingTableConflict", "Lamp_1", "BackColor", "reason");
+        Check(conflict.Contains("Lamp_1.BackColor") && conflict.Contains("onConflict") && conflict.Contains("replace"),
+            "mapping table refusal names item.property and onConflict");
+
+        Check(Invoke("DescribeTagDynamizationTypeSwitch", "Singlebit", 2, 2, "Singlebit") == null,
+            "hmi_set_tag_dynamization keeps an existing Singlebit table");
+        Check(Invoke("DescribeTagDynamizationTypeSwitch", "None", 0, 0, "Singlebit") == null,
+            "hmi_set_tag_dynamization fills an empty table");
+        Check(Invoke("DescribeTagDynamizationTypeSwitch", "Range", 3, 0, "Range") == null,
+            "hmi_set_tag_dynamization rebuilds a Range table");
+        Check(Invoke("DescribeTagDynamizationTypeSwitch", "Singlebit", 2, 2, "Range") != null,
+            "hmi_set_tag_dynamization refuses Singlebit to Range");
+        Check(Invoke("DescribeTagDynamizationTypeSwitch", "Range", 2, 0, "Singlebit") != null,
+            "hmi_set_tag_dynamization refuses Range to Singlebit");
+        Check(Invoke("DescribeTagDynamizationTypeSwitch", "Singlebit", 3, 3, "Singlebit") != null,
+            "hmi_set_tag_dynamization refuses an unexpected Singlebit layout");
+    }
+
+    // Issue #8: z-order check helpers.
+    static void ZOrderTests()
+    {
+        Check(((IList)Invoke("FindZOrderDifferences", new List<string> { "A", "B", "C", "D" },
+            new List<string> { "A", "B", "C", "D" })).Count == 0, "matching order has no differences");
+        var front = (List<string>)Invoke("FindZOrderDifferences", new List<string> { "Back", "A", "B", "C", "D" },
+            new List<string> { "C", "D", "Back", "A", "B" });
+        Check(front.Count == 2 && front.Contains("C") && front.Contains("D"), "new items placed at the back are reported: " + Json(front));
+        Check(((IList)Invoke("FindZOrderDifferences", new List<string> { "A", "B" },
+            new List<string> { "a", "X", "b" })).Count == 0, "items not in the file are ignored, names case-insensitive");
+        Check(((IList)Invoke("FindZOrderDifferences", new List<string> { "A", "B", "C" },
+            new List<string> { "C", "B", "A" })).Count == 2, "reversed order reports all but one item");
+        Check((string)Invoke("ResolveZOrderMode", null, null, "x") == "keep", "zOrder defaults to keep");
+        Check((string)Invoke("ResolveZOrderMode", "require", null, "x") == "require", "manifest zOrder require");
+        Check((string)Invoke("ResolveZOrderMode", "require", "Keep", "x") == "keep", "screen zOrder overrides manifest");
+        Reject(() => Invoke("ResolveZOrderMode", null, "file", "screens/main.json"), "unsupported zOrder value");
+        var names = new List<string> { "C" };
+        string message = (string)Invoke("DescribeZOrderDifference", "Main", names, false);
+        Check(message.Contains("Main") && message.Contains("'C'"), "z-order warning names the screen and items");
+    }
+
+    // Issue #22: patch format fields, bind guards and unknown-field warnings.
+    static void PatchFormatTests()
+    {
+        object patch = Parse("HmiJsonPatch",
+            "{\"format\":\"tia-mcp-hmi-patch/1\",\"extra\":1," +
+            "\"require\":{\"screens\":[{\"name\":\"Main\",\"items\":[{\"name\":\"Lamp\",\"type\":\"HmiCircle\",\"kind\":\"x\"}]}]}," +
+            "\"operations\":[{\"op\":\"bind\",\"screen\":\"Main\",\"item\":\"Lamp\",\"property\":\"BackColor\",\"tag\":\"New\"," +
+            "\"expectTag\":\"Old\",\"bogus\":true}]}");
+        object operation = ((IList)Get(patch, "Operations"))[0];
+        Check(Get(operation, "ReadOnly") == null && Get(operation, "UseIndirectAddressing") == null &&
+            (string)Get(operation, "ExpectTag") == "Old", "bind flags are optional and expectTag is read");
+        var warnings = (List<string>)Invoke("CollectUnknownPatchFields", patch);
+        Check(warnings.Count == 3 && warnings.Any(w => w.Contains("(root)") && w.Contains("extra")) &&
+            warnings.Any(w => w.Contains("operations[0]") && w.Contains("bogus")) &&
+            warnings.Any(w => w.Contains("require.screens[0].items[0]") && w.Contains("kind")),
+            "unknown patch fields are reported: " + Json(warnings));
+        Check(((List<string>)Invoke("CollectUnknownPatchFields", Parse("HmiJsonPatch",
+            "{\"format\":\"tia-mcp-hmi-patch/1\",\"Operations\":[{\"Op\":\"delete\",\"Screen\":\"Main\",\"Item\":\"A\"}]}"))).Count == 0,
+            "known patch fields in any case give no warnings");
+        Check((bool)Invoke("ResolveBindFlag", null, true), "omitted bind flag keeps the existing true value");
+        Check(!(bool)Invoke("ResolveBindFlag", null, null), "omitted bind flag is false for a new dynamization");
+        Check(!(bool)Invoke("ResolveBindFlag", false, true), "explicit bind flag wins");
+        Check(Invoke("CheckBindExpectTag", null, null, null) == null, "no expectTag guard");
+        Check(Invoke("CheckBindExpectTag", "Old", "TagDynamization", "Old") == null, "expectTag matches");
+        Check(Invoke("CheckBindExpectTag", "Old", "TagDynamization", "Other") != null, "expectTag mismatch fails");
+        Check(Invoke("CheckBindExpectTag", "Old", null, null) != null, "expectTag without a dynamization fails");
+        Check(Invoke("CheckBindExpectTag", "Old", "ScriptDynamization", null) != null, "expectTag on a script dynamization fails");
+        Type button = typeof(HmiButton);
+        Invoke("ValidatePatchBindDocument", button, "BackColor", "Replace");
+        Invoke("ValidatePatchBindDocument", button, "BackColor", null);
+        Check(true, "bind accepts a dynamizable property and onConflict replace/null");
+        Reject(() => Invoke("ValidatePatchBindDocument", button, "BackColor", "merge"), "bind rejects unknown onConflict");
+        Reject(() => Invoke("ValidatePatchBindDocument", button, "Font.Size", null), "bind rejects a dotted part path");
+        Reject(() => Invoke("ValidatePatchBindDocument", button, "NoSuchProperty", null), "bind rejects an unknown property");
+        Invoke("ValidatePatchProperty", button, "Left", JsonValue("286"));
+        Check(true, "set accepts a numeric Left value");
+        Reject(() => Invoke("ValidatePatchProperty", button, "Name", JsonValue("\"x\"")), "set rejects renames");
+        var description = (Dictionary<string, object>)Invoke("DescribePatchOperation", operation);
+        Check((string)description["readOnly"] == "keep" && (string)description["expectTag"] == "Old",
+            "dry-run description shows kept bind flags and expectTag");
+        object explicitPatch = Parse("HmiJsonPatch",
+            "{\"format\":\"tia-mcp-hmi-patch/1\",\"operations\":[{\"op\":\"bind\",\"screen\":\"Main\",\"item\":\"Lamp\"," +
+            "\"property\":\"BackColor\",\"tag\":\"New\",\"readOnly\":true,\"useIndirectAddressing\":false}]}");
+        var explicitDescription = (Dictionary<string, object>)Invoke("DescribePatchOperation",
+            ((IList)Get(explicitPatch, "Operations"))[0]);
+        Check(explicitDescription["readOnly"] is bool && (bool)explicitDescription["readOnly"] &&
+            explicitDescription["useIndirectAddressing"] is bool && !(bool)explicitDescription["useIndirectAddressing"],
+            "dry-run description gives explicit bind flags as JSON booleans");
+    }
+
     static void Live(int pid, string target, bool libraryTests)
     {
         var manager = TiaManager.Instance;
@@ -323,17 +679,27 @@ class HmiJsonTests
                     bitmaskTarget.Dynamizations.Find("BackColor"));
                 Check(Json(bitmaskDocument) == Json(bitmaskReadBack),
                     "live bitmask converter API create and read-back");
+                // Issue #6: applying the same Singlebit document again updates the existing table in place.
+                Invoke("ApplyDynamizations", hmi, bitmaskTarget, bitmaskDynamizations, true);
+                Check(Json(bitmaskDocument) == Json(Invoke("CreateDynamizationDocument",
+                    bitmaskTarget.Dynamizations.Find("BackColor"))) &&
+                    ((ExpressionDynamization)bitmaskTarget.Dynamizations.Find("BackColor")).ValueConverter
+                        .MappingTable.Entries.Count == 2,
+                    "live Singlebit re-apply updates the existing table in place");
                 var existingTag = hmi.Tags.FirstOrDefault();
                 if (existingTag != null)
                 {
                     var singlebitTarget = temporary.ScreenItems.Create<HmiButton>("__SinglebitTarget");
                     singlebitTarget.Dynamizations.Create<TagDynamization>("BackColor");
-                    manager.SetTagDynamization(name, singlebitTarget.Name, "BackColor", existingTag.Name,
-                        "Singlebit", new List<HmiRangeEntryInput>
-                        {
-                            new HmiRangeEntryInput { From = 0, To = 0, Value = "#E2E5E8" },
-                            new HmiRangeEntryInput { From = 1, To = 1, Value = "#E80000" }
-                        }, target);
+                    // The public method opens its own transaction; inside this rollback-only transaction the
+                    // body is called directly. Called twice: the second call must update the table in place.
+                    for (int pass = 0; pass < 2; pass++)
+                        InstanceInvoke(manager, "SetTagDynamizationInTransaction", name, singlebitTarget.Name,
+                            "BackColor", existingTag.Name, "Singlebit", new List<HmiRangeEntryInput>
+                            {
+                                new HmiRangeEntryInput { From = 0, To = 0, Value = "#E2E5E8" },
+                                new HmiRangeEntryInput { From = 1, To = 1, Value = "#E80000" }
+                            }, target);
                     var singlebitTable = ((TagDynamization)singlebitTarget.Dynamizations.Find("BackColor"))
                         .ValueConverter.MappingTable;
                     var singlebitEntries = singlebitTable.Entries.OfType<MappingTableEntryBitmask>().ToList();

@@ -72,7 +72,9 @@ operations, use `tia-portal-openness`.
    screen files, and other relevant files. Inspect them before making claims about the
    design; the manifest contains the file hashes.
 5. Keep the export structure intact and make focused edits. Preserve screen item array
-   order: it represents visual stacking order.
+   order: it represents visual stacking order. Import cannot reorder existing items
+   (V21 Openness has no reorder API) and TIA decides where newly created items land;
+   see `zOrder` under the import workflow.
 
 For remote transfers, create an import staging area with `hmi_begin_import`, then upload
 the edited `manifest.json` and every referenced file with `hmi_upload_import_file`.
@@ -123,14 +125,19 @@ The manifest records `format` (`tia-mcp-hmi/1`), target and TIA version, languag
 export timestamp, compact mode, file references, and SHA-256 hashes. Screen groups are
 stored as slash-separated `group` paths; root screens have `group: null`. Screen files
 contain `props`, `text`, and ordered `items`. Items contain `name`, `type`, `props`,
-`text`, `dynamizations`, and `events`, with an optional `style`.
+`text`, `dynamizations`, and `events`, with an optional `style`. Export always writes
+all three item sections. On import, an item without a `text`, `dynamizations` or
+`events` key (or with the key set to `null`) leaves that section of an existing item
+unchanged; `[]` removes all dynamizations or events.
 
 Conventions:
 
 - Keep JSON UTF-8, two-space indented, and preserve the existing key/property spelling.
 - Property keys in `props` use the Openness property names (for example `Left`,
-  `Width`, `BackColor`). Enums are strings by name. Colors use `#RRGGBB` or
-  `#AARRGGBB`.
+  `Width`, `BackColor`). Enums are strings by name. Flags enums such as `WindowFlags`
+  take one name or several names separated by `,` or `|` (export writes the form
+  `"ShowCaption, CanClose"`); `"None"` clears all flags and numbers are rejected.
+  Colors use `#RRGGBB` or `#AARRGGBB`.
 - Text that is plain across all configured languages can be a string. Use a language
   map such as `{ "en-US": "...", "fi-FI": "..." }` for differing translations. Use
   `{ "html": "<body><p>...</p></body>" }` for raw markup. A language map must include
@@ -159,7 +166,10 @@ Conventions:
   Referenced text/graphic lists must already exist in the destination; this export
   records the binding, not the underlying resource-list definition.
 - Event scripts are JSON strings inline by default. With sidecars, each event has
-  `scriptFile`; the manifest hashes the script file as well.
+  `scriptFile`; the manifest hashes the script file as well. Import read-back compares
+  event and script-dynamization code ignoring CRLF/LF differences and trailing spaces
+  or tabs at line ends and at the end; any other difference fails and names the first
+  differing line. Scripts are always written exactly as supplied.
 - Faceplate/custom-widget `interface` arrays contain parameter `name`, typed `value`
   (the same `{ "type": "Double", "value": 50 }` shape used for converters), and nested
   `properties`. Preserve parameter types and tag-reference strings; these are instance
@@ -187,7 +197,12 @@ Conventions:
    confirm its PLC path and connection are the intended ones.
 3. Before editing or removing an event or dynamization, inspect the whole item record;
    an empty `events` or `dynamizations` array is meaningful on import and removes
-   existing handlers or dynamizations for that item.
+   existing handlers or dynamizations for that item. Omit the key (or set it to
+   `null`) to leave that section unchanged. `text: {}` sets no texts in a non-compact
+   import and resets texts to the type defaults in a compact import; omit `text` to
+   keep the existing texts. Omitted `props` are still reset to type defaults in a
+   compact import, so use item `compact: false` or `hmi_patch_json` for partial
+   property edits.
 4. Validate JSON syntax and cross-references: file references, screen identities,
    unique item/tag/alarm names, style references, alarm tags, dynamization tags, and
    event scripts. Screen width and height must be present and nonzero.
@@ -199,14 +214,26 @@ Conventions:
 6. Import supports Tag, Expression, Script, and ResourceList dynamizations, with
    Simple/Range/Bitmask converter mappings. Setting `Singlebit` may cause TIA to create its bitmask entries
    automatically; reuse those entries and create them only if the table is empty.
-   Import verifies generated relevant masks against the JSON. Other
+   Import verifies generated relevant masks against the JSON. Bitmask entries cannot
+   be deleted through Openness, so an existing Singlebit or Bitmask table is updated
+   in place when the condition type, bit dynamization type, entry count and relevant
+   masks match; an unchanged export re-imports cleanly. A different condition type or
+   relevant mask (bit) needs `"onConflict": "replace"` on that dynamization, which
+   recreates only the dynamization, never the item. The relevant mask is read-only in
+   Openness, so a recreated table works only when TIA generates the requested bit;
+   otherwise change the bit in TIA Portal. To retag such items, use `bind` in
+   `hmi_patch_json`. Other
    dynamization/mapping kinds fail explicitly. Legacy `ExpressionDynamization`
    placeholders lack converter data: re-export rather than attempting to import them.
 
 ## Singlebit setter and tool availability
 
-- `hmi_set_tag_dynamization` with `condition_type: "Singlebit"` sets or replaces the
-  mapping table; it is not a one-entry editor. Use `hmi_update_dynamization_entry` for
+- `hmi_set_tag_dynamization` with `condition_type: "Singlebit"` sets the off/on values
+  of the mapping table; an existing Singlebit table is updated in place. Switching an
+  existing table that has entries to another condition type (for example Singlebit to
+  Range), or replacing a non-tag dynamization, fails: call `hmi_delete_dynamization`
+  first. `condition_type: "None"` only sets the tag and leaves an existing table as
+  it is. The setter is not a one-entry editor. Use `hmi_update_dynamization_entry` for
   a targeted update to an existing row.
 - TIA may generate Singlebit entries when the condition type is assigned, even if an
   initial Openness collection read appears empty. If a setter call fails, assume the
@@ -328,8 +355,23 @@ reviews reproducible; otherwise en-US is preferred, then the first manifest lang
 An import upserts screens, widgets, tags, and alarms in the listed files; it does not
 delete screens or tag/alarm objects omitted from the export. For each imported item,
 the supplied properties and text are applied, while `events` and `dynamizations` are
-reconciled to the supplied arrays. With compact imports, omitted item properties and
-text are reset to TIA-created type defaults. Review these effects before importing.
+reconciled to the supplied arrays. A missing or `null` `text`, `events` or
+`dynamizations` key leaves that section unchanged (the result `warnings` lists such
+items); `[]` deletes all events or dynamizations of the item. With compact imports,
+omitted item properties are reset to TIA-created type defaults, and so are texts when
+the item has a `text` key. Screen-level `props` and `text` are applied as given.
+Review these effects before importing.
+
+Screen item order: the item array order is the stacking order. Import never reorders
+existing items, and V21 Openness cannot create an item at a given position, so new
+items are created in file order and TIA decides where they land (they have been seen
+behind existing items). After applying, the import compares the item order of each
+imported screen with the file. Set `"zOrder"` in `manifest.json` (all screens) or in
+a screen file (that screen only): `"keep"` (default) reports differences in the
+result's `zOrderWarnings`; `"require"` fails and rolls the import back. A dry run
+reports existing items that are already out of file order. Fix the order with Arrange
+(Bring to front / Send to back) in the TIA editor. Older server versions ignore
+`zOrder`.
 
 ## Native library import and SVG sources
 
@@ -350,8 +392,85 @@ metadata-only XML produced by `LibraryTypeVersion.Export`.
 ## Guarded patch workflow
 
 Use `hmi_patch_json` for a narrow update to existing items when a full export/import is
-unnecessary. Patch files use `tia-mcp-hmi-patch/1`, support `set`, `bind`, and `delete`,
-and can include `require` and `verify` conditions. For example:
+unnecessary. A patch file is one JSON object in the `tia-mcp-hmi-patch/1` format (at
+most 10 MiB). It changes existing items only: it cannot create items, rename items,
+or edit events, scripts or expression dynamizations.
+
+### Root fields
+
+| Field | Required | Meaning |
+|---|---|---|
+| `format` | yes | Exactly `"tia-mcp-hmi-patch/1"`. |
+| `require` | no | Preconditions checked before any change (see below). |
+| `operations` | yes | Ordered list of `set`, `bind` and `delete` operations, at most 10,000. |
+| `verify` | no | Postconditions checked after the operations, before commit. |
+
+`require` and `verify` have the same shape:
+
+| Field | Meaning |
+|---|---|
+| `screens[].name` | Screen name (required). |
+| `screens[].group` | Slash-separated screen group path; `null` or omitted for a root screen. |
+| `screens[].width`, `screens[].height` | Optional; must equal the screen size. |
+| `screens[].items[].name` | Item that must exist on that screen. |
+| `screens[].items[].type` | Optional exact item class name, for example `HmiIOField`. |
+| `tags[].name` | HMI tag that must exist. |
+| `tags[].plcTag` | Optional; the tag's PLC binding must equal this text exactly. |
+
+`require` is checked against the project before the patch, including
+`screens[].items`. After the operations, the screens, dimensions and tags in `require`
+are checked again (items are not, so a patch may require an item and then delete it).
+`verify` checks screens, dimensions, tags and the listed items with their types.
+
+### Operation fields
+
+| Field | Used by | Required | Meaning |
+|---|---|---|---|
+| `op` | all | yes | `"set"`, `"bind"` or `"delete"` (lower case). |
+| `screen` | all | yes | Screen name. |
+| `group` | all | no | Screen group path; `null` or omitted for a root screen. |
+| `item` | all | yes | Existing item name. |
+| `requireType` | all | no | The item class name must match exactly, for example `HmiIOField`. |
+| `property` | set, bind | yes | Openness property name. `set` accepts a dotted path into parts such as `Font.Size`; `bind` takes a top-level dynamizable property such as `ProcessValue` or `BackColor`. |
+| `value` | set | yes | New value with the JSON type of the property: number, `true`/`false`, enum name (flags enums: names separated by `,` or `\|`), `#RRGGBB` color, or for a text property a string, language map or `{ "html": "..." }`. |
+| `tag` | bind | yes | Existing HMI tag, member/array path, or system tag. |
+| `expectTag` | bind | no | Guard: the property must already have a tag dynamization bound to exactly this tag. |
+| `readOnly` | bind | no | `true`/`false`. Omitted: keeps the current value of an existing tag dynamization (`false` for a new one). |
+| `useIndirectAddressing` | bind | no | Same rule as `readOnly`. |
+| `onConflict` | bind | no | `"fail"` (default) or `"replace"`. `replace` allows replacing a non-tag (Expression, Script or ResourceList) dynamization with a tag dynamization. |
+| `requireNoDynamizations` | delete | no | Fail if the item has dynamizations (checked before the patch). |
+| `requireNoEvents` | delete | no | Fail if the item has event handlers (checked before the patch). |
+
+Field names are case-insensitive. The values of `format` and `op` are case-sensitive;
+`onConflict` is not. Unknown fields are ignored and listed in the result's `warnings`;
+check them, because a misspelled guard is not applied.
+
+`bind` semantics: an existing tag dynamization is reused and only its tag (and the
+two flags) are written. The server never touches the value converter or mapping table
+on `bind`, so an existing Range, Singlebit or Bitmask table stays as it is. This makes
+`bind` the way to retag Singlebit/Bitmask items without reimporting their tables
+(issue #6). Whether TIA itself adjusts the table when the new tag has a different data
+type has not been verified; read the item back after a retag to a different type.
+
+### Processing order
+
+1. Read the file, check `format`, check `require` (screens, dimensions, tags, items).
+2. Validate every operation against the project state before the patch. An operation
+   on an item that an earlier operation deletes is rejected.
+3. With `dry_run: true`, stop and return the operation list. For `bind` it shows
+   `expectTag`, `readOnly` and `useIndirectAddressing` (`"keep"` when omitted) and
+   `onConflict`.
+4. Otherwise, in one transaction: apply the operations in order, re-check `require`,
+   check `verify`, commit.
+5. Compile the HMI. The project is never saved.
+
+A failure in steps 1 to 4 changes nothing (the transaction rolls back). A compile error
+in step 5 is reported as an error, but the changes stay applied in memory and unsaved;
+do not report them as rolled back.
+
+### Examples
+
+Move an IO field and set its text in all languages, guarded by item type:
 
 ```json
 {
@@ -364,57 +483,82 @@ and can include `require` and `verify` conditions. For example:
         "width": 800,
         "height": 450,
         "items": [
-          { "name": "IO field_1", "type": "HmiIOField" }
+          { "name": "IO field_1", "type": "HmiIOField" },
+          { "name": "Label_1", "type": "HmiText" }
         ]
       }
-    ],
-    "tags": [
-      { "name": "DB_Params_FlowLower", "plcTag": "DB_Params.FlowLower" }
     ]
   },
   "operations": [
     {
       "op": "set",
       "screen": "ParameterScreen",
-      "group": null,
       "item": "IO field_1",
       "requireType": "HmiIOField",
       "property": "Left",
       "value": 286
     },
     {
-      "op": "bind",
+      "op": "set",
       "screen": "ParameterScreen",
-      "item": "IO field_1",
-      "requireType": "HmiIOField",
-      "property": "ProcessValue",
-      "tag": "DB_Params_FlowLower",
-      "readOnly": false,
-      "onConflict": "fail"
+      "item": "Label_1",
+      "property": "Text",
+      "value": { "en-US": "Flow lower limit", "fi-FI": "Virtauksen alaraja" }
     }
   ],
   "verify": {
     "screens": [
       {
         "name": "ParameterScreen",
-        "group": null,
-        "items": [
-          { "name": "IO field_1", "type": "HmiIOField" }
-        ]
+        "items": [ { "name": "IO field_1", "type": "HmiIOField" } ]
       }
     ]
   }
 }
 ```
 
-`require` checks existing screens, optional dimensions, and tags before operations.
-`verify` checks the resulting screens, dimensions, tags, and named item types.
-`set` fails when the screen or item is missing and cannot rename an item. `bind` must
-reference an existing HMI tag and refuses to replace a non-tag dynamization by default.
-`delete` requires the existing item; use `requireNoDynamizations` and/or
-`requireNoEvents` when deletion must be guarded against those dependencies. Always
-use a dry run, review the operation list, and get authorization before applying a
-patch. The patch also compiles and leaves the project unsaved.
+Retag a Singlebit status lamp without touching its mapping table; the patch fails if
+the lamp is not currently bound to the old tag:
+
+```json
+{
+  "format": "tia-mcp-hmi-patch/1",
+  "require": {
+    "tags": [ { "name": "Motor2_Running", "plcTag": "DB_Motors.Motor2.Running" } ]
+  },
+  "operations": [
+    {
+      "op": "bind",
+      "screen": "Overview",
+      "item": "Lamp_Motor2",
+      "property": "BackColor",
+      "tag": "Motor2_Running",
+      "expectTag": "Motor1_Running"
+    }
+  ]
+}
+```
+
+Delete an item only if it has no dynamizations and no events:
+
+```json
+{
+  "format": "tia-mcp-hmi-patch/1",
+  "operations": [
+    {
+      "op": "delete",
+      "screen": "Overview",
+      "item": "Old_Label",
+      "requireType": "HmiText",
+      "requireNoDynamizations": true,
+      "requireNoEvents": true
+    }
+  ]
+}
+```
+
+Always use a dry run, review the operation list and `warnings`, and get authorization
+before applying a patch.
 
 ## Limits and failure handling
 
