@@ -1,6 +1,6 @@
 {
   "name": "tia_set_block_attribute",
-  "description": "Set one allow-listed attribute of an OB in place (PlcBlock.SetAttribute; the block is not deleted or re-imported): CyclicTime (cyclic interrupt interval) and PhaseOffset of a cyclic interrupt OB, or PriorityNumber. Time values need an explicit unit \u0027ms\u0027 or \u0027us\u0027; Openness and SimaticML store microseconds (100 ms = 100000 us). expected_current_value (same unit) makes the call fail with \u0027conflict\u0027 when the current value differs. The new value is read back; the project is not compiled or saved. F-CPU safety OBs are not supported.",
+  "description": "Set one allow-listed attribute of an OB in place (PlcBlock.SetAttribute; the block is not deleted or re-imported): CyclicTime (cyclic interrupt interval) and PhaseOffset of a cyclic interrupt OB, or PriorityNumber. Time values need an explicit unit \u0027ms\u0027 or \u0027us\u0027; Openness and SimaticML store microseconds (100 ms = 100000 us). expected_current_value (same unit) makes the call fail with \u0027conflict\u0027 when the current value differs. The attribute is written only when TIA Portal lists it as writable for that OB (otherwise status \u0027not_supported\u0027). The new value is read back; the project is not compiled or saved. F-CPU safety OBs are not supported.",
   "parameters": {
     "type": "object",
     "properties": {

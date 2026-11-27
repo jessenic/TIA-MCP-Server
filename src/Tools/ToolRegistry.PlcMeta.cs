@@ -13,7 +13,7 @@ namespace TiaOpennessMcp.Tools
             Register("tia_set_block_attribute",
                 "Set one allow-listed attribute of an OB in place (PlcBlock.SetAttribute; the block is not deleted or re-imported): CyclicTime (cyclic interrupt interval) and PhaseOffset of a cyclic interrupt OB, or PriorityNumber. " +
                 "Time values need an explicit unit 'ms' or 'us'; Openness and SimaticML store microseconds (100 ms = 100000 us). " +
-                "expected_current_value (same unit) makes the call fail with 'conflict' when the current value differs. The new value is read back; the project is not compiled or saved. F-CPU safety OBs are not supported.",
+                "expected_current_value (same unit) makes the call fail with 'conflict' when the current value differs. The attribute is written only when TIA Portal lists it as writable for that OB (otherwise status 'not_supported'). The new value is read back; the project is not compiled or saved. F-CPU safety OBs are not supported.",
                 schema =>
                 {
                     schema.Properties["block_name"] = new ToolProperty { Type = "string", Description = "Exact OB name, e.g. 'Cyclic interrupt'." };

@@ -45,18 +45,29 @@ namespace TiaOpennessMcp.Tia
                  text.IndexOf("up to date", StringComparison.OrdinalIgnoreCase) >= 0));
         }
 
-        // Number of blocks whose CompileDate is new or different after the compile.
-        internal static int CountChangedCompileDates(
+        // Number of blocks whose CompileDate is new or different after the compile. Null when no block changed but
+        // the CompileDate of at least one block could not be read before or after (unknown, not unchanged), so the
+        // caller does not claim "up to date" from dates it never saw.
+        internal static int? CountChangedCompileDates(
             IDictionary<string, DateTime?> before,
             IDictionary<string, DateTime?> after)
         {
             int changed = 0;
+            bool unknown = false;
             foreach (var entry in after)
             {
-                if (!before.TryGetValue(entry.Key, out DateTime? previous) || previous != entry.Value)
+                bool known = before.TryGetValue(entry.Key, out DateTime? previous);
+                if (entry.Value == null || (known && previous == null))
+                {
+                    unknown = true;
+                    continue;
+                }
+                if (!known || previous != entry.Value)
                     changed++;
             }
-            return changed;
+            if (changed > 0)
+                return changed;
+            return unknown ? (int?)null : 0;
         }
 
         internal static string? FormatCompileStateDate(DateTime? value)
@@ -195,7 +206,8 @@ namespace TiaOpennessMcp.Tia
                 WalkTypes(plc.TypeGroup, "");
 
                 result.TypeCount = types.Count;
-                result.InconsistentTypes = types.Count(t => t.IsConsistent != true);
+                result.InconsistentTypes = types.Count(t => t.IsConsistent == false);
+                result.UnknownTypes = types.Count(t => t.IsConsistent == null);
                 result.Types = onlyInconsistent ? types.Where(t => t.IsConsistent != true).ToList() : types;
             }
 
@@ -215,6 +227,8 @@ namespace TiaOpennessMcp.Tia
         public int? TypeCount { get; set; }
         [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
         public int? InconsistentTypes { get; set; }
+        [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+        public int? UnknownTypes { get; set; }
         public List<PlcCompileStateBlock> Blocks { get; set; } = new List<PlcCompileStateBlock>();
         [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
         public List<PlcCompileStateType>? Types { get; set; }

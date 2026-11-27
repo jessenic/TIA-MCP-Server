@@ -193,6 +193,8 @@ internal static class PlcMetaTests
         Check((string)Invoke("SourceExtensionFor", "DB") == ".db", "DB -> .db");
         Check(Invoke("SourceExtensionFor", "LAD") == null, "LAD has no source");
         Check(Invoke("SourceExtensionFor", "FBD") == null, "FBD has no source");
+        Check((string)Invoke("SourceExtensionFor", "UDT") == ".udt", "PLC data type -> .udt");
+        Check((string)Invoke("ResolveBlockCodeFormat", null, "UDT") == "source", "auto UDT -> source");
 
         var sourceOnly = new BlockExportResult { Name = "FB_Pump", Format = "source", Source = "FUNCTION_BLOCK", SourceFileExtension = ".scl" };
         string json = CallToolResult.Json(sourceOnly).Content[0].Text;
@@ -213,11 +215,28 @@ internal static class PlcMetaTests
             "no text hint and unknown dates -> not claimed up to date");
 
         var t1 = new DateTime(2026, 1, 1, 10, 0, 0, DateTimeKind.Utc);
-        var before = new Dictionary<string, DateTime?> { { "/A", t1 }, { "/B", null } };
-        var same = new Dictionary<string, DateTime?> { { "/A", t1 }, { "/B", null } };
-        var changed = new Dictionary<string, DateTime?> { { "/A", t1.AddMinutes(1) }, { "/B", null }, { "/C", t1 } };
-        Check((int)Invoke("CountChangedCompileDates", before, same) == 0, "unchanged compile dates");
-        Check((int)Invoke("CountChangedCompileDates", before, changed) == 2, "changed and new blocks are counted");
+        var before = new Dictionary<string, DateTime?> { { "/A", t1 }, { "/B", t1 } };
+        var same = new Dictionary<string, DateTime?> { { "/A", t1 }, { "/B", t1 } };
+        var changed = new Dictionary<string, DateTime?> { { "/A", t1.AddMinutes(1) }, { "/B", t1 }, { "/C", t1 } };
+        Check((int?)Invoke("CountChangedCompileDates", before, same) == 0, "unchanged compile dates");
+        Check((int?)Invoke("CountChangedCompileDates", before, changed) == 2, "changed and new blocks are counted");
+        var unreadableBefore = new Dictionary<string, DateTime?> { { "/A", t1 }, { "/B", null } };
+        var unreadableAfter = new Dictionary<string, DateTime?> { { "/A", t1 }, { "/B", null } };
+        Check(Invoke("CountChangedCompileDates", unreadableBefore, unreadableAfter) == null,
+            "an unreadable compile date (null -> null) is unknown, not unchanged");
+        var allUnreadable = new Dictionary<string, DateTime?> { { "/A", null }, { "/B", null } };
+        Check(Invoke("CountChangedCompileDates", allUnreadable, allUnreadable) == null, "no readable compile date -> unknown");
+        Check(Invoke("CountChangedCompileDates", before, new Dictionary<string, DateTime?> { { "/A", t1 }, { "/B", null } }) == null,
+            "a date that became unreadable is unknown");
+        Check((int?)Invoke("CountChangedCompileDates", unreadableBefore, new Dictionary<string, DateTime?> { { "/A", t1.AddMinutes(1) }, { "/B", null } }) == 1,
+            "a real change is still reported when another date is unreadable");
+        Check(!(bool)Invoke("IsCompileUpToDate", "Success", 0, 0, Invoke("CountChangedCompileDates", allUnreadable, allUnreadable),
+                new[] { "Compiling finished (errors: 0; warnings: 0)" }),
+            "unreadable compile dates are not reported as up to date");
+
+        var states = new PlcCompileStateResult { PlcName = "PLC_1", TypeCount = 2, InconsistentTypes = 0, UnknownTypes = 1, Types = new List<PlcCompileStateType>() };
+        string typesJson = JsonSerializer.Serialize(states);
+        Check(typesJson.Contains("\"UnknownTypes\":1") && typesJson.Contains("\"InconsistentTypes\":0"), "type totals separate unknown from inconsistent");
 
         Check((string)Invoke("FormatCompileStateDate", (DateTime?)t1) == "2026-01-01T10:00:00.0000000Z", "dates are ISO 8601");
         Check(Invoke("FormatCompileStateDate", new object[] { null }) == null, "missing date stays null");

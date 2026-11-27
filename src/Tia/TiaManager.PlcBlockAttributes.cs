@@ -256,7 +256,7 @@ namespace TiaOpennessMcp.Tia
             results.Add(new PlcMetadataAttribute
             {
                 Name = "CyclicApplicationCycleTime",
-                Status = cycleOk ? "available" : "not_supported",
+                Status = cycleOk && cycleTime != null ? "available" : "not_supported",
                 Value = cycleTime is IConvertible ? cycleTime : cycleTime?.ToString()
             });
 
@@ -361,8 +361,13 @@ namespace TiaOpennessMcp.Tia
 
                 EngineeringAttributeInfo? info = block.GetAttributeInfos()
                     .FirstOrDefault(candidate => string.Equals(candidate.Name, name, StringComparison.Ordinal));
-                if (info != null &&
-                    (info.AccessMode & EngineeringAttributeAccessMode.Write) != EngineeringAttributeAccessMode.Write)
+                // Write only when TIA lists the attribute as writable; an unlisted attribute is never written.
+                if (info == null)
+                {
+                    return PlcMutationResult.FailureOutcome(operation, "not_supported", plc.Name, block.Name, targetPath,
+                        $"TIA Portal does not list attribute '{name}' for OB '{block.Name}' (GetAttributeInfos), so it is not written.");
+                }
+                if ((info.AccessMode & EngineeringAttributeAccessMode.Write) != EngineeringAttributeAccessMode.Write)
                 {
                     return PlcMutationResult.FailureOutcome(operation, "not_supported", plc.Name, block.Name, targetPath,
                         $"TIA Portal reports attribute '{name}' of OB '{block.Name}' as not writable (AccessMode {info.AccessMode}).");
@@ -410,8 +415,6 @@ namespace TiaOpennessMcp.Tia
                 var result = PlcMutationResult.CreateOutcome(operation, "updated", plc.Name, block.Name, targetPath,
                     $"{name} changed from {Show(current.Value)} to {Show(readBack.Value)}. The project is not compiled or saved; run tia_compile.",
                     "Int32", Show(readBack.Value));
-                if (info == null)
-                    result.Warnings.Add($"GetAttributeInfos did not list '{name}'; the write was accepted by TIA Portal and verified by read-back.");
                 return result;
             }
             catch (PlcMutationRejectedException ex)

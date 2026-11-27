@@ -6,6 +6,7 @@ using System.Text;
 using Siemens.Engineering.SW;
 using Siemens.Engineering.SW.Blocks;
 using Siemens.Engineering.SW.ExternalSources;
+using Siemens.Engineering.SW.Types;
 
 namespace TiaOpennessMcp.Tia
 {
@@ -40,8 +41,11 @@ namespace TiaOpennessMcp.Tia
             return SourceExtensionFor(programmingLanguage) != null ? "source" : "xml";
         }
 
+        // ProgrammingLanguage reported for a PLC data type (PlcType has no ProgrammingLanguage property).
+        internal const string PlcTypeCodeLanguage = "UDT";
+
         // File extension GenerateSource requires for a block language, or null when TIA cannot generate source for it.
-        // The V21 'Generate source from block' rules: SCL -> .scl, STL -> .awl, data blocks -> .db.
+        // The V21 'Generate source from block' rules: SCL -> .scl, STL -> .awl, data blocks -> .db, PLC data types -> .udt.
         internal static string? SourceExtensionFor(string? programmingLanguage)
         {
             switch ((programmingLanguage ?? "").Trim().ToUpperInvariant())
@@ -49,18 +53,20 @@ namespace TiaOpennessMcp.Tia
                 case "SCL": return ".scl";
                 case "STL": return ".awl";
                 case "DB": return ".db";
+                case PlcTypeCodeLanguage: return ".udt";
                 default: return null;
             }
         }
 
-        private PlcBlock ResolveBlockForCode(PlcSoftware plc, string blockName)
+        // Null when no block has this name (the caller then looks for a PLC data type).
+        private PlcBlock? ResolveBlockForCode(PlcSoftware plc, string blockName)
         {
             if (string.IsNullOrWhiteSpace(blockName))
                 throw new ArgumentException("block_name is required.");
 
             List<BlockLocation> matches = FindBlockLocations(plc.BlockGroup, blockName);
             if (matches.Count == 0)
-                throw new ArgumentException($"Block '{blockName}' was not found in PLC '{plc.Name}'.");
+                return null;
             if (matches.Count == 1)
                 return matches[0].Block;
 
@@ -74,10 +80,43 @@ namespace TiaOpennessMcp.Tia
                 $"Block name '{blockName}' is ambiguous in PLC '{plc.Name}' ({paths}); use the exact name.");
         }
 
+        // Exact-case match wins over a case-insensitive one; null when no PLC data type has this name.
+        private static PlcType? ResolveTypeForCode(PlcSoftware plc, string typeName)
+        {
+            var matches = new List<(PlcType Type, string Path)>();
+            void Walk(PlcTypeGroup group, string path)
+            {
+                foreach (PlcType type in group.Types)
+                {
+                    if (string.Equals(type.Name, typeName, StringComparison.OrdinalIgnoreCase))
+                        matches.Add((type, path));
+                }
+                foreach (PlcTypeUserGroup sub in group.Groups)
+                    Walk(sub, string.IsNullOrEmpty(path) ? sub.Name : $"{path}/{sub.Name}");
+            }
+            Walk(plc.TypeGroup, "");
+
+            if (matches.Count == 0)
+                return null;
+            if (matches.Count == 1)
+                return matches[0].Type;
+
+            var exact = matches.Where(m => string.Equals(m.Type.Name, typeName, StringComparison.Ordinal)).ToList();
+            if (exact.Count == 1)
+                return exact[0].Type;
+
+            string paths = string.Join(", ", matches.Select(m =>
+                string.IsNullOrEmpty(m.Path) ? m.Type.Name : $"{m.Path}/{m.Type.Name}"));
+            throw new InvalidOperationException(
+                $"PLC data type name '{typeName}' is ambiguous in PLC '{plc.Name}' ({paths}); use the exact name.");
+        }
+
         // Returns null on success, or a message saying why no source could be generated.
+        // target is a PlcBlock or a PlcType (both implement IGenerateSource in V21).
         private string? TryGenerateBlockSource(
             PlcSoftware plc,
-            PlcBlock block,
+            object target,
+            string targetName,
             string programmingLanguage,
             bool isKnowHowProtected,
             bool withDependencies,
@@ -88,15 +127,15 @@ namespace TiaOpennessMcp.Tia
             extension = SourceExtensionFor(programmingLanguage);
             if (extension == null)
             {
-                return $"TIA Portal generates source text only for SCL, STL and DB blocks; block '{block.Name}' is {programmingLanguage}. Use format 'xml'.";
+                return $"TIA Portal generates source text only for SCL, STL and DB blocks and PLC data types; '{targetName}' is {programmingLanguage}. Use format 'xml'.";
             }
             if (isKnowHowProtected)
             {
-                return $"Block '{block.Name}' is know-how protected; TIA Portal does not generate source for it.";
+                return $"'{targetName}' is know-how protected; TIA Portal does not generate source for it.";
             }
-            if (!(block is IGenerateSource generator))
+            if (!(target is IGenerateSource generator))
             {
-                return $"Block '{block.Name}' does not support source generation in TIA Portal Openness. Use format 'xml'.";
+                return $"'{targetName}' does not support source generation in TIA Portal Openness. Use format 'xml'.";
             }
 
             string directory = Path.Combine(Path.GetTempPath(), $"tia_src_{Guid.NewGuid():N}");
@@ -104,21 +143,22 @@ namespace TiaOpennessMcp.Tia
             {
                 Directory.CreateDirectory(directory);
                 // GenerateSource fails when the file already exists, so the file is not created beforehand.
-                var file = new FileInfo(Path.Combine(directory, SafeFileName(block.Name) + extension));
+                var file = new FileInfo(Path.Combine(directory, SafeFileName(targetName) + extension));
                 plc.ExternalSourceGroup.GenerateSource(
                     new[] { generator },
                     file,
                     withDependencies ? GenerateOptions.WithDependencies : GenerateOptions.None);
                 if (!File.Exists(file.FullName))
-                    return $"TIA Portal did not write a source file for block '{block.Name}'.";
+                    return $"TIA Portal did not write a source file for '{targetName}'.";
 
-                source = File.ReadAllText(file.FullName, Encoding.UTF8).TrimStart('﻿');
+                // Encoding.UTF8 already drops a leading BOM; the TrimStart only guards a doubled one.
+                source = File.ReadAllText(file.FullName, Encoding.UTF8).TrimStart('\uFEFF');
                 return null;
             }
             catch (Exception ex) when (!(ex is OutOfMemoryException))
             {
-                return $"TIA Portal could not generate source for block '{block.Name}': {ex.Message} " +
-                       "(source generation needs the PLC to be offline in TIA Portal).";
+                return $"TIA Portal could not generate source for '{targetName}': {ex.Message} " +
+                       "(one possible cause: TIA Portal is online with this PLC; source generation needs it offline).";
             }
             finally
             {

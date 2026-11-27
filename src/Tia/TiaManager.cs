@@ -509,24 +509,31 @@ namespace TiaOpennessMcp.Tia
             bool withDependencies = false)
         {
             var plc = FindPlc(plcName);
-            PlcBlock targetBlock = ResolveBlockForCode(plc, blockName);
-            string language = targetBlock.ProgrammingLanguage.ToString();
             string requested = NormalizeBlockCodeFormatRequest(format);
+            // Blocks first; a PLC data type (UDT) of that name is used only when no block matches.
+            PlcBlock? targetBlock = ResolveBlockForCode(plc, blockName);
+            PlcType? targetType = targetBlock == null ? ResolveTypeForCode(plc, blockName) : null;
+            if (targetBlock == null && targetType == null)
+                throw new ArgumentException($"No block or PLC data type named '{blockName}' was found in PLC '{plc.Name}'.");
+
+            IEngineeringObject target = targetBlock != null ? (IEngineeringObject)targetBlock : targetType!;
+            string targetName = targetBlock != null ? targetBlock.Name : targetType!.Name;
+            string language = targetBlock != null ? targetBlock.ProgrammingLanguage.ToString() : PlcTypeCodeLanguage;
             string resolved = ResolveBlockCodeFormat(requested, language);
-            bool isProtected = (bool?)GetSafeAttributeObj(targetBlock, "IsKnowHowProtected") ?? false;
+            bool isProtected = (bool?)GetSafeAttributeObj(target, "IsKnowHowProtected") ?? false;
 
             var result = new BlockExportResult
             {
-                Name = targetBlock.Name,
-                Number = targetBlock.Number,
-                BlockType = GetBlockTypeName(targetBlock),
+                Name = targetName,
+                Number = targetBlock?.Number ?? 0,
+                BlockType = targetBlock != null ? GetBlockTypeName(targetBlock) : "PlcType",
                 ProgrammingLanguage = language,
                 IsKnowHowProtected = isProtected
             };
 
             if (resolved == "source")
             {
-                string? sourceError = TryGenerateBlockSource(plc, targetBlock, language, isProtected, withDependencies,
+                string? sourceError = TryGenerateBlockSource(plc, target, targetName, language, isProtected, withDependencies,
                     out string? source, out string? extension);
                 if (sourceError == null)
                 {
@@ -548,24 +555,39 @@ namespace TiaOpennessMcp.Tia
             }
             else if (requested == "auto")
             {
-                result.Warnings.Add($"TIA Portal generates source text only for SCL, STL and DB blocks; '{targetBlock.Name}' is {language}, so SimaticML is returned.");
+                result.Warnings.Add($"TIA Portal generates source text only for SCL, STL and DB blocks and PLC data types; '{targetName}' is {language}, so SimaticML is returned.");
             }
 
             if (resolved == "xml")
+            {
                 result.Format = "xml";
-
-            if (resolved == "xml" || includeXml)
-                result.XmlContent = ExportBlockXml(targetBlock);
+                result.XmlContent = ExportBlockXml(targetBlock, targetType);
+            }
+            else if (includeXml)
+            {
+                // Source was already produced; a failing SimaticML export must not fail the whole call.
+                try
+                {
+                    result.XmlContent = ExportBlockXml(targetBlock, targetType);
+                }
+                catch (Exception ex) when (!(ex is OutOfMemoryException))
+                {
+                    result.Warnings.Add($"include_xml: SimaticML export of '{targetName}' failed, so XmlContent is left out: {ex.Message}");
+                }
+            }
 
             return result;
         }
 
-        private static string ExportBlockXml(PlcBlock block)
+        private static string ExportBlockXml(PlcBlock? block, PlcType? type)
         {
             string tempFile = Path.Combine(Path.GetTempPath(), $"tia_block_{Guid.NewGuid():N}.xml");
             try
             {
-                block.Export(new FileInfo(tempFile), ExportOptions.WithDefaults);
+                if (block != null)
+                    block.Export(new FileInfo(tempFile), ExportOptions.WithDefaults);
+                else
+                    type!.Export(new FileInfo(tempFile), ExportOptions.WithDefaults);
                 return File.ReadAllText(tempFile);
             }
             finally
@@ -595,7 +617,7 @@ namespace TiaOpennessMcp.Tia
                 {
                     importedBlocks = targetGroup.Blocks.Import(new FileInfo(tempFile), options);
                 }
-                catch (EngineeringException ex) when (attributeWarnings.Count > 0)
+                catch (Exception ex) when (attributeWarnings.Count > 0 && !(ex is OutOfMemoryException))
                 {
                     throw new InvalidOperationException(AppendImportNotes(ex.Message, new List<string>(), attributeWarnings), ex);
                 }
@@ -731,7 +753,7 @@ namespace TiaOpennessMcp.Tia
                     {
                         try
                         {
-                            result.Compilation = Compile(plc.Name);
+                            result.Compilation = Compile(plc.Name, detectUpToDate: false);
                         }
                         catch (Exception ex)
                         {
@@ -1144,7 +1166,9 @@ namespace TiaOpennessMcp.Tia
 
         #region Compilation
 
-        public CompilationReport Compile(string? plcName = null)
+        // detectUpToDate is set by tia_compile only: it snapshots every block's CompileDate around the compile and sets
+        // UpToDate/Note. tia_import_scl_block passes false, so its Compilation keeps its earlier shape and cost.
+        public CompilationReport Compile(string? plcName = null, bool detectUpToDate = true)
         {
             var plc = FindPlc(plcName);
             var compilable = plc.GetService<ICompilable>();
@@ -1162,7 +1186,7 @@ namespace TiaOpennessMcp.Tia
             }
 
             Console.Error.WriteLine($"[TiaManager] Compiling PLC Software '{plc.Name}'...");
-            var compileDatesBefore = TrySnapshotCompileDates(plc);
+            var compileDatesBefore = detectUpToDate ? TrySnapshotCompileDates(plc) : null;
             CompilerResult result = compilable.Compile();
 
             var report = new CompilationReport
@@ -1173,7 +1197,8 @@ namespace TiaOpennessMcp.Tia
             };
 
             CollectCompileMessages(result.Messages, report.Messages);
-            ApplyCompileUpToDateNote(report, plc, compileDatesBefore);
+            if (detectUpToDate)
+                ApplyCompileUpToDateNote(report, plc, compileDatesBefore);
             return report;
         }
 

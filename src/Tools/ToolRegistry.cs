@@ -199,14 +199,16 @@ namespace TiaOpennessMcp.Tools
 
             // 12. tia_get_block_code
             Register("tia_get_block_code", "Read the code of a PLC block. By default (format 'auto') SCL, STL and DB blocks return the source text TIA Portal generates (Source, file extension .scl/.awl/.db) without SimaticML; other languages (LAD, FBD, GRAPH) and blocks whose source cannot be generated return SimaticML in XmlContent, with the reason in Warnings. " +
-                "format 'xml' always returns SimaticML; format 'source' fails instead of falling back. Source generation needs the PLC offline in TIA Portal. " +
-                "The source of a single SCL block (without dependencies) can be edited and passed to tia_import_scl_block. ExtractedScl is a deprecated copy of Source for SCL blocks.",
+                "format 'xml' always returns SimaticML; format 'source' fails instead of falling back. Source generation can fail while TIA Portal is online with the PLC. " +
+                "When no block has the name, a PLC data type (UDT) of that name is used (BlockType 'PlcType', ProgrammingLanguage 'UDT', source extension .udt). " +
+                "The source of a single SCL block (without dependencies) can be edited and passed to tia_import_scl_block. ExtractedScl is a deprecated copy of Source for SCL blocks. " +
+                "With include_xml, a failing SimaticML export is reported in Warnings instead of failing the call.",
                 schema =>
                 {
                     schema.Properties["block_name"] = new ToolProperty
                     {
                         Type = "string",
-                        Description = "Name of the block to export (e.g. 'Main', 'PumpControl', 'DB_Config')."
+                        Description = "Name of the block, or of a PLC data type (UDT), to export (e.g. 'Main', 'PumpControl', 'DB_Config', 'UDT_Motor')."
                     };
                     schema.Properties["plc_name"] = new ToolProperty
                     {
@@ -216,7 +218,7 @@ namespace TiaOpennessMcp.Tools
                     schema.Properties["format"] = new ToolProperty
                     {
                         Type = "string",
-                        Description = "'auto' (default): generated source for SCL/STL/DB blocks, SimaticML otherwise or when generation fails. 'source': generated source only, fails if not possible. 'xml': SimaticML only.",
+                        Description = "'auto' (default): generated source for SCL/STL/DB blocks and PLC data types, SimaticML otherwise or when generation fails. 'source': generated source only, fails if not possible. 'xml': SimaticML only.",
                         Enum = new List<string> { "auto", "source", "xml" },
                         Default = "auto"
                     };
