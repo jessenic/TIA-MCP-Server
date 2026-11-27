@@ -19,6 +19,19 @@ namespace TiaOpennessMcp
     {
         const string V21ApiPath = @"C:\Program Files\Siemens\Automation\Portal V21\PublicAPI\V21\net48";
 
+        // The PLCSIM Advanced API folder is looked up once: the resolver runs for every unresolved
+        // assembly (including satellite and XmlSerializers probes).
+        static readonly Lazy<PlcSimApiLocation?> PlcSimApiFolder = new Lazy<PlcSimApiLocation?>(() =>
+        {
+            var location = PlcSimRuntimeProbe.FindApiAssembly();
+            if (location != null && location.FolderVersion != PlcSimRuntimeProbe.PreferredApiVersion.ToString())
+            {
+                Console.Error.WriteLine($"[Program] PLCSIM Advanced API {PlcSimRuntimeProbe.PreferredApiVersion} not found; using the newer API folder " +
+                    $"{location.Directory}. The server is built against API {PlcSimRuntimeProbe.PreferredApiVersion}; binary compatibility is not verified.");
+            }
+            return location;
+        });
+
         [STAThread]
         static void Main(string[] args)
         {
@@ -182,9 +195,13 @@ namespace TiaOpennessMcp
             var path = Path.Combine(V21ApiPath, name + ".dll");
             if (File.Exists(path)) return Assembly.LoadFrom(path);
 
-            // 4. Check PLCSIM Advanced API path
-            string plcsimPath = Path.Combine(@"C:\Program Files (x86)\Common Files\Siemens\PLCSIMADV\API\8.0", name + ".dll");
-            if (File.Exists(plcsimPath)) return Assembly.LoadFrom(plcsimPath);
+            // 4. Check the PLCSIM Advanced API folder (API\8.0 preferred, otherwise the newest API folder >= 8.0)
+            var plcsimApi = PlcSimApiFolder.Value;
+            if (plcsimApi != null)
+            {
+                string plcsimPath = Path.Combine(plcsimApi.Directory, name + ".dll");
+                if (File.Exists(plcsimPath)) return Assembly.LoadFrom(plcsimPath);
+            }
 
             return null;
         }
@@ -350,7 +367,7 @@ namespace TiaOpennessMcp
 
             // Connect to PLCSIM
             Console.WriteLine("\n[1/4] Connecting to S7-PLCSIM Advanced instance 'PLC_1'...");
-            var conn = PlcSimManager.Instance.Connect("PLC_1");
+            var conn = PlcSimRuntimeProbe.ConnectSafe("PLC_1");
             if (!conn.Success)
             {
                 Console.Error.WriteLine($"[ERROR] {conn.Message}");

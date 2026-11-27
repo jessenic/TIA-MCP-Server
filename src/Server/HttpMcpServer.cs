@@ -376,7 +376,7 @@ namespace TiaOpennessMcp.Server
             }
 
             string body;
-            using (var reader = new StreamReader(req.InputStream, req.ContentEncoding))
+            using (var reader = new StreamReader(req.InputStream, ResolveRequestEncoding(req.ContentType), detectEncodingFromByteOrderMarks: true))
             {
                 body = await reader.ReadToEndAsync().ConfigureAwait(false);
             }
@@ -406,13 +406,39 @@ namespace TiaOpennessMcp.Server
             });
         }
 
+        /// <summary>
+        /// Request body encoding: the charset named in Content-Type when it is a known encoding, otherwise
+        /// UTF-8 (JSON and MCP are UTF-8). HttpListenerRequest.ContentEncoding would fall back to the ANSI
+        /// code page when no charset is given and corrupt non-ASCII arguments.
+        /// </summary>
+        public static Encoding ResolveRequestEncoding(string? contentType)
+        {
+            if (!string.IsNullOrWhiteSpace(contentType))
+            {
+                try
+                {
+                    string? charset = new System.Net.Mime.ContentType(contentType).CharSet;
+                    if (!string.IsNullOrWhiteSpace(charset))
+                    {
+                        Encoding named = Encoding.GetEncoding(charset!.Trim().Trim('"'));
+                        if (named.CodePage != Encoding.UTF8.CodePage) return named;
+                    }
+                }
+                catch (Exception ex) when (ex is FormatException || ex is ArgumentException || ex is NotSupportedException)
+                {
+                    // Malformed Content-Type or unknown charset: use UTF-8.
+                }
+            }
+            return new UTF8Encoding(false);
+        }
+
         private async Task HandleDirectJsonRpcAsync(HttpListenerContext context)
         {
             var req = context.Request;
             var res = context.Response;
 
             string body;
-            using (var reader = new StreamReader(req.InputStream, req.ContentEncoding))
+            using (var reader = new StreamReader(req.InputStream, ResolveRequestEncoding(req.ContentType), detectEncodingFromByteOrderMarks: true))
             {
                 body = await reader.ReadToEndAsync().ConfigureAwait(false);
             }

@@ -625,7 +625,7 @@ namespace TiaOpennessMcp.Tia
                     : targetFolder ?? "";
                 PlcBlockGroup destinationGroup = FindBlockGroup(plc.BlockGroup, destinationFolder);
 
-                File.WriteAllText(sourceFile, sclCode, new UTF8Encoding(false));
+                ExternalSourceFile.Write(sourceFile, sclCode);
                 string sourceName = Path.GetFileNameWithoutExtension(sourceFile);
                 PlcExternalSource source = plc.ExternalSourceGroup.ExternalSources.CreateFromFile(sourceName, sourceFile)
                     ?? throw new InvalidOperationException("TIA Portal did not create an external SCL source.");

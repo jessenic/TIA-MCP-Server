@@ -1,1 +1,1 @@
-{"name":"plcsim_disconnect","description":"Disconnect from the currently connected S7-PLCSIM Advanced instance.","parameters":{"additionalProperties":false,"properties":{},"type":"object"}}
+{"name":"plcsim_disconnect","description":"Disconnect from the currently connected S7-PLCSIM Advanced instance. S7-PLCSIM Advanced V8.0+ only (S7-1500 / ET 200SP); standard S7-PLCSIM and S7-1200 simulation are not supported.","parameters":{"additionalProperties":false,"properties":{},"type":"object"}}
