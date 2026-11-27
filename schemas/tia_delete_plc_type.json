@@ -1,0 +1,25 @@
+{
+  "name": "tia_delete_plc_type",
+  "description": "Delete one PLC data type (UDT) by exact, case-sensitive name. TIA Portal decides whether the delete is allowed and its answer is reported; blocks, DBs and other UDTs that used the type become inconsistent until changed, so compile afterwards. Program blocks are deleted with tia_delete_block. Only the PLC software\u0027s own folders are searched; objects inside S7-1500 software units are out of scope.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "type_name": {
+        "type": "string",
+        "description": "Exact name of the PLC data type (UDT) to delete."
+      },
+      "plc_name": {
+        "type": "string",
+        "description": "Exact PLC software name; required when the project has multiple PLCs."
+      },
+      "group_path": {
+        "type": "string",
+        "description": "Exact type-folder path, e.g. \u0027HMI/Manual\u0027. Omit to search all folders; an empty string means the root folder only."
+      }
+    },
+    "required": [
+      "type_name"
+    ],
+    "additionalProperties": false
+  }
+}

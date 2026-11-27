@@ -1,0 +1,38 @@
+{
+  "name": "tia_rename_plc_type",
+  "description": "Rename one PLC data type (UDT) in place (no delete, re-import or overwrite) and verify by read-back. Fails without changes when any UDT or program block in the PLC already uses the new name (case-insensitive). Importing a UDT under a new name creates a second type instead; use this tool to rename. Only the PLC software\u0027s own folders are searched; objects inside S7-1500 software units are out of scope.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "type_name": {
+        "type": "string",
+        "description": "Exact current name of the PLC data type (UDT)."
+      },
+      "new_name": {
+        "type": "string",
+        "description": "New name; no leading/trailing whitespace, control characters or path separators."
+      },
+      "plc_name": {
+        "type": "string",
+        "description": "Exact PLC software name; required when the project has multiple PLCs."
+      },
+      "group_path": {
+        "type": "string",
+        "description": "Exact type-folder path of the type. Omit to search all folders; an empty string means the root folder only."
+      },
+      "on_conflict": {
+        "type": "string",
+        "description": "Conflict policy; only \u0027fail\u0027 is supported, existing names are never overwritten.",
+        "enum": [
+          "fail"
+        ],
+        "default": "fail"
+      }
+    },
+    "required": [
+      "type_name",
+      "new_name"
+    ],
+    "additionalProperties": false
+  }
+}

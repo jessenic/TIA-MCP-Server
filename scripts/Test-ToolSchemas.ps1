@@ -154,6 +154,9 @@ try {
         hmi_rename_screen = @('screen_name', 'group_path', 'new_name', 'on_conflict')
         hmi_rename_screen_group = @('group_path', 'new_name', 'on_conflict')
         hmi_rename_tag_table = @('table_name', 'new_name', 'on_conflict')
+        tia_delete_plc_type = @('type_name')
+        tia_rename_plc_type = @('type_name', 'new_name')
+        tia_rename_block = @('block_name', 'new_name')
     }
     foreach ($toolName in $requiredAdditionalContracts.Keys) {
         $schemaPath = Join-Path $outputDirectory "$toolName.json"
@@ -248,8 +251,39 @@ try {
         throw 'hmi_set_expression_dynamization_entries must define strict condition and typed-value row objects.'
     }
     $sclImportSchema = Get-Content -LiteralPath (Join-Path $outputDirectory 'tia_import_scl_block.json') -Raw | ConvertFrom-Json
-    if ('scl_code' -notin $sclImportSchema.parameters.required) {
-        throw 'tia_import_scl_block must require the complete SCL source string.'
+    if ($sclImportSchema.parameters.properties.backup.type -ne 'boolean' -or
+        $sclImportSchema.parameters.properties.backup.default -ne $true) {
+        throw 'tia_import_scl_block.backup must be a boolean that defaults to true.'
+    }
+    foreach ($importTool in @(
+        @{ Name = 'tia_import_block'; Inline = 'xml_content' },
+        @{ Name = 'tia_import_scl_block'; Inline = 'scl_code' },
+        @{ Name = 'tia_import_plc_type'; Inline = 'xml_content' }
+    )) {
+        $importSchema = Get-Content -LiteralPath (Join-Path $outputDirectory "$($importTool.Name).json") -Raw | ConvertFrom-Json
+        $checkedImportSchema = Get-Content -LiteralPath (Join-Path $PSScriptRoot "..\schemas\$($importTool.Name).json") -Raw | ConvertFrom-Json
+        foreach ($sourceName in @($importTool.Inline, 'file_path')) {
+            if ($importSchema.parameters.properties.$sourceName.type -ne 'string') {
+                throw "$($importTool.Name).$sourceName must be a string source parameter."
+            }
+            if ($sourceName -in @($importSchema.parameters.required)) {
+                throw "$($importTool.Name) must not require '$sourceName'; exactly one of $($importTool.Inline) or file_path is given."
+            }
+            if ($checkedImportSchema.parameters.properties.$sourceName.description -ne $importSchema.parameters.properties.$sourceName.description) {
+                throw "Checked-in $($importTool.Name).$sourceName differs from the exported tool schema."
+            }
+        }
+        if ($checkedImportSchema.description -ne $importSchema.description -or
+            (@($checkedImportSchema.parameters.required) -join ',') -ne (@($importSchema.parameters.required) -join ',')) {
+            throw "Checked-in $($importTool.Name) description or required fields differ from the exported tool schema."
+        }
+    }
+    foreach ($toolName in @('tia_rename_plc_type', 'tia_rename_block')) {
+        $schema = Get-Content -LiteralPath (Join-Path $outputDirectory "$toolName.json") -Raw | ConvertFrom-Json
+        if ((@($schema.parameters.properties.on_conflict.enum) -join ',') -ne 'fail' -or
+            $schema.parameters.properties.on_conflict.default -ne 'fail') {
+            throw "$toolName.on_conflict must expose only the safe fail behavior and default to it."
+        }
     }
     if ($sclImportSchema.parameters.properties.compile_after_import.default -ne $true) {
         throw 'tia_import_scl_block.compile_after_import must default to true.'
@@ -261,7 +295,7 @@ try {
     if ($checkedSclImportSchema.description -ne $sclImportSchema.description) {
         throw 'Checked-in tia_import_scl_block description differs from the exported tool schema.'
     }
-    foreach ($propertyName in @('scl_code', 'plc_name', 'folder', 'compile_after_import', 'open_after_import')) {
+    foreach ($propertyName in @('scl_code', 'file_path', 'plc_name', 'folder', 'compile_after_import', 'open_after_import', 'backup')) {
         $exportedProperty = $sclImportSchema.parameters.properties.$propertyName
         $checkedProperty = $checkedSclImportSchema.parameters.properties.$propertyName
         if ($null -eq $checkedProperty -or

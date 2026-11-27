@@ -221,13 +221,18 @@ namespace TiaOpennessMcp.Tools
                 });
 
             // 13. tia_import_block
-            Register("tia_import_block", "Import or update a PLC block from SimaticML XML.",
+            Register("tia_import_block", "Import or update a PLC block from SimaticML XML, given inline (xml_content) or as a server-local .xml file (file_path, preferred for large blocks).",
                 schema =>
                 {
                     schema.Properties["xml_content"] = new ToolProperty
                     {
                         Type = "string",
-                        Description = "The SimaticML XML string containing the block definition."
+                        Description = "The SimaticML XML string containing the block definition. Use this or file_path, not both."
+                    };
+                    schema.Properties["file_path"] = new ToolProperty
+                    {
+                        Type = "string",
+                        Description = "Fully qualified server-local path to a SimaticML .xml file (e.g. one written by tia_export_project_files). Use this or xml_content, not both."
                     };
                     schema.Properties["plc_name"] = new ToolProperty
                     {
@@ -245,26 +250,33 @@ namespace TiaOpennessMcp.Tools
                         Type = "string",
                         Description = "Target group folder path for the block (optional)."
                     };
-                    schema.Required = new List<string> { "xml_content" };
                 },
                 args =>
                 {
-                    string xml = GetStringProp(args, "xml_content") ?? throw new ArgumentException("xml_content is required.");
+                    PlcImportSourceResult source = PlcImportSource.Resolve(
+                        GetStringProp(args, "xml_content"), GetStringProp(args, "file_path"), "xml_content", new[] { ".xml" }, readText: false);
                     string? plc = GetStringProp(args, "plc_name");
                     bool overwrite = GetBoolProp(args, "overwrite", true);
                     string? folder = GetStringProp(args, "folder");
-                    string msg = TiaManager.Instance.ImportBlock(plc, xml, overwrite, folder);
+                    string msg = TiaManager.Instance.ImportBlock(plc, source.Text, overwrite, folder, source.FullPath);
                     return CallToolResult.Text(msg);
                 });
 
             // 13a. tia_import_scl_block
-            Register("tia_import_scl_block", "Import a complete SCL block source string; the server creates the temporary .scl file. Existing same-name blocks are backed up, deleted, and replaced; failed imports attempt to restore the backup.",
+            Register("tia_import_scl_block", "Import a complete SCL block source, given inline (scl_code) or as a server-local .scl file (file_path); the server creates the temporary .scl file. " +
+                "Existing same-name blocks are backed up (unless backup is false), deleted, and replaced; failed imports attempt to restore the backup. " +
+                "An inconsistent existing block is compiled once before the backup; if it stays inconsistent (or is know-how protected) nothing is replaced unless backup is false.",
                 schema =>
                 {
                     schema.Properties["scl_code"] = new ToolProperty
                     {
                         Type = "string",
-                        Description = "Complete SCL source for exactly one FUNCTION, FUNCTION_BLOCK, ORGANIZATION_BLOCK, or DATA_BLOCK."
+                        Description = "Complete SCL source for exactly one FUNCTION, FUNCTION_BLOCK, ORGANIZATION_BLOCK, or DATA_BLOCK. Use this or file_path, not both."
+                    };
+                    schema.Properties["file_path"] = new ToolProperty
+                    {
+                        Type = "string",
+                        Description = "Fully qualified server-local path to a .scl file with exactly one block declaration (read as UTF-8 unless it has a BOM). Use this or scl_code, not both."
                     };
                     schema.Properties["plc_name"] = new ToolProperty
                     {
@@ -288,21 +300,30 @@ namespace TiaOpennessMcp.Tools
                         Description = "Open the imported block in the TIA Portal editor after import (default false).",
                         Default = false
                     };
-                    schema.Required = new List<string> { "scl_code" };
+                    schema.Properties["backup"] = new ToolProperty
+                    {
+                        Type = "boolean",
+                        Description = "Export the existing same-name block as a backup before replacing it (default true). If that block is inconsistent it is compiled once first; " +
+                            "if it stays inconsistent or is know-how protected, the import fails without replacing it. With false no backup is taken (a warning is returned) " +
+                            "and a failed import cannot restore the previous block.",
+                        Default = true
+                    };
                 },
                 args =>
                 {
-                    string sclCode = GetStringProp(args, "scl_code") ?? throw new ArgumentException("scl_code is required.");
+                    PlcImportSourceResult source = PlcImportSource.Resolve(
+                        GetStringProp(args, "scl_code"), GetStringProp(args, "file_path"), "scl_code", new[] { ".scl" }, readText: true);
                     string? plc = GetStringProp(args, "plc_name");
                     string? folder = GetStringProp(args, "folder");
                     bool compileAfterImport = GetBoolProp(args, "compile_after_import", true);
                     bool openAfterImport = GetBoolProp(args, "open_after_import", false);
+                    bool backup = GetBoolProp(args, "backup", true);
                     return CallToolResult.Json(
-                        TiaManager.Instance.ImportSclBlock(plc, sclCode, folder, compileAfterImport, openAfterImport));
+                        TiaManager.Instance.ImportSclBlock(plc, source.Text ?? "", folder, compileAfterImport, openAfterImport, backup, source.FullPath));
                 });
 
             // 14. tia_delete_block
-            Register("tia_delete_block", "Delete a PLC program block from the project.",
+            Register("tia_delete_block", "Delete a PLC program block (OB/FB/FC/DB) from the project. PLC data types (UDTs) are deleted with tia_delete_plc_type.",
                 schema =>
                 {
                     schema.Properties["block_name"] = new ToolProperty
@@ -365,13 +386,19 @@ namespace TiaOpennessMcp.Tools
                 });
 
             // 17. tia_import_plc_type
-            Register("tia_import_plc_type", "Import or update a PLC User Data Type (UDT) from SimaticML XML.",
+            Register("tia_import_plc_type", "Import or update a PLC User Data Type (UDT) from SimaticML XML, given inline (xml_content) or as a server-local .xml file (file_path). " +
+                "Importing under a new name creates a second type; use tia_rename_plc_type to rename.",
                 schema =>
                 {
                     schema.Properties["xml_content"] = new ToolProperty
                     {
                         Type = "string",
-                        Description = "The SimaticML XML string containing the UDT definition."
+                        Description = "The SimaticML XML string containing the UDT definition. Use this or file_path, not both."
+                    };
+                    schema.Properties["file_path"] = new ToolProperty
+                    {
+                        Type = "string",
+                        Description = "Fully qualified server-local path to a SimaticML .xml file of the UDT (e.g. one written by tia_export_project_files). Use this or xml_content, not both."
                     };
                     schema.Properties["plc_name"] = new ToolProperty
                     {
@@ -384,14 +411,14 @@ namespace TiaOpennessMcp.Tools
                         Description = "Whether to overwrite existing UDT (default true).",
                         Default = true
                     };
-                    schema.Required = new List<string> { "xml_content" };
                 },
                 args =>
                 {
-                    string xml = GetStringProp(args, "xml_content") ?? throw new ArgumentException("xml_content is required.");
+                    PlcImportSourceResult source = PlcImportSource.Resolve(
+                        GetStringProp(args, "xml_content"), GetStringProp(args, "file_path"), "xml_content", new[] { ".xml" }, readText: false);
                     string? plc = GetStringProp(args, "plc_name");
                     bool overwrite = GetBoolProp(args, "overwrite", true);
-                    string msg = TiaManager.Instance.ImportPlcType(plc, xml, overwrite);
+                    string msg = TiaManager.Instance.ImportPlcType(plc, source.Text, overwrite, source.FullPath);
                     return CallToolResult.Text(msg);
                 });
 
@@ -2380,6 +2407,7 @@ namespace TiaOpennessMcp.Tools
             RegisterPlcOnlineTools();
             RegisterHardwareTools();
             RegisterBackupTools();
+            RegisterPlcBlockTools();
         }
 
         // Read-only online access to a real S7-1200/S7-1500 over S7CommPlus with TLS (TIA V17+ projects).
