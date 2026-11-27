@@ -2452,17 +2452,12 @@ namespace TiaOpennessMcp.Tia
         }
 
         /// <summary>
-        /// Pairs each desired bitmask entry with an existing entry. When every position keeps its relevant mask, the
-        /// pairing is the identity: the in-place update and the read-back are both positional, so edited conditions
-        /// (even ones another entry had before) are simply written per position. Otherwise entries are searched first
-        /// by equal relevant mask and condition, then by equal relevant mask only, preferring the same position; that
-        /// tells a reorder (RefuseEntryOrder) apart from a mask change. Returns null when no full pairing exists.
+        /// Pairs each desired bitmask entry with an existing entry: first by equal relevant mask and condition,
+        /// then by equal relevant mask only, preferring the same position. Returns null when no full pairing exists.
         /// </summary>
         private static int[]? PairBitmaskEntries(List<HmiJsonMappingEntry> existing, List<HmiJsonMappingEntry> desired)
         {
             if (existing.Count != desired.Count) return null;
-            if (Enumerable.Range(0, existing.Count).All(k => existing[k].Relevant.HasValue && existing[k].Relevant == desired[k].Relevant))
-                return Enumerable.Range(0, existing.Count).ToArray();
             var used = new bool[existing.Count];
             var pairing = Enumerable.Repeat(-1, desired.Count).ToArray();
             for (int pass = 0; pass < 2; pass++)
