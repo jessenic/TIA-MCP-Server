@@ -45,12 +45,14 @@ namespace TiaOpennessMcp.Tia
             return list;
         }
 
-        private void FindHmiInDevice(Device dev, List<HmiTargetInfo> list)
+        // includeCounts: fill ScreenCount and TagTableCount (hmi_list_targets). Target selection only needs the
+        // names, so it skips walking every screen and tag table.
+        private void FindHmiInDevice(Device dev, List<HmiTargetInfo> list, bool includeCounts = true)
         {
-            FindHmiInDeviceItems(dev.DeviceItems, dev.Name, list);
+            FindHmiInDeviceItems(dev.DeviceItems, dev.Name, list, includeCounts);
         }
 
-        private static void FindHmiInDeviceItems(IEnumerable<DeviceItem> items, string deviceName, List<HmiTargetInfo> list)
+        private static void FindHmiInDeviceItems(IEnumerable<DeviceItem> items, string deviceName, List<HmiTargetInfo> list, bool includeCounts)
         {
             foreach (DeviceItem item in items)
             {
@@ -62,11 +64,11 @@ namespace TiaOpennessMcp.Tia
                         DeviceName = deviceName,
                         DeviceItemName = item.Name,
                         SoftwareName = hmiSw.Name,
-                        ScreenCount = EnumerateHmiScreens(hmiSw.Screens, hmiSw.ScreenGroups).Count(),
-                        TagTableCount = hmiSw.TagTables.Count
+                        ScreenCount = includeCounts ? EnumerateHmiScreens(hmiSw.Screens, hmiSw.ScreenGroups).Count() : 0,
+                        TagTableCount = includeCounts ? hmiSw.TagTables.Count : 0
                     });
                 }
-                FindHmiInDeviceItems(item.DeviceItems, deviceName, list);
+                FindHmiInDeviceItems(item.DeviceItems, deviceName, list, includeCounts);
             }
         }
 
@@ -75,7 +77,7 @@ namespace TiaOpennessMcp.Tia
             EnsureProjectOpen();
             var candidates = new List<HmiTargetInfo>();
             foreach (Device dev in _project!.Devices)
-                FindHmiInDevice(dev, candidates);
+                FindHmiInDevice(dev, candidates, includeCounts: false);
 
             HmiTargetInfo selected = SelectHmiTarget(candidates, targetName);
 
@@ -1401,13 +1403,14 @@ namespace TiaOpennessMcp.Tia
             EnsureProjectOpen();
             var candidates = new List<HmiTargetInfo>();
             foreach (Device dev in _project!.Devices)
-                FindHmiInDevice(dev, candidates);
+                FindHmiInDevice(dev, candidates, includeCounts: false);
             return CompileHmiTarget(SelectHmiTarget(candidates, targetName));
         }
 
-        // Compiles an already-resolved HMI target. ICompilable is taken from the lowest object that offers it:
-        // the device item holding the HMI software, its SoftwareContainer, the parent device items, and finally
-        // the device itself (the path that works for Unified Comfort panels such as the MTP1200).
+        // Compiles an already-resolved HMI target. HmiSoftware itself is not an IEngineeringServiceProvider in V21, so
+        // the software side is asked first through its SoftwareContainer; then ICompilable is taken from the device
+        // item holding the software, the parent device items, and finally the device itself (the path proven to work
+        // for Unified Comfort panels such as the MTP1200). CompiledObject in the report names the object used.
         internal CompilationReport CompileHmiTarget(HmiTargetInfo target)
         {
             EnsureProjectOpen();
@@ -1433,33 +1436,22 @@ namespace TiaOpennessMcp.Tia
             string ItemLabel(int depth) =>
                 $"DeviceItem '{device.Name}/{string.Join("/", itemPath.Take(depth + 1).Select(item => item.Name))}'";
 
+            // Software side first, then the hardware chain from the holder item up to the device.
+            var probes = new List<KeyValuePair<string, Func<object?>>>
+            {
+                new KeyValuePair<string, Func<object?>>($"SoftwareContainer of '{target.SoftwareName}'",
+                    () => holder.GetService<SoftwareContainer>()?.GetService<ICompilable>())
+            };
+            for (int depth = itemPath.Count - 1; depth >= 0; depth--)
+            {
+                DeviceItem item = itemPath[depth];
+                probes.Add(new KeyValuePair<string, Func<object?>>(ItemLabel(depth), () => item.GetService<ICompilable>()));
+            }
+            probes.Add(new KeyValuePair<string, Func<object?>>($"Device '{device.Name}'", () => device.GetService<ICompilable>()));
+
             var tried = new List<string>();
-            ICompilable? compilable = null;
-            string compiledObject = "";
-
-            void Probe(Func<ICompilable?> getter, string label)
-            {
-                if (compilable != null) return;
-                tried.Add(label);
-                ICompilable? candidate = getter();
-                if (candidate != null)
-                {
-                    compilable = candidate;
-                    compiledObject = label;
-                }
-            }
-
-            Probe(() => holder.GetService<ICompilable>(), ItemLabel(itemPath.Count - 1));
-            Probe(() => holder.GetService<SoftwareContainer>()?.GetService<ICompilable>(),
-                $"SoftwareContainer of '{target.SoftwareName}'");
-            for (int depth = itemPath.Count - 2; depth >= 0; depth--)
-            {
-                DeviceItem ancestor = itemPath[depth];
-                Probe(() => ancestor.GetService<ICompilable>(), ItemLabel(depth));
-            }
-            Probe(() => device.GetService<ICompilable>(), $"Device '{device.Name}'");
-
-            if (compilable == null)
+            string? compiledObject = ProbeServiceChain(probes, tried, out object? service);
+            if (!(service is ICompilable compilable) || compiledObject == null)
             {
                 throw new InvalidOperationException(
                     $"No ICompilable found for HMI target '{target.SoftwareName}'. Tried: {string.Join(", ", tried)}.");
@@ -1502,6 +1494,35 @@ namespace TiaOpennessMcp.Tia
                 {
                     nested.Insert(0, item);
                     return nested;
+                }
+            }
+            return null;
+        }
+
+        // Runs labeled service getters in order and returns the label of the first one that yields a service.
+        // Every label probed is added to 'tried'; a getter that throws an Openness error (EngineeringException or
+        // COMException) is recorded with the error and the next getter is tried.
+        internal static string? ProbeServiceChain(
+            IEnumerable<KeyValuePair<string, Func<object?>>> probes, List<string> tried, out object? service)
+        {
+            service = null;
+            foreach (KeyValuePair<string, Func<object?>> probe in probes)
+            {
+                object? candidate;
+                try
+                {
+                    candidate = probe.Value();
+                }
+                catch (Exception ex) when (ex is EngineeringException || ex is System.Runtime.InteropServices.COMException)
+                {
+                    tried.Add($"{probe.Key} ({ex.GetType().Name}: {ex.Message})");
+                    continue;
+                }
+                tried.Add(probe.Key);
+                if (candidate != null)
+                {
+                    service = candidate;
+                    return probe.Key;
                 }
             }
             return null;

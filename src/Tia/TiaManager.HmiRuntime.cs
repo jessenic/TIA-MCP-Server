@@ -100,9 +100,9 @@ namespace TiaOpennessMcp.Tia
                     {
                         // Leaving the transaction without CommitOnDispose rolls the change back.
                         RestoreStartScreen(settings, oldStartScreen, result);
-                        result.StartScreen = readBack;
+                        result.StartScreen = oldStartScreen;
                         result.Status = "verification_failed";
-                        result.Message = $"Start screen read back as '{readBack}' instead of '{exactName}'; the change was not committed.";
+                        result.Message = $"Start screen read back as '{readBack}' instead of '{exactName}'; the previous start screen '{oldStartScreen}' was restored and nothing was committed.";
                         return result;
                     }
 

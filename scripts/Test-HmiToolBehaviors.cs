@@ -186,6 +186,7 @@ internal static class HmiToolBehaviorTests
         TestExpressionMappingEntryParsing();
         TestHmiCompileTool(registry, fake);
         TestHmiTargetSelection();
+        TestCompileProbeChain();
         TestHmiRuntimeTools(registry, fake);
         TestStartScreenHelpers();
     }
@@ -201,7 +202,7 @@ internal static class HmiToolBehaviorTests
         Check(!noTarget.IsError && fake.LastOperation == "compile" && fake.TargetName == null,
             "hmi_compile without a target lets the backend auto-select the only HMI");
         Check(FirstText(noTarget).Contains("\"CompiledObject\"") && FirstText(noTarget).Contains("HMI_RT_1"),
-            "hmi_compile returns the compiled target and object");
+            "hmi_compile passes the backend's compiled target and object through to the JSON result");
 
         registry.Execute("hmi_compile", Arguments("{\"target_name\":\"HMI_RT_1\"}"));
         Check(fake.LastOperation == "compile" && fake.TargetName == "HMI_RT_1",
@@ -221,6 +222,57 @@ internal static class HmiToolBehaviorTests
         string plcReport = JsonSerializer.Serialize(new CompilationReport { State = "Success" });
         Check(!plcReport.Contains("Target") && !plcReport.Contains("DeviceName") && !plcReport.Contains("CompiledObject"),
             "PLC compilation reports keep their JSON shape without the HMI-only fields");
+    }
+
+    private static void TestCompileProbeChain()
+    {
+        var calls = new List<string>();
+        var compilable = new object();
+        var probes = new List<KeyValuePair<string, Func<object>>>
+        {
+            new KeyValuePair<string, Func<object>>("SoftwareContainer", () => { calls.Add("SoftwareContainer"); return null; }),
+            new KeyValuePair<string, Func<object>>("Holder", () => { calls.Add("Holder"); throw new System.Runtime.InteropServices.COMException("not supported"); }),
+            new KeyValuePair<string, Func<object>>("Parent", () => { calls.Add("Parent"); return compilable; }),
+            new KeyValuePair<string, Func<object>>("Device", () => { calls.Add("Device"); return new object(); })
+        };
+        var tried = new List<string>();
+        object[] arguments = { probes, tried, null };
+        var label = (string)typeof(TiaManager).GetMethod("ProbeServiceChain", BindingFlags.NonPublic | BindingFlags.Static)
+            .Invoke(null, arguments);
+        Check(label == "Parent" && ReferenceEquals(arguments[2], compilable),
+            "compile probe chain returns the first object that offers the service");
+        Check(string.Join(",", calls) == "SoftwareContainer,Holder,Parent",
+            "compile probe chain asks in order and stops at the first hit");
+        Check(tried.Count == 3 && tried[0] == "SoftwareContainer" && tried[1].StartsWith("Holder (COMException") && tried[2] == "Parent",
+            "compile probe chain records a throwing getter with its error and continues");
+
+        var none = new List<KeyValuePair<string, Func<object>>>
+        {
+            new KeyValuePair<string, Func<object>>("SoftwareContainer", () => null),
+            new KeyValuePair<string, Func<object>>("Device", () => null)
+        };
+        var triedNone = new List<string>();
+        object[] noneArguments = { none, triedNone, null };
+        object noneLabel = typeof(TiaManager).GetMethod("ProbeServiceChain", BindingFlags.NonPublic | BindingFlags.Static)
+            .Invoke(null, noneArguments);
+        Check(noneLabel == null && noneArguments[2] == null && triedNone.Count == 2,
+            "compile probe chain returns nothing and lists every object tried when none offers the service");
+
+        bool propagated = false;
+        try
+        {
+            var failing = new List<KeyValuePair<string, Func<object>>>
+            {
+                new KeyValuePair<string, Func<object>>("Bug", () => { throw new NullReferenceException("bug"); })
+            };
+            typeof(TiaManager).GetMethod("ProbeServiceChain", BindingFlags.NonPublic | BindingFlags.Static)
+                .Invoke(null, new object[] { failing, new List<string>(), null });
+        }
+        catch (TargetInvocationException error)
+        {
+            propagated = error.InnerException is NullReferenceException;
+        }
+        Check(propagated, "compile probe chain does not swallow non-Openness exceptions");
     }
 
     private static void TestHmiTargetSelection()
