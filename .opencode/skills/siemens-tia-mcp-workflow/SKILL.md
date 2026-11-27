@@ -17,7 +17,7 @@ instructions before acting, and use the live MCP tool descriptions for arguments
 
 | User request | Read this skill |
 | --- | --- |
-| TIA connection/project status, devices, PLCs, blocks, tags, PLC edits or compile; direct WinCC Unified screen, widget, tag, connection, text-list, or HMI compile work; Siemens TestSuite | `siemens-tia-portal-openness` |
+| TIA connection/project status, devices, PLCs, blocks, data types, tags, technology objects, PLC edits or compile; direct WinCC Unified screen, widget, tag, connection, text-list, or HMI compile work; Siemens TestSuite | `siemens-tia-portal-openness` |
 | HMI export, inspection, editing, rendering, patching, or import specifically using the TIA MCP JSON format | `siemens-hmi-json` |
 | Recreate or adapt a Figma design into a WinCC Unified screen | `siemens-figma-to-wincc-unified`; also read `siemens-hmi-json` only if the user explicitly requests JSON export/import/patch work |
 | Connect to S7-PLCSIM, inspect or write simulated tags, control the virtual CPU, or run an online sequence verification | `siemens-plcsim-sequence-tester` |
@@ -39,7 +39,10 @@ authorization requirements still applying.
    PLC, or HMI target; discover targets rather than guessing when ambiguous.
 2. For PLCSIM work, read `siemens-plcsim-sequence-tester` and check
    `plcsim_get_status` before simulation operations. Confirm that the target is
-   the intended virtual controller, not a physical PLC.
+   the intended virtual controller, not a physical PLC. The `plcsim_*` tools
+   support S7-PLCSIM Advanced V8.0+ only (S7-1500, ET 200SP); S7-1200 projects
+   in standard S7-PLCSIM cannot be driven by them. Check `runtimeAvailable` in
+   the `plcsim_list_instances` result.
 3. Keep the persistent TIA and PLCSIM connections open. Do not disconnect,
    close, or tear down a session as routine cleanup. If a connection is missing,
    follow the selected skill's attach procedure rather than launching a

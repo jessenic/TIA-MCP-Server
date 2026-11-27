@@ -45,19 +45,33 @@ The TIA Openness MCP server operates as a persistent daemon process maintaining 
 ### Inspecting Software & Blocks
 - **`tia_list_plcs`**: Discover CPU device items and software containers.
 - **`tia_list_blocks`**: List all blocks (OB, FB, FC, DB) with programming language and compile consistency status.
-- **`tia_get_block_code`**: Retrieve block definition as SimaticML XML and extracted SCL code.
+- **`tia_get_block_code`**: Read a block's code. By default (`format: "auto"`) SCL, STL and DB blocks, and PLC data types, return the source text TIA Portal generates in `Source`; LAD, FBD and GRAPH blocks return SimaticML in `XmlContent`. Pass `format: "xml"` or `include_xml: true` when you need the SimaticML. The source of one SCL block (without `with_dependencies`) can be edited and passed to `tia_import_scl_block`. `ExtractedScl` is deprecated.
+- **`tia_get_compile_state`**: Read-only list of block and UDT consistency and compile dates, without compiling.
 
 ### Authoring & Updating Blocks
-- **`tia_import_block`**: Import or replace block logic from SimaticML XML:
+- **`tia_import_block`**: Import or replace block logic from SimaticML XML, inline or from a server-local file (prefer `file_path` for large blocks):
   ```json
-  { "xml_content": "<Document>...", "overwrite": true }
+  { "file_path": "C:\\Projects\\Plant\\export\\plc\\PLC_1\\blocks\\Main.xml", "overwrite": true }
   ```
-- **`tia_import_scl_block`**: Import a complete `FUNCTION`, `FUNCTION_BLOCK`, `ORGANIZATION_BLOCK`, or `DATA_BLOCK` from `scl_code`. Same-name blocks are replaced as whole blocks using backup/delete/reimport; import failures attempt to restore the backup. Compilation is enabled by default, and compile errors do not roll back the imported block.
+  OB `CyclicTime` and `PhaseOffset` in SimaticML are microseconds (100 ms = `100000`). Read the `Warnings:` lines in the result.
+- **`tia_import_scl_block`**: Import a complete `FUNCTION`, `FUNCTION_BLOCK`, `ORGANIZATION_BLOCK`, or `DATA_BLOCK` from `scl_code` or from a UTF-8 `.scl` `file_path`. Same-name blocks are replaced as whole blocks using backup/delete/reimport; import failures attempt to restore the backup. An inconsistent existing block is compiled once first; if it stays inconsistent the import stops without changes. Pass `backup: false` only when losing the old block on a failed import is acceptable. Compilation is enabled by default, and compile errors do not roll back the imported block. The block number can change on replace; the result warns when it does.
+- **`tia_rename_block`** / **`tia_rename_plc_type`**: Rename a block or UDT in place. Do not re-import under a new name; that creates a second object.
+- **`tia_delete_block`** / **`tia_delete_plc_type`**: Delete a program block or a UDT. Users of a deleted UDT become inconsistent; compile afterwards.
+- **`tia_set_block_attribute`**: Change an OB's `CyclicTime`, `PhaseOffset` or `PriorityNumber` in place, with an explicit unit:
+  ```json
+  { "block_name": "Cyclic interrupt", "attribute_name": "CyclicTime", "value": 100, "unit": "ms" }
+  ```
 - **`tia_compile`**: Always compile after modifying PLC blocks or UDTs:
   ```json
   { "plc_name": "PLC_1" }
   ```
-  Returns `State`, `ErrorCount`, `WarningCount`, and detailed compiler messages with file paths and line numbers.
+  Returns `State`, `ErrorCount`, `WarningCount`, and detailed compiler messages with file paths and line numbers. TIA compiles only changed blocks; when nothing needed compiling the result has `UpToDate: true` and earlier warnings are not shown again.
+
+### Technology Objects
+- **`tia_list_technology_objects`**, **`tia_get_technology_object_parameters`**: List technology objects and read their parameters (names differ per type and version; read them before writing).
+- **`tia_create_technology_object`**: Create e.g. `PID_Temp` with an explicit version (`"1.1"` on S7-1200). It fails if a block or technology object already has the name.
+- **`tia_set_technology_object_parameters`**: Write parameters as strings; each is read back, and earlier writes are not rolled back when a later one fails.
+- Creating the object does not call it: call it from a cyclic interrupt OB (`"PID_Temp_1"(...)`) with `tia_import_scl_block`.
 
 ---
 
@@ -74,6 +88,7 @@ The TIA Openness MCP server operates as a persistent daemon process maintaining 
 - **`hmi_get_js_type_definitions`**: Get the server-bundled TypeScript declaration subset for runtime APIs documented by this server. It is not the complete Siemens V21 API; see `tia://docs/hmi-javascript-type-definitions`.
 
 ### Creating Widgets & Controls
+Pass texts as plain Unicode (ä, ö, °), not HTML entities; the server escapes and wraps them.
 - **`hmi_add_label`**: Add a text label or banner (text is HTML-escaped and wrapped automatically):
   ```json
   {
@@ -144,7 +159,9 @@ Use **single-object dynamization** instead of dual overlaid objects with visibil
   }
   ```
 
-`hmi_set_tag_dynamization` creates or replaces the whole mapping. For an existing
+`hmi_set_tag_dynamization` sets the whole mapping. An existing Singlebit table is
+updated in place; switching an existing table to another condition type fails, so
+call `hmi_delete_dynamization` first. For an existing
 dynamization where only one entry changes, use **`hmi_update_dynamization_entry`**;
 its `entry_index` is zero-based, supplied value types must match the existing entry,
 and unspecified fields and entries are preserved. Do not use the setter as a
@@ -190,8 +207,7 @@ first. Read the screen with `hmi_get_screen_items` before editing, verify the it
 property, existing tag, condition type, and mapping entry index, then apply the
 appropriate direct tool. Do not use HMI JSON export/import for this direct workflow.
 Read the screen again to verify the resulting tag dynamization and compile with
-`hmi_compile`, passing the HMI device name as `target_device` (not the software
-target name). For detailed arguments and response shapes, read the MCP resource
+`hmi_compile` (pass `target_name` when the project has more than one HMI). For detailed arguments and response shapes, read the MCP resource
 `tia://docs/tools-reference`; prefer the live tool schemas when available.
 
 For JavaScript API references, use `hmi_get_js_type_definitions` or read
@@ -210,6 +226,14 @@ When modifying existing button functions (e.g. changing `SetBitInTag` to `Invert
   }
   ```
   The MCP server applies changes directly to the Openness DOM and runs `handler.Script.SyntaxCheck()` to guarantee syntax validity.
+- **`hmi_update_screen_item`**: Change other item properties in place (position, size, colors, `Visible`, `Enabled`, `OutputFormat`, text alignment, a screen window's `Screen`, `Text`, `Font`). A plain `Text` string keeps the existing paragraph style:
+  ```json
+  {
+    "screen_name": "Screen_2",
+    "item_name": "btn_M101_Start",
+    "item_properties": { "Text": "Käynnistä", "Font": { "Size": 14, "Bold": true } }
+  }
+  ```
 
 ### HMI Tag Management & Acquisition Cycles
 - **`hmi_list_tags`**: List all tags, tables, PLC bindings, data types, and acquisition cycles.
@@ -256,6 +280,12 @@ When modifying existing button functions (e.g. changing `SetBitInTag` to `Invert
     "mode": "Cyclic"
   }
   ```
+- **`hmi_delete_tag`**: Delete one HMI tag. Run with `dry_run: true` first. With the default `on_referenced: "fail"`, a tag that is still referenced, or whose reference scan was incomplete, is not deleted; read `References`, `CrossReferences` and `NotScanned` in the result.
+- **`hmi_rename_tag`**: Rename one HMI tag in place (never delete and recreate it):
+  ```json
+  { "tag_name": "HMI_Motor1_Run", "new_name": "HMI_Motor1_Running", "on_conflict": "fail", "dry_run": true }
+  ```
+  After the rename, check `StructuredReferences` for references that still read the old name (`renamed_with_stale_references`). `script_references: "replace"` rewrites only script string literals that are exactly the old name. The PLC tag is not renamed, and old HMI JSON exports still contain the old name.
 ### Integrated HMI Connections & Communication Management
 - **`hmi_list_connections`**: Enumerate all configured HMI communication links on an HMI target:
   ```json
@@ -322,13 +352,20 @@ WinCC Unified V21 manages multilingual text lists through its Version 2.0 YAML s
   }
   ```
 
+### Runtime Settings
+- **`hmi_get_runtime_settings`**: Read the Runtime settings, including the start screen and validation messages.
+- **`hmi_set_start_screen`**: Set the start screen in place:
+  ```json
+  { "screen_name": "Frame", "on_conflict": "fail" }
+  ```
+
 ### HMI Compilation
 Always compile the HMI target after modifying screens or tags to ensure runtime consistency:
-- **`hmi_compile`**:
+- **`hmi_compile`**: The only HMI in a project is selected automatically; with several HMIs pass the HMI software, device item or device name as `target_name` (`target_device` is a deprecated alias):
   ```json
-  { "target_device": "PC-System_1" }
+  { "target_name": "HMI_RT_1" }
   ```
-  Verifies that JavaScript event scripts, tag bindings, and screen geometries compile with 0 errors.
+  Verifies that JavaScript event scripts, tag bindings, and screen geometries compile with 0 errors. `CompiledObject` in the result names the object that was compiled.
 
 ---
 
@@ -422,6 +459,8 @@ To get the highest quality results when prompting agents equipped with this skil
 ## 7. Virtual Controller Simulation & Testing (S7-PLCSIM Advanced)
 
 The MCP server integrates directly with **Siemens S7-PLCSIM Advanced API V8.0** (`Siemens.Simatic.Simulation.Runtime.Api.x64.dll`), allowing agents to validate PLC logic in live memory without physical hardware:
+
+Only S7-PLCSIM Advanced V8.0 or newer is supported (S7-1500 and ET 200SP). Standard S7-PLCSIM, and therefore S7-1200 simulation, cannot be driven by the `plcsim_*` tools. `plcsim_list_instances` returns an object: check `runtimeAvailable` and `message`.
 
 ### 7.1 Key Tools
 - **Connection & State**: `plcsim_list_instances`, `plcsim_connect`, `plcsim_disconnect`, `plcsim_get_status`, `plcsim_set_operating_state`.

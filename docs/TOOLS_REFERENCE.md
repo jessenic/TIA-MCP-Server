@@ -1,5 +1,5 @@
 # Siemens TIA Portal V21 Openness MCP Server
-## Complete Tools Reference Dictionary (139 Tools)
+## Complete Tools Reference Dictionary (153 Tools)
 
 **Protocol Specification:** Model Context Protocol (MCP) JSON-RPC 2.0  
 **Transport Binding:** HTTP (`POST /mcp`), SSE (`GET /sse`), stdio  
@@ -14,15 +14,16 @@
 | :---: | :--- | :---: | :--- |
 | **1** | [Connection & Session Management](#category-1-connection--session-management-8-tools) | 8 | `tia_get_status`, `tia_list_processes`, `tia_connect`, `tia_disconnect`, `tia_get_project_info`, `tia_open_project`, `tia_save_project`, `tia_close_project` |
 | **2** | [Hardware & Device Topology](#category-2-hardware--device-topology-2-tools) | 2 | `tia_list_devices`, `tia_get_device_tree` |
-| **3** | [PLC Software, Blocks & Compilation](#category-3-plc-software-blocks--compilation-16-tools) | 16 | `tia_list_plcs`, `tia_list_blocks`, `tia_get_block_code`, `tia_get_block_info`, `tia_get_block_attributes`, `tia_import_block`, `tia_import_scl_block`, `tia_delete_block`, `tia_list_plc_types`, `tia_get_plc_type`, `tia_get_type_info`, `tia_get_type_attributes`, `tia_get_tag_table_info`, `tia_import_plc_type`, `tia_compile`, `tia_get_db_member_attributes` |
-| **4** | [WinCC Unified HMI Engineering](#category-4-wincc-unified-hmi-screen--widget-engineering-49-tools) | 49 | `hmi_list_targets`, `hmi_list_screens`, `hmi_list_screen_groups`, `hmi_list_graphic_lists`, `hmi_create_screen`, `hmi_delete_screen`, `hmi_get_screen_items`, `hmi_get_screen_item`, `hmi_update_screen_item`, `hmi_read_event_scripts`, `hmi_set_event_script`, `hmi_delete_screen_items`, `hmi_add_label`, `hmi_add_button`, `hmi_add_toggle_switch`, `hmi_add_shape`, `hmi_add_io_field`, `hmi_set_tag_dynamization`, `hmi_delete_dynamization`, `hmi_update_dynamization_entry`, `hmi_set_expression_dynamization`, `hmi_set_expression_dynamization_entries`, `hmi_get_js_type_definitions`, `hmi_update_button_scripts`, `hmi_list_tag_tables`, `hmi_list_tags`, `hmi_create_tag`, `hmi_create_discrete_alarm`, `hmi_update_tag_acquisition_cycles`, `hmi_set_tag_range`, `hmi_create_data_log`, `hmi_assign_logging_tags`, `hmi_list_connections`, `hmi_create_connection`, `hmi_delete_connection`, `hmi_list_text_lists`, `hmi_create_text_list`, `hmi_delete_text_list`, `hmi_export_text_lists`, `hmi_compile`, `tia_list_tag_tables`, `tia_get_tags`, `hmi_export_json`, `hmi_read_export_file`, `hmi_begin_import`, `hmi_upload_import_file`, `hmi_import_json`, `hmi_patch_json`, `hmi_render_json` |
+| **3** | [PLC Software, Blocks & Compilation](#category-3-plc-software-blocks--compilation-21-tools) | 21 | `tia_list_plcs`, `tia_list_blocks`, `tia_get_block_code`, `tia_get_block_info`, `tia_get_block_attributes`, `tia_set_block_attribute`, `tia_import_block`, `tia_import_scl_block`, `tia_rename_block`, `tia_delete_block`, `tia_list_plc_types`, `tia_get_plc_type`, `tia_get_type_info`, `tia_get_type_attributes`, `tia_get_tag_table_info`, `tia_import_plc_type`, `tia_rename_plc_type`, `tia_delete_plc_type`, `tia_compile`, `tia_get_compile_state`, `tia_get_db_member_attributes` |
+| **4** | [WinCC Unified HMI Engineering](#category-4-wincc-unified-hmi-screen--widget-engineering-51-tools) | 51 | `hmi_list_targets`, `hmi_list_screens`, `hmi_list_screen_groups`, `hmi_list_graphic_lists`, `hmi_create_screen`, `hmi_delete_screen`, `hmi_get_screen_items`, `hmi_get_screen_item`, `hmi_update_screen_item`, `hmi_read_event_scripts`, `hmi_set_event_script`, `hmi_delete_screen_items`, `hmi_add_label`, `hmi_add_button`, `hmi_add_toggle_switch`, `hmi_add_shape`, `hmi_add_io_field`, `hmi_set_tag_dynamization`, `hmi_delete_dynamization`, `hmi_update_dynamization_entry`, `hmi_set_expression_dynamization`, `hmi_set_expression_dynamization_entries`, `hmi_get_js_type_definitions`, `hmi_update_button_scripts`, `hmi_list_tag_tables`, `hmi_list_tags`, `hmi_create_tag`, `hmi_create_discrete_alarm`, `hmi_update_tag_acquisition_cycles`, `hmi_set_tag_range`, `hmi_create_data_log`, `hmi_assign_logging_tags`, `hmi_list_connections`, `hmi_create_connection`, `hmi_delete_connection`, `hmi_list_text_lists`, `hmi_create_text_list`, `hmi_delete_text_list`, `hmi_export_text_lists`, `hmi_compile`, `hmi_get_runtime_settings`, `hmi_set_start_screen`, `tia_list_tag_tables`, `tia_get_tags`, `hmi_export_json`, `hmi_read_export_file`, `hmi_begin_import`, `hmi_upload_import_file`, `hmi_import_json`, `hmi_patch_json`, `hmi_render_json` |
 | **5** | [Siemens TestSuite Automation](#category-5-siemens-testsuite-automation-2-tools) | 2 | `tia_testsuite_list_tests`, `tia_testsuite_load_test` |
 | **6** | [S7-PLCSIM Advanced Live Simulation & Testing](#category-6-s7-plcsim-advanced-live-simulation--testing-12-tools) | 12 | `plcsim_list_instances`, `plcsim_connect`, `plcsim_disconnect`, `plcsim_get_status`, `plcsim_set_operating_state`, `plcsim_set_scale_factor`, `plcsim_read_tag`, `plcsim_write_tag`, `plcsim_read_tags`, `plcsim_write_tags`, `plcsim_run_sequence`, `plcsim_run_mixing_sequence` |
 | **7** | [Project, Library & Text Discovery](#category-7-project-library--text-discovery-6-tools) | 6 | `tia_list_global_libraries`, `tia_search_project_library_types`, `tia_list_project_faceplates`, `tia_get_library_type_instances`, `tia_list_project_text_categories`, `tia_download_project_texts` |
-| **8** | [PLC, Project & HMI Operations](#category-8-plc-project--hmi-operations-16-tools) | 16 | `tia_get_plc_tag_info`, `tia_read_user_constant`, `tia_get_tag_table_attributes`, `tia_create_plc_tag_table`, `tia_create_tagtable_group`, `tia_create_block_group`, `tia_create_user_constant`, `tia_update_user_constant`, `tia_create_project`, `hmi_create_screen_group`, `hmi_create_screen_under_group`, `hmi_create_tag_table`, `hmi_create_navigation_button`, `hmi_rename_screen`, `hmi_rename_screen_group`, `hmi_rename_tag_table` |
+| **8** | [PLC, Project & HMI Operations](#category-8-plc-project--hmi-operations-18-tools) | 18 | `tia_get_plc_tag_info`, `tia_read_user_constant`, `tia_get_tag_table_attributes`, `tia_create_plc_tag_table`, `tia_create_tagtable_group`, `tia_create_block_group`, `tia_create_user_constant`, `tia_update_user_constant`, `tia_create_project`, `hmi_create_screen_group`, `hmi_create_screen_under_group`, `hmi_create_tag_table`, `hmi_create_navigation_button`, `hmi_rename_screen`, `hmi_rename_screen_group`, `hmi_rename_tag_table`, `hmi_delete_tag`, `hmi_rename_tag` |
 | **9** | [Siemens Online Documentation](#category-9-siemens-online-documentation-4-tools) | 4 | `docs_search`, `docs_read_page`, `docs_get_toc`, `docs_list_publications` |
 | **10** | [Online PLC Values](#category-10-online-plc-values-6-tools) | 6 | `plc_online_connect`, `plc_online_get_status`, `plc_online_disconnect`, `plc_online_list_datablocks`, `plc_online_browse`, `plc_online_read_tags` |
 | **11** | [Hardware Configuration, Networks & Project Backup](#category-11-hardware-configuration-networks--project-backup-19-tools) | 19 | `tia_find_module_types`, `tia_create_device`, `tia_list_plug_locations`, `tia_plug_module`, `tia_delete_hardware`, `tia_rename_hardware`, `tia_get_io_addresses`, `tia_list_network`, `tia_create_subnet`, `tia_connect_to_subnet`, `tia_create_io_system`, `tia_connect_to_io_system`, `tia_set_network_node`, `tia_export_aml`, `tia_import_aml`, `tia_export_project_files`, `tia_archive_project`, `tia_retrieve_project`, `tia_export_cross_references` |
+| **12** | [Technology Objects](#category-12-technology-objects-4-tools) | 4 | `tia_list_technology_objects`, `tia_get_technology_object_parameters`, `tia_create_technology_object`, `tia_set_technology_object_parameters` |
 
 ## MCP Documentation Resources
 
@@ -210,7 +211,7 @@ The bundled Openness assemblies cover authoring APIs, not the complete WinCC Uni
 
 ---
 
-## Category 3: PLC Software, Blocks & Compilation (16 Tools)
+## Category 3: PLC Software, Blocks & Compilation (21 Tools)
 
 ### 11. `tia_list_plcs`
 - **Description:** Lists all PLCs with block counts, UDT counts, and tag table counts.
@@ -264,12 +265,19 @@ The bundled Openness assemblies cover authoring APIs, not the complete WinCC Uni
 ---
 
 ### 13. `tia_get_block_code`
-- **Description:** Exports block definition as SimaticML XML and extracts readable SCL logic.
+- **Description:** Reads the code of a PLC block. With `format: "auto"` (default), SCL, STL and DB blocks return the source text that TIA Portal generates (`ExternalSourceGroup.GenerateSource`) in `Source`, without SimaticML. LAD, FBD and GRAPH blocks, and blocks whose source cannot be generated (for example know-how protected blocks, or while TIA Portal is online with the PLC), return SimaticML in `XmlContent`, and `Warnings` gives the reason. When no block has the name, a PLC data type (UDT) of that name is used.
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
   | :--- | :---: | :---: | :---: | :--- |
-  | `block_name` | string | **Yes** | — | Block name (e.g. `"FB_MixingLine"`). |
+  | `block_name` | string | **Yes** | — | Block name, or UDT name (e.g. `"FB_MixingLine"`, `"UDT_Motor"`). |
   | `plc_name` | string | No | null | Target PLC name. |
+  | `format` | string | No | `"auto"` | `"auto"`, `"source"` (fails instead of falling back to SimaticML) or `"xml"` (always SimaticML). `"scl"` is accepted as an alias of `"source"`. |
+  | `include_xml` | boolean | No | `false` | Also return SimaticML in `XmlContent` when source text is returned. A failed SimaticML export is then reported in `Warnings` instead of failing the call. |
+  | `with_dependencies` | boolean | No | `false` | Generate the source together with the blocks and types it depends on. |
+- **Result fields:** `Name`, `Number`, `BlockType`, `ProgrammingLanguage`, `Format` (`source` or `xml`), `Source`, `SourceFileExtension` (`.scl`, `.awl`, `.db` or `.udt`), `IsKnowHowProtected`, `XmlContent` (only with `format: "xml"`, `include_xml: true` or the fallback), `Warnings`, and `ExtractedScl`.
+- **UDTs:** a UDT result has `BlockType` `"PlcType"`, `ProgrammingLanguage` `"UDT"` and `Number` 0.
+- **Re-import:** only the source of a single SCL block generated without `with_dependencies` can be edited and passed to `tia_import_scl_block`. STL (`.awl`) and UDT (`.udt`) source and output with dependencies cannot.
+- **Changed in v2.14.0:** before, the tool always returned `XmlContent` and an `ExtractedScl` built from the XML. Callers that read `XmlContent` must now pass `format: "xml"` or `include_xml: true`. `ExtractedScl` is deprecated: it is a copy of `Source` for SCL blocks and will be removed in a later release.
 - **Response Example:**
   ```json
   {
@@ -277,22 +285,29 @@ The bundled Openness assemblies cover authoring APIs, not the complete WinCC Uni
     "Number": 10,
     "BlockType": "FB",
     "ProgrammingLanguage": "SCL",
-    "XmlContent": "<?xml version=\"1.0\"...<Document>...</Document>",
-    "ExtractedScl": "REGION Motor Control\n  IF #Cmd_Start THEN\n    #Motor_Run := TRUE;\n  END_IF;\nEND_REGION"
+    "Format": "source",
+    "SourceFileExtension": ".scl",
+    "IsKnowHowProtected": false,
+    "Source": "FUNCTION_BLOCK \"FB_MixingLine\"\n...\nEND_FUNCTION_BLOCK\n",
+    "ExtractedScl": "FUNCTION_BLOCK \"FB_MixingLine\"\n...\nEND_FUNCTION_BLOCK\n",
+    "Warnings": []
   }
   ```
+- **Not verified against a live TIA Portal:** the generated `.db`, `.awl` and `.udt` content, the fallback while online, and re-import of generated SCL.
 
 ---
 
 ### 14. `tia_import_block`
-- **Description:** Imports or updates a block from SimaticML XML.
+- **Description:** Imports or updates a block from SimaticML XML (`ImportOptions.Override`; no backup is taken). The result is text.
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
   | :--- | :---: | :---: | :---: | :--- |
-  | `xml_content` | string | **Yes** | — | SimaticML XML string. |
+  | `xml_content` | string | One required | — | SimaticML XML string. Use this or `file_path`, not both. |
+  | `file_path` | string | One required | — | Fully qualified server-local `.xml` path (`X:\...` or UNC), at most 50 MiB, passed directly to Openness. Prefer it for large blocks, for example a file from `tia_export_project_files`. |
   | `overwrite` | boolean | No | `true` | Overwrite existing block. |
   | `plc_name` | string | No | null | Target PLC name. |
   | `folder` | string | No | null | Subfolder inside Program Blocks. |
+- **OB cycle settings:** `CyclicTime` and `PhaseOffset` in SimaticML are microseconds (100 ms = `<CyclicTime>100000</CyclicTime>`). OBs have no `PhaseShift` attribute (use `PhaseOffset`), and `CyclicApplicationCycleTime` is read-only. The XML is imported unchanged. For imported cyclic interrupt OBs, the stored `CyclicTime` and `PhaseOffset` are read back on extra lines, and suspicious settings are listed under `Warnings:` (for example `CyclicTime` below 1000 us, a value that is not a whole number of milliseconds, a `PhaseShift` element, or `PhaseOffset` not smaller than `CyclicTime`). If the import fails, the same hints are added to the error.
 
 ---
 
@@ -301,16 +316,23 @@ The bundled Openness assemblies cover authoring APIs, not the complete WinCC Uni
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
   | :--- | :---: | :---: | :---: | :--- |
-  | `scl_code` | string | **Yes** | — | Complete source for exactly one `FUNCTION`, `FUNCTION_BLOCK`, `ORGANIZATION_BLOCK`, or `DATA_BLOCK`. |
+  | `scl_code` | string | One required | — | Complete source for exactly one `FUNCTION`, `FUNCTION_BLOCK`, `ORGANIZATION_BLOCK`, or `DATA_BLOCK`. Use this or `file_path`, not both. |
+  | `file_path` | string | One required | — | Fully qualified server-local `.scl` path, at most 50 MiB. Read as UTF-8 unless the file has a BOM; a file that is not valid UTF-8 (for example ANSI) is rejected before any change. |
   | `plc_name` | string | No | null | Target PLC name. |
   | `folder` | string | No | null | Existing PLC block group path; when omitted, preserves the existing block's group or uses the root group for a new block. |
+  | `backup` | boolean | No | `true` | Export the existing same-name block as a backup before replacing it. `false` skips the backup and returns a warning; a failed import then cannot restore the old block. |
   | `compile_after_import` | boolean | No | `true` | Compile the target PLC after generation. Compilation errors do not trigger rollback. |
   | `open_after_import` | boolean | No | `false` | Open the imported block in the TIA Portal editor. |
+- **Order of checks:** the destination folder is resolved before anything changes. With `backup: true`, an inconsistent existing block is compiled once on its own first. If it stays inconsistent, the compile fails, or the block is know-how protected, the import fails without replacing the block; the error says whether that compile ran. Retry with `backup: false` only when losing the old block on a failed import is acceptable.
+- **Name space:** the import is refused, and nothing changes, if the block name equals the name of a technology object (case-insensitive).
+- **Encoding:** the temporary `.scl` file is written as UTF-8 with BOM, so non-ASCII text in titles and comments is kept.
+- **New result fields:** `SourceFile`, `BackupTaken`, `ExistingWasConsistent` (read whenever a block is replaced; null only if unreadable), `PreImportBlockCompilation`, `PreviousBlockNumber` and `BlockNumber`. A warning appears when the block number changes, because a replace deletes the block and regenerates it; the old number is not restored. The `Compilation` object keeps `State`, `ErrorCount`, `WarningCount` and `Messages` (no `UpToDate`).
+- **Not verified against a live TIA Portal:** the pre-import compile of an inconsistent block, the block-number change, and non-ASCII text in imported blocks.
 
 ---
 
 ### 15. `tia_delete_block`
-- **Description:** Deletes a program block from the PLC.
+- **Description:** Deletes a program block (OB/FB/FC/DB) from the PLC. The output is text. If the name belongs to a PLC data type, the error points to `tia_delete_plc_type`.
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
   | :--- | :---: | :---: | :---: | :--- |
@@ -339,11 +361,12 @@ The bundled Openness assemblies cover authoring APIs, not the complete WinCC Uni
 ---
 
 ### 18. `tia_import_plc_type`
-- **Description:** Imports or replaces a User Data Type (UDT) from SimaticML XML.
+- **Description:** Imports or replaces a User Data Type (UDT) from SimaticML XML. Importing a UDT under a new name creates a second type; use `tia_rename_plc_type` to rename.
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
   | :--- | :---: | :---: | :---: | :--- |
-  | `xml_content` | string | **Yes** | — | SimaticML XML definition. |
+  | `xml_content` | string | One required | — | SimaticML XML definition. Use this or `file_path`, not both. |
+  | `file_path` | string | One required | — | Fully qualified server-local `.xml` path, at most 50 MiB. |
   | `overwrite` | boolean | No | `true` | Overwrite if type exists. |
   | `plc_name` | string | No | null | Target PLC name. |
 
@@ -373,6 +396,73 @@ The bundled Openness assemblies cover authoring APIs, not the complete WinCC Uni
     ]
   }
   ```
+- **Up-to-date projects:** TIA Portal compiles only changed blocks, and Openness V21 has no rebuild-all option. The tool compares the blocks' compile dates before and after. When the compile succeeds with no errors and no warnings and no compile date changed, the result adds `"UpToDate": true` and a `Note`: nothing was compiled, and warnings from an earlier compile are not shown again. Use `tia_get_compile_state`, or *Compile > Software (rebuild all blocks)* in TIA Portal. If some compile dates cannot be read, `UpToDate` is decided from the compiler message text only.
+
+---
+
+### `tia_get_compile_state`
+- **Description:** Read-only. Lists the compile state of PLC blocks and PLC data types without compiling.
+- **Parameters:**
+  | Parameter | Type | Required | Default | Description |
+  | :--- | :---: | :---: | :---: | :--- |
+  | `plc_name` | string | No | null | Exact PLC software name; required when the project has several PLCs. |
+  | `group_path` | string | No | null | Block group to list, with its subgroups. Omit or use `""` for all blocks. Types are always listed from the root. |
+  | `only_inconsistent` | boolean | No | `false` | List only entries that are inconsistent or whose state is unknown. Totals always count everything. |
+  | `include_types` | boolean | No | `true` | Also list PLC data types. |
+- **Returns:** per block `IsConsistent` (null when TIA does not report it), `IsKnowHowProtected`, `CompileDate`, `ModifiedDate`, `CodeModifiedDate` and `InterfaceModifiedDate` (ISO 8601); per type `IsConsistent` and `ModifiedDate`; totals `BlockCount`, `ConsistentBlocks`, `InconsistentBlocks`, `UnknownBlocks`, `TypeCount`, `InconsistentTypes`, `UnknownTypes`; and a `Note`.
+- Openness cannot read the warnings TIA stored from an earlier compile.
+
+---
+
+### `tia_rename_block`
+- **Description:** Renames one program block (OB/FB/FC/DB) in place and verifies the new name by read-back. The block number is unchanged.
+- **Parameters:**
+  | Parameter | Type | Required | Default | Description |
+  | :--- | :---: | :---: | :---: | :--- |
+  | `block_name` | string | **Yes** | — | Exact current block name. |
+  | `new_name` | string | **Yes** | — | New name; no leading or trailing whitespace, control characters or path separators. |
+  | `plc_name` | string | No | null | Exact PLC software name; required when the project has several PLCs. |
+  | `group_path` | string | No | null | Exact block folder. Omit to search all folders; `""` means the root folder only. |
+  | `on_conflict` | string | No | `"fail"` | Only `"fail"` is supported. |
+- **Collision check:** the rename fails with status `collision`, and nothing changes, if any program block, PLC data type, system block or system data type in the PLC already has the new name (case-insensitive). Objects inside S7-1500 software units are not searched.
+- **Not found:** when `group_path` is given and the name is not in that folder, the message names the folders where it exists. If the name belongs to a UDT, the message points to `tia_rename_plc_type`.
+- **Result:** `{ Success, Operation, Status, PlcName, ObjectName, TargetPath, Partial, Message, Warnings }`. If TIA rejects the name and the read-back shows the old name unchanged, `Status` is `api_failure` with `Partial: false`.
+- **Not verified against a live TIA Portal:** whether callers and instance DBs follow the rename, and the behaviour for know-how protected or library-linked blocks.
+
+### `tia_rename_plc_type`
+- **Description:** Renames one PLC data type (UDT) in place (no delete, re-import or overwrite) and verifies the new name by read-back.
+- **Parameters:** `type_name` and `new_name` (required); `plc_name`, `group_path` and `on_conflict` (`"fail"` only) as for `tia_rename_block`.
+- Same collision check, folder hints and result as `tia_rename_block`. Importing a UDT under a new name creates a second type; use this tool to rename.
+- **Not verified against a live TIA Portal:** whether blocks, DBs, other UDTs and HMI tags that use the type follow the rename.
+
+### `tia_delete_plc_type`
+- **Description:** Deletes one PLC data type (UDT) by exact, case-sensitive name. TIA Portal decides whether the delete is allowed; its answer is reported. Blocks, DBs and other UDTs that used the type become inconsistent until changed, so run `tia_compile` afterwards.
+- **Parameters:**
+  | Parameter | Type | Required | Default | Description |
+  | :--- | :---: | :---: | :---: | :--- |
+  | `type_name` | string | **Yes** | — | Exact UDT name. |
+  | `plc_name` | string | No | null | Exact PLC software name; required when the project has several PLCs. |
+  | `group_path` | string | No | null | Exact type folder, e.g. `"HMI/Manual"`. Omit to search all folders; `""` means the root folder only. |
+- Program blocks are deleted with `tia_delete_block`. Objects inside S7-1500 software units are not searched.
+- **Not verified against a live TIA Portal:** what TIA does when the type is still in use, and the exact message.
+
+### `tia_set_block_attribute`
+- **Description:** Sets one allow-listed OB attribute in place with `PlcBlock.SetAttribute` (no delete or re-import) and reads it back. The project is not compiled or saved; run `tia_compile` afterwards.
+- **Parameters:**
+  | Parameter | Type | Required | Default | Description |
+  | :--- | :---: | :---: | :---: | :--- |
+  | `block_name` | string | **Yes** | — | Exact OB name, e.g. `"Cyclic interrupt"`. |
+  | `attribute_name` | string | **Yes** | — | `"CyclicTime"`, `"PhaseOffset"` (cyclic interrupt OBs only) or `"PriorityNumber"`. |
+  | `value` | integer | **Yes** | — | New value in `unit`. `CyclicTime` 1 to 60000 ms; `PhaseOffset` smaller than `CyclicTime`. |
+  | `unit` | string | For time values | — | `"ms"` or `"us"`. Required for `CyclicTime` and `PhaseOffset`; must be omitted for `PriorityNumber`. |
+  | `expected_current_value` | integer | No | null | Guard in the same unit. If the current value differs, the status is `conflict` and nothing is written. |
+  | `plc_name` | string | No | null | Exact PLC software name. |
+  | `group_path` | string | No | null | Exact block group; required when the block name is duplicated. `""` is the root group. |
+- Openness and SimaticML store microseconds: 100 ms = 100000 us.
+- The attribute is written only when TIA Portal lists it as writable for that OB (`GetAttributeInfos`); otherwise the status is `not_supported` and nothing is written. F-CPU safety OBs are not supported.
+- **Status values:** `updated`, `unchanged`, `conflict`, `invalid_input`, `invalid_target`, `protected`, `not_supported`, `not_found`, `ambiguous`, `verification_failed`, `api_failure`.
+- **Sample Invocation:** `{ "block_name": "Cyclic interrupt", "attribute_name": "CyclicTime", "value": 100, "unit": "ms" }` sets the OB to 100 ms.
+- **Not verified against a live TIA Portal:** whether TIA lists `CyclicTime` and `PhaseOffset` as writable. If it does not, the tool returns `not_supported` for them.
 
 ---
 
@@ -381,7 +471,7 @@ The bundled Openness assemblies cover authoring APIs, not the complete WinCC Uni
 - **Parameters:** Required `db_name` and `member_name`; optional exact `plc_name` and `group_path`.
 - **Returns:** Every attribute reported for the selected direct member, with values only when its V21 access mode permits reading. Nested paths, dedicated datatype, stable ID, and revision fields are not claimed.
 
-## Category 4: WinCC Unified HMI Screen & Widget Engineering (49 Tools)
+## Category 4: WinCC Unified HMI Screen & Widget Engineering (51 Tools)
 
 ### 20. `hmi_list_targets`
 - **Description:** Enumerates all WinCC Unified runtime devices and software containers.
@@ -484,7 +574,7 @@ The bundled Openness assemblies cover authoring APIs, not the complete WinCC Uni
   | :--- | :---: | :---: | :---: | :--- |
   | `screen_name` | string | **Yes** | — | Target screen. |
   | `name` | string | **Yes** | — | Item name (e.g. `"lbl_Header"`). |
-  | `text` | string | **Yes** | — | Display text string. |
+  | `text` | string | **Yes** | — | Display text. Plain Unicode text (ä, ö, å, °). The server wraps it as `<body><p>…</p></body>` and escapes it, so do not use HTML entities. Numeric character references such as `&#196;` or `&#xC4;` are decoded to the character before escaping; named entities such as `&amp;` stay literal. |
   | `left` | integer | **Yes** | — | X coordinate in pixels. |
   | `top` | integer | **Yes** | — | Y coordinate in pixels. |
   | `width` | integer | **Yes** | — | Width in pixels. |
@@ -505,7 +595,7 @@ The bundled Openness assemblies cover authoring APIs, not the complete WinCC Uni
   | :--- | :---: | :---: | :---: | :--- |
   | `screen_name` | string | **Yes** | — | Target screen. |
   | `name` | string | **Yes** | — | Button item name. |
-  | `text` | string | **Yes** | — | Button text caption. |
+  | `text` | string | **Yes** | — | Button caption. Plain Unicode text (ä, ö, å, °). The server wraps it as `<body><p>…</p></body>` and escapes it, so do not use HTML entities. Numeric character references such as `&#196;` or `&#xC4;` are decoded to the character before escaping; named entities such as `&amp;` stay literal. |
   | `left`, `top`, `width`, `height` | integer | **Yes** | — | Geometry in pixels. |
   | `back_color` | string | No | null | Button background color. |
   | `fore_color` | string | No | null | Button text color. |
@@ -531,7 +621,7 @@ The bundled Openness assemblies cover authoring APIs, not the complete WinCC Uni
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
   | :--- | :---: | :---: | :---: | :--- |
-  | `screen_name`, `name`, `off_text`, `on_text` | string | **Yes** | — | Target screen, item name, and captions for normal and alternate states. |
+  | `screen_name`, `name`, `off_text`, `on_text` | string | **Yes** | — | Target screen, item name, and captions for normal and alternate states. Captions: plain Unicode text (ä, ö, å, °). The server wraps it as `<body><p>…</p></body>` and escapes it, so do not use HTML entities. Numeric character references such as `&#196;` or `&#xC4;` are decoded to the character before escaping; named entities such as `&amp;` stay literal. |
   | `left`, `top`, `width`, `height` | integer | **Yes** | — | Switch geometry. |
   | `process_tag` | string | **Yes** | — | Existing HMI tag bound to `IsAlternateState`. |
   | `target_name` | string | No | null | Target HMI software. |
@@ -565,7 +655,7 @@ The bundled Openness assemblies cover authoring APIs, not the complete WinCC Uni
   | `left`, `top`, `width`, `height` | integer | **Yes** | — | Geometry in pixels. |
   | `mode` | string | No | `"Output"` | `"Output"` or `"InputOutput"`. |
   | `process_tag` | string | No | null | Bound HMI tag for ProcessValue. |
-  | `output_format` | string | No | null | Output format, e.g. `"{F1} °C"` (one decimal and a unit). Omit to keep the current format. |
+  | `output_format` | string | No | null | Output format, e.g. `"{F1} °C"` (one decimal and a unit). Omit to keep the current format. Plain Unicode text, not HTML; numeric references such as `&#176;` are decoded. |
   | `target_name` | string | No | null | Target HMI software. |
 
 ---
@@ -582,6 +672,7 @@ The bundled Openness assemblies cover authoring APIs, not the complete WinCC Uni
   | `condition_type` | string | No | `"None"` | `"None"`, `"Range"`, or `"Singlebit"`. |
   | `ranges` | array | No | null | For `Range`, provide numeric bounds. For `Singlebit`, provide exactly one `0..0` and one `1..1` entry; values map the off/on states. |
   | `target_name` | string | No | null | Target HMI software. |
+- **Existing dynamizations:** an existing Singlebit table is updated in place; its bitmask entries are not deleted. Switching an existing mapping table that has entries to another condition type (for example Singlebit to Range), or replacing a non-tag dynamization, fails: call `hmi_delete_dynamization` first. `"None"` only sets the tag and leaves an existing table unchanged. All changes run in one transaction and are rolled back on failure.
 - **Sample Invocation:**
   ```json
   {
@@ -699,7 +790,7 @@ The bundled Openness assemblies cover authoring APIs, not the complete WinCC Uni
   | `alarm_name` | string | **Yes** | — | Discrete alarm name. |
   | `alarm_class` | string | **Yes** | — | Existing HMI alarm class name. |
   | `raised_state_tag` | string | **Yes** | — | Existing HMI tag used as the alarm trigger. |
-  | `text` | string | **Yes** | — | Event text applied to active text languages. |
+  | `text` | string | **Yes** | — | Event text applied to active text languages. Plain Unicode text (ä, ö, å, °). The server wraps it as `<body><p>…</p></body>` and escapes it, so do not use HTML entities. Numeric character references such as `&#196;` or `&#xC4;` are decoded to the character before escaping; named entities such as `&amp;` stay literal. |
   | `raised_state_tag_bit_number` | integer | No | `0` | Trigger bit number. |
   | `trigger_mode` | string | No | `"OnRisingEdge"` | Discrete alarm trigger mode supported by TIA Portal V21. |
   | `acknowledgment_control_tag` | string | No | null | Optional existing HMI acknowledgment-control tag. |
@@ -788,11 +879,14 @@ The bundled Openness assemblies cover authoring APIs, not the complete WinCC Uni
 ---
 
 ### 41. `hmi_compile`
-- **Description:** Compiles the WinCC Unified HMI device and runtime software using Openness `ICompilable`.
+- **Description:** Compiles a WinCC Unified HMI using Openness `ICompilable`. The HMI is selected like in the other HMI tools.
 - **Parameters:**
   | Parameter | Type | Required | Default | Description |
   | :--- | :---: | :---: | :---: | :--- |
-  | `target_device` | string | No | null | Target device name (e.g. `"PC-System_1"`). |
+  | `target_name` | string | No | null | Exact HMI software, device item or device name (e.g. `"HMI_RT_1"` or `"HMI_1"`). When the project has exactly one HMI it is selected automatically. With several HMIs it is required, and the error lists the candidates. |
+  | `target_device` | string | No | null | Deprecated alias of `target_name`, kept for existing clients. If both are given they must match. |
+- `ICompilable` is taken from the first object that offers it: the HMI software's container, the device item that holds the HMI software, its parent device items, then the device. `hmi_import_json` and `hmi_patch_json` compile through the same path.
+- **Sample Invocation:** `{ "target_name": "HMI_RT_1" }`
 - **Response Example:**
   ```json
   {
@@ -805,9 +899,39 @@ The bundled Openness assemblies cover authoring APIs, not the complete WinCC Uni
         "Description": "Compiling finished (errors: 0; warnings: 0)",
         "State": "Success"
       }
-    ]
+    ],
+    "Target": "HMI_RT_1",
+    "DeviceName": "PC-System_1",
+    "CompiledObject": "SoftwareContainer of 'HMI_RT_1'"
   }
   ```
+- **Not verified against a live TIA Portal:** which object returns `ICompilable`, and that HMI script errors are reported through it. Before v2.14.0 the device was compiled.
+
+---
+
+### `hmi_get_runtime_settings`
+- **Description:** Read-only. Returns the WinCC Unified Runtime settings of an HMI (`HmiSoftware.RuntimeSettings`).
+- **Parameters:**
+  | Parameter | Type | Required | Default | Description |
+  | :--- | :---: | :---: | :---: | :--- |
+  | `target_name` | string | No | null | Exact HMI device, device item or software name; required when several HMIs exist. |
+- **Returns:** `TargetSoftwareName`, `StartScreen`, `StartScreenExists`, `ScreenResolution`, `AutoLogOffUrl`, `BitSelection`, `BitSelectionStrategyForResourceLists`, `BitSelectionStrategyForTagDynamization`, `CentralInputHint`, `CentralPanning`, `CentralZooming`, `EnableLanguageCompatibleFontFamilies`, `GmpEnabled`, `GeneralEsigCommentsStrategy`, `ReadErrors` (properties that could not be read) and `Validation` (Runtime settings validation errors and warnings per property).
+
+### `hmi_set_start_screen`
+- **Description:** Sets the WinCC Unified Runtime start screen in place. No screens or screen items are changed.
+- **Parameters:**
+  | Parameter | Type | Required | Default | Description |
+  | :--- | :---: | :---: | :---: | :--- |
+  | `screen_name` | string | **Yes** | — | Exact, case-sensitive name of an existing screen, also one inside a screen group. |
+  | `on_conflict` | string | **Yes** | — | Only `"fail"` is supported. |
+  | `expected_current_start_screen` | string | No | null | Guard: the start screen you expect now (`""` means none). If the current value differs, nothing changes. |
+  | `target_name` | string | No | null | Exact HMI device, device item or software name. |
+- The value is read back and the Runtime settings are validated. If the read-back differs (`verification_failed`) or validation reports a start-screen error (`validation_failed`), the previous start screen is restored, nothing is committed, and `StartScreen` in the result is the previous value. Validation errors on other settings are only reported.
+- **Status values:** `changed`, `unchanged`, `validation_failed`, `verification_failed`, `api_failure`.
+- **Result:** `{ Success, Operation, Status, TargetSoftwareName, OldStartScreen, StartScreen, Message, Warnings, Validation }`.
+- For a frame screen with a screen window, set the frame screen as the start screen and set the window's content with `hmi_update_screen_item` (`Screen`).
+- **Sample Invocation:** `{ "screen_name": "Frame", "on_conflict": "fail" }`
+- **Not verified against a live TIA Portal:** that the value persists after save, that a grouped screen is accepted by its bare name, and that Runtime starts on the new screen.
 
 ---
 
@@ -1134,6 +1258,54 @@ name, the property and the inner Openness message (for example
 and `plcTag`. A tag that has a connection but no PLC tag is skipped with a `warnings`
 entry instead of failing the import; references to an existing tag of that name still resolve.
 
+**Missing keys (since v2.14.0).** An item without a `text`, `dynamizations` or `events`
+key, or with the key set to `null`, keeps that part of an existing item unchanged. `[]`
+removes all dynamizations or events of the item. `text: {}` sets nothing in a non-compact
+import and resets the texts to the type defaults in a compact import. A compact import
+still resets omitted `props` to the type defaults; use item `compact: false` or
+`hmi_patch_json` for partial property edits. Items with omitted sections are listed in
+the result `warnings`. Before v2.14.0, such items lost their dynamizations and events.
+
+**Flags enums.** Properties with a flags enum type, such as `WindowFlags`, take one member
+name or names separated by `,` or `|` (export writes `"ShowCaption, CanClose"`). `None`
+clears all flags. Names are case-insensitive; numbers and empty names are rejected. Enum
+values are validated before any change (also in a dry run) and compared by value on
+read-back.
+
+**Singlebit and Bitmask mapping tables.** Bitmask entries cannot be deleted or reordered
+through Openness. An existing Singlebit or Bitmask table is therefore updated in place
+when the condition type, bit dynamization type, entry count, relevant masks and entry order
+match TIA's, so an unchanged export imports again without errors. A changed condition type
+or relevant mask (bit) needs `"onConflict": "replace"` on that dynamization: only the
+dynamization is recreated, never the item. The relevant mask is read-only in Openness, so
+a recreated table works only when TIA generates the requested bit. Entries listed in a
+different order than TIA's are refused, also with `replace`; keep the exported order.
+`dry_run: true` reports these mapping-table refusals before any change.
+
+**Script read-back.** Event scripts and script dynamizations are written exactly as given.
+The read-back ignores CRLF/LF differences, trailing spaces and tabs on each line, a BOM
+and trailing line breaks. Other differences fail and name the first differing line.
+
+**Plain-string texts** are escaped exactly as written and are not decoded, so an
+export/import round trip is lossless: a text that literally contains `&#196;` stays
+`&#196;`. Write plain Unicode in the document. Text and alarm `eventText` read-back
+accepts `{ "html": ... }` and equal language maps.
+
+**Screen item order (`zOrder`).** The item array order in a screen file is the stacking
+order. Import never reorders existing items (V21 has no API for it). New items are created
+in file order, and TIA decides where they land. After applying, the import compares each
+imported screen's item order with the file. Set `"zOrder"` in `manifest.json` (all
+screens) or in a screen file (that screen only):
+  | Value | Effect |
+  | :--- | :--- |
+  | `"keep"` (default) | Differences are returned in `zOrderWarnings`; the import continues. |
+  | `"require"` | A difference fails the import and rolls it back. |
+
+A dry run reports existing items that are already out of file order. Fix the order with
+*Arrange* in the TIA editor. Older server versions ignore `zOrder`. Not verified against
+a live TIA Portal: whether the `ScreenItems` order equals the visual stacking order, and
+whether the order inside the transaction equals the order after commit.
+
 ---
 
 ### 53. `hmi_patch_json`
@@ -1144,6 +1316,100 @@ entry instead of failing the import; references to an existing tag of that name 
   | `file_path` | string | **Yes** | — | Path to the JSON patch file. |
   | `dry_run` | boolean | No | `false` | Validate preconditions and report operations without applying them. |
   | `target_name` | string | No | null | Target HMI software/device selector. |
+
+A patch changes existing items only. It cannot create or rename items, or edit events,
+scripts or expression dynamizations. A patch file is one JSON object of at most 10 MiB.
+The same format is described in the `hmi-json` skill, section *Guarded patch workflow*.
+
+**Root fields**
+  | Field | Required | Meaning |
+  | :--- | :---: | :--- |
+  | `format` | Yes | Exactly `"tia-mcp-hmi-patch/1"`. |
+  | `require` | No | Preconditions checked before any change. |
+  | `operations` | Yes | Ordered list of `set`, `bind` and `delete` operations, at most 10,000. |
+  | `verify` | No | Postconditions checked after the operations, before commit. |
+
+**`require` and `verify`** have the same shape:
+  | Field | Meaning |
+  | :--- | :--- |
+  | `screens[].name` | Screen name (required). |
+  | `screens[].group` | Slash-separated screen group path; `null` or omitted for a root screen. |
+  | `screens[].width`, `screens[].height` | Optional; must equal the screen size. |
+  | `screens[].items[].name` | Item that must exist on that screen. |
+  | `screens[].items[].type` | Optional exact item class name, for example `HmiIOField`. |
+  | `tags[].name` | HMI tag that must exist. |
+  | `tags[].plcTag` | Optional; the tag's PLC binding must equal this text exactly. |
+
+`require` is checked against the project before the patch, including `screens[].items`.
+After the operations, the screens, dimensions and tags in `require` are checked again
+(items are not, so a patch may require an item and then delete it). `verify` checks
+screens, dimensions, tags and the listed items with their types.
+
+**Operation fields**
+  | Field | Used by | Required | Meaning |
+  | :--- | :--- | :---: | :--- |
+  | `op` | all | Yes | `"set"`, `"bind"` or `"delete"` (lower case). |
+  | `screen` | all | Yes | Screen name. |
+  | `group` | all | No | Screen group path; `null` or omitted for a root screen. |
+  | `item` | all | Yes | Existing item name. |
+  | `requireType` | all | No | The item class name must match exactly, for example `HmiIOField`. |
+  | `property` | set, bind | Yes | Openness property name. `set` accepts a dotted path into parts such as `Font.Size`; `bind` takes a top-level dynamizable property such as `ProcessValue` or `BackColor`. |
+  | `value` | set | Yes | New value with the JSON type of the property: number, `true`/`false`, enum name (flags enums: names separated by `,` or `\|`), `#RRGGBB` color, or for a text property a string, language map or `{ "html": "..." }`. |
+  | `tag` | bind | Yes | Existing HMI tag, member/array path, or system tag. |
+  | `expectTag` | bind | No | Guard: the property must already have a tag dynamization bound to exactly this tag. |
+  | `readOnly` | bind | No | `true`/`false`. Omitted: keeps the current value of an existing tag dynamization (`false` for a new one). |
+  | `useIndirectAddressing` | bind | No | Same rule as `readOnly`. |
+  | `onConflict` | bind | No | `"fail"` (default) or `"replace"`. `replace` allows replacing a non-tag (Expression, Script or ResourceList) dynamization with a tag dynamization. |
+  | `requireNoDynamizations` | delete | No | Fail if the item has dynamizations (checked before the patch). |
+  | `requireNoEvents` | delete | No | Fail if the item has event handlers (checked before the patch). |
+
+Field names are case-insensitive. The values of `format` and `op` are case-sensitive;
+`onConflict` is not. Unknown fields are ignored and listed in the result `warnings`;
+check them, because a misspelled guard is not applied.
+
+**`bind`** reuses an existing tag dynamization and writes only its tag (and the two
+flags). It never changes the value converter or mapping table, so an existing Range,
+Singlebit or Bitmask table stays as it is. Use it to retag Singlebit/Bitmask items without
+re-importing their tables. Whether TIA adjusts the table when the new tag has a different
+data type is not verified; read the item back after such a retag.
+
+**Processing order**
+1. Read the file, check `format`, check `require` (screens, dimensions, tags, items).
+2. Validate every operation against the project state before the patch. An operation on
+   an item that an earlier operation deletes is rejected.
+3. With `dry_run: true`, stop and return the operation list. For `bind` it shows
+   `expectTag`, `readOnly` and `useIndirectAddressing` (booleans when given, `"keep"` when
+   omitted) and `onConflict`.
+4. Otherwise, in one transaction: apply the operations in order, re-check `require`,
+   check `verify`, commit.
+5. Compile the HMI. The project is never saved.
+
+A failure in steps 1 to 4 changes nothing (the transaction rolls back). A compile error in
+step 5 is reported as an error, but the changes stay applied in memory and unsaved.
+
+**Example:** retag a Singlebit lamp without touching its mapping table; the patch fails if
+the lamp is not bound to the old tag now:
+```json
+{
+  "format": "tia-mcp-hmi-patch/1",
+  "require": {
+    "tags": [ { "name": "Motor2_Running", "plcTag": "DB_Motors.Motor2.Running" } ]
+  },
+  "operations": [
+    {
+      "op": "bind",
+      "screen": "Overview",
+      "item": "Lamp_Motor2",
+      "property": "BackColor",
+      "tag": "Motor2_Running",
+      "expectTag": "Motor1_Running"
+    }
+  ]
+}
+```
+
+Not verified against a live TIA Portal: a retag of a Singlebit/Bitmask dynamization, a
+re-bind that keeps `ReadOnly`, and a bind to a system tag.
 
 ---
 
@@ -1173,8 +1439,18 @@ entry instead of failing the import; references to an existing tag of that name 
 #### `hmi_update_screen_item`
 - **Description:** Updates one item in place and returns the full item readback. It never deletes or recreates the item.
 - **Parameters:** `screen_name`, `item_name`, and non-empty `item_properties` object are required; `target_name` is optional.
-- **Allowlisted properties:** `Visible`, `Left`, `Top`, `Width`, `Height`, `CenterX`, `CenterY`, `Radius`, `BackColor`, `ForeColor`, `BorderColor`, and `BorderWidth`. Unknown or read-only properties and invalid value types fail explicitly.
-- **Behavior:** Each requested property is validated before mutation; the update is applied transactionally and every supplied property is verified by readback. No project save is performed.
+- **Allowlisted properties:** use the names exactly as listed.
+  - `Visible`, `Enabled`, `Left`, `Top`, `Width`, `Height`, `CenterX`, `CenterY`, `Radius`
+  - `BackColor`, `ForeColor`, `BorderColor` (`#RRGGBB` or `#AARRGGBB`), `BorderWidth`
+  - `OutputFormat` (IO fields)
+  - `HorizontalTextAlignment` (`Left`/`Center`/`Right`/`Stretch`), `VerticalTextAlignment` (`Top`/`Center`/`Bottom`/`Stretch`)
+  - `Screen` (screen windows: the exact name of an existing screen in the same HMI; empty is rejected)
+  - `Text`
+  - `Font`, as an object `{ Size, Weight (Light/Normal/SemiBold/Bold), Italic, Underline, StrikeOut, Name (Arial/TimesNewRoman/SimSun/SiemensSans), Bold }` or as dotted keys such as `"Font.Size": 14`. `Font.Bold` true/false is shorthand for `Weight` Bold/Normal; do not combine it with `Weight`. Each property may appear only once, nested or dotted.
+- **Text:** a plain string becomes a single paragraph that keeps the existing `<body>` and first `<p>` attributes (for example `style="margin: 0; text-align: center;"`). Further paragraphs and inline formatting are dropped, and the result reports this under `warnings`. A string that starts with `<body` is written as raw markup and must be well-formed. `{ "html": "<body>...</body>" }` sets raw markup for every language. A language map such as `{ "en-US": "Start", "fi-FI": "Käynnistä" }` must cover every active language. The schema declares `Text` as `anyOf` string or object; clients that support only part of JSON Schema may not show it.
+- **Behavior:** A property the item type does not have, a wrong value type, an unknown enum name, malformed markup or a missing screen fails before anything is changed. The update is applied transactionally and every supplied property is verified by reading the value back. If an updated property also has a dynamization, the static value is still written, the result gets a `warnings` entry, and the dynamization is left as it is. No project save is performed.
+- **Sample Invocation:** `{ "screen_name": "Overview", "item_name": "btn_Start", "item_properties": { "Text": "Käynnistä", "Font": { "Size": 14, "Bold": true }, "Enabled": false } }`
+- **Not verified against a live TIA Portal:** `Font.Size` round trip, `Text` on every item type, accepted `OutputFormat` values, `Screen` with grouped screens, and the `Enabled` setter on every item type.
 
 #### `hmi_read_event_scripts`
 - **Description:** Reads event scripts on a screen, or on one item when `item_name` is supplied, and returns supported event enum names for that target.
@@ -1184,7 +1460,7 @@ entry instead of failing the import; references to an existing tag of that name 
 #### `hmi_set_event_script`
 - **Description:** Creates or updates one event handler in place on a screen or item.
 - **Parameters:** `screen_name`, `event_type`, and `script` are required; `item_name` and `target_name` are optional.
-- **Behavior:** Only event values supported by the selected V21 handler enum are accepted. Other event handlers and item identity/layout are preserved. The new source is read back and checked; syntax diagnostics are returned when exposed by the API. No project save is performed.
+- **Behavior:** Only event values supported by the selected V21 handler enum are accepted. Other event handlers and item identity/layout are preserved. The new source is read back and checked; the read-back ignores line endings and trailing whitespace. Syntax diagnostics are returned when exposed by the API. No project save is performed.
 
 #### `hmi_set_expression_dynamization`
 - **Description:** Creates or updates the formula of one expression dynamization without reconciling or replacing other dynamizations or the existing expression's mapping entries.
@@ -1262,21 +1538,41 @@ The `hmi_set_expression_dynamization_entries` tool writes condition/value tables
 
 ## Category 6: S7-PLCSIM Advanced Live Simulation & Testing (12 Tools)
 
+**Supported simulator.** The `plcsim_*` tools support S7-PLCSIM Advanced V8.0 or newer
+only (S7-1500 and ET 200SP virtual controllers). Standard S7-PLCSIM (V18-V21), and
+therefore S7-1200 simulation, has no public API and is not supported.
+`plcsim_list_instances` reports when standard S7-PLCSIM is running. If that instance has
+TCP/IP communication enabled, `plc_online_connect` to its IP address may be able to read
+tags (read-only; not verified against standard S7-PLCSIM).
+
+The server loads the API from `Common Files\Siemens\PLCSIMADV\API\8.0`, or else from the
+newest API folder of version 8.0 or later, and writes a note to stderr when it uses a
+folder other than 8.0 (binary compatibility with such a folder is not verified). Older API
+folders are never used. When the API is missing or the runtime is not running, every
+`plcsim_*` tool error explains the cause and refers to `plcsim_list_instances`.
+
 ### 56. `plcsim_list_instances`
-- **Description:** Lists all registered virtual S7-1500 controller instances managed by S7-PLCSIM Advanced runtime with ID, name, operating state, CPU type, and IP address.
+- **Description:** Lists the registered S7-PLCSIM Advanced instances with ID, name, operating state, CPU type and IP address, together with a diagnosis of the runtime and API.
 - **Parameters:** None (`{}`)
-- **Sample Response:**
+- **Changed in v2.14.0 (breaking):** the result is an object, not an array. The elements of `instances` keep the previous fields. The call succeeds (`isError` false) also when S7-PLCSIM Advanced is not available, so check `runtimeAvailable`.
+- **Result fields:** `runtimeAvailable`, `apiPath`, `apiVersion` (the `PLCSIMADV\API` folder version, e.g. `"8.0"`), `apiAssemblyVersion` (loaded assembly version, null until the API is loaded), `runtimeManagerAvailable`, `runtimeVersion`, `instances[]`, `standardPlcSimProcesses[]` (name and process ID of a running standard S7-PLCSIM), `message` (explains an empty list) and `error`.
+- **Sample Response** (PLCSIM Advanced not installed, standard S7-PLCSIM running):
   ```json
-  [
-    {
-      "ID": 0,
-      "Name": "PLC_1",
-      "OperatingState": "Run",
-      "CPUType": "CPU1511TF",
-      "IP": "192.168.0.101"
-    }
-  ]
+  {
+    "runtimeAvailable": false,
+    "apiPath": null,
+    "apiVersion": null,
+    "apiAssemblyVersion": null,
+    "runtimeManagerAvailable": null,
+    "runtimeVersion": null,
+    "instances": [],
+    "standardPlcSimProcesses": [ { "name": "S7-PLCSIM", "processId": 1234 } ],
+    "message": "S7-PLCSIM Advanced V8.0+ runtime not available: ... Only S7-PLCSIM Advanced V8.0+ is supported ...",
+    "error": "..."
+  }
   ```
+  With a running PLCSIM Advanced runtime, `instances` holds objects with `ID`, `Name`, `OperatingState`, `CPUType` and `IP`, as before.
+- **Not verified live:** the process names used to detect standard S7-PLCSIM V21, the field values with PLCSIM Advanced V8 installed, and API folders newer than 8.0.
 
 ---
 
@@ -1529,6 +1825,7 @@ and return `Items`, `Offset`, `PageSize`, `TotalCount`, `HasMore`,
 ### `tia_get_block_attributes`
 - **Parameters:** Required exact `block_name`; optional `plc_name` and `group_path`, with the same ambiguity rules as `tia_get_block_info`.
 - **Returns:** Read status/value for the verified `IsConsistent` and `IsKnowHowProtected` attributes. An attribute read failure fails the operation; this does not claim arbitrary attribute enumeration or mutability.
+- **OBs:** also `SecondaryType`, `CyclicTime` and `PhaseOffset` (value in microseconds with `Unit` `"us"` and `ValueMs`), `PriorityNumber` and the read-only `CyclicApplicationCycleTime`. An attribute the OB does not have, or that reads as empty, has `Status` `"not_supported"`. Change these with `tia_set_block_attribute`.
 
 ### `tia_get_tag_table_info`
 - **Parameters:** Required exact `table_name`; optional `plc_name` and `group_path`, with the same ambiguity rules.
@@ -1565,7 +1862,7 @@ and [HMI discovery](./plans/MCP_TOOL_TEST_PLAN_HMI.md). They specify offline con
 checks and later live disposable-project verification; no live verification is
 claimed here.
 
-## Category 8: PLC, Project & HMI Operations (15 Tools)
+## Category 8: PLC, Project & HMI Operations (18 Tools)
 
 All mutation tools reject conflicts rather than overwriting existing objects.
 PLC selection is exact and must be unambiguous; an omitted PLC name is accepted
@@ -1639,6 +1936,50 @@ in-memory read-back; saving and reopening remains a separate verification step.
 
 All six HMI structure operations accept only `on_conflict: "fail"` and return the
 affected name/path plus relevant screen dimensions, item count, or tag count.
+
+### WinCC Unified HMI tag delete and rename
+
+#### `hmi_delete_tag`
+- **Description:** Deletes one Unified HMI tag by exact, case-sensitive name, also in tag tables inside tag-table groups. Members of structured tags, system tags and whole tag tables cannot be deleted.
+- **Parameters:**
+  | Parameter | Type | Required | Default | Description |
+  | :--- | :---: | :---: | :---: | :--- |
+  | `tag_name` | string | **Yes** | — | Exact HMI tag name. |
+  | `table_name` | string | No | null | Safety check: the table name or `group/table` path that must contain the tag. |
+  | `target_name` | string | No | null | Exact HMI device, device item or software name; required when several HMIs exist. |
+  | `on_referenced` | string | No | `"fail"` | `"fail"` keeps a tag that the scan finds referenced or could not fully check; `"ignore"` deletes it and returns the references that now point to a missing tag. |
+  | `dry_run` | boolean | No | `false` | Only resolve the tag and report its references. |
+- **Reference scan:** before deleting, a best-effort scan looks for references in:
+  - alarms: raised-state, acknowledgment control and state, and alarm parameter tags; discrete alarm `TriggerBitAddress`; analog alarm `TriggerAddress`; analog alarm `ConditionValue` when it is a tag-name string
+  - other tags: read, write and buffer handshake tags, limit values of type Tag, logging-tag trigger tags
+  - the exclusive-operation control and status tags in the Runtime settings
+  - screen and item dynamizations: tag, resource-list, tag-parameter and script trigger tags
+  - button parts
+  - script text, including the global definition area of event scripts
+
+  References to members or elements of the tag (`Tag.X`, `Tag[2]`) count. Scan hits are in `References`; `BlockingReferenceCount` includes literal script hits. TIA cross-references ("used by") are listed separately in `CrossReferences` with `CrossReferenceCount`; they may repeat a scan hit and may include the tag's own logging relations. Categories the scan could not read are listed in `ScanFailures`.
+- **Outcome:** with `on_referenced: "fail"`, a tag with scan hits or cross-references is not deleted (status `referenced`), and a tag whose scan was incomplete is not deleted either (status `scan_incomplete`). With `"ignore"`, the tag is deleted and the dangling references are returned; `hmi_compile` will report them. The delete runs in a transaction and is verified by exact-name read-back.
+- **Not scanned** (listed in `NotScanned`): global script modules, faceplate and widget interface bindings, other Runtime settings, `ConditionValue` that is not a string, screen items nested in groups if `HmiScreen.ScreenItems` does not list them, plant object tags, scheduler, reports and recipes, other HMI devices, and saved HMI JSON exports.
+- **Status values:** `deleted`, `dry_run`, `referenced`, `scan_incomplete`, `not_found`, `ambiguous`, `table_mismatch`, `member_tag`, `api_failure`, `verification_failed`.
+- **Not verified against a live TIA Portal:** `HmiTag.Delete()` with commit, what happens to the tag's logging tags, the string format of alarm trigger addresses, and the scan time on a large project.
+
+#### `hmi_rename_tag`
+- **Description:** Renames one Unified HMI tag in place with TIA's own rename. The tag is never deleted and recreated; tags in grouped tag tables are included. The PLC tag is not renamed.
+- **Parameters:**
+  | Parameter | Type | Required | Default | Description |
+  | :--- | :---: | :---: | :---: | :--- |
+  | `tag_name` | string | **Yes** | — | Exact existing HMI tag name. |
+  | `new_name` | string | **Yes** | — | New name. It must not exist yet (compared case-insensitively over all tag tables and system tags; plant object tags are not checked) and must not contain `.`, `[`, `]`, `{`, `}`, `"`, `'`, a backtick, `\` or `:`. |
+  | `on_conflict` | string | **Yes** | — | Only `"fail"` is supported. |
+  | `table_name` | string | No | null | Safety check: the table name or `group/table` path that must contain the tag. |
+  | `target_name` | string | No | null | Exact HMI device, device item or software name. |
+  | `script_references` | string | No | `"report"` | `"report"` only lists script occurrences of the old name; `"replace"` also rewrites string literals that are exactly the old name. |
+  | `dry_run` | boolean | No | `false` | Only report what the rename would touch. |
+- **Structured references:** the same places as in the `hmi_delete_tag` scan are read before the rename and read again after it. Each is reported in `StructuredReferences` with `Value`, `ExpectedAfter`, `ValueAfter` and `Updated`. The tool never rewrites structured references itself. If some still read the old name, the status is `renamed_with_stale_references` and `StaleReferenceCount` is set. TIA cross-references are listed in `CrossReferences` but are not read back.
+- **Scripts:** `script_references: "replace"` rewrites only string literals that are exactly the old name (`"Old"` or `'Old'`), and only in scripts whose object has a syntax check. Each changed script is verified by read-back and by a syntax check that must not report more errors than before; nothing is committed on failure. Member literals (`"Old.X"`), templates, comments, identifiers, scripts with a regular-expression or unterminated literal, and scripts without a syntax check are only reported in `ScriptOccurrences` with `Replaced: false`.
+- Logging tags named after the old tag keep their names; they are listed in `LoggingTagsNamedAfterOldName`. HMI JSON exports made before the rename still contain the old name, so export again before importing. Run with `dry_run: true` first.
+- **Status values:** `renamed`, `renamed_with_stale_references`, `dry_run`, `conflict`, `not_found`, `ambiguous`, `table_mismatch`, `member_tag`, `api_failure`, `verification_failed`. In every outcome `Name` holds the requested new name and `OldName` the source name.
+- **Not verified against a live TIA Portal:** whether TIA's rename updates each kind of reference (including the read-only alarm trigger addresses), whether a failed script rewrite restores the name, and whether event scripts expose a syntax check.
 
 ### WinCC Unified navigation button
 
@@ -1916,3 +2257,67 @@ with FPNO-21 (GSDML-V2.45-ABB-DRIVES-20250423, DAP `FPNO_DAP_V6`, standard teleg
 - Uses `CrossReferenceService.GetCrossReferences` on every block and PLC tag (tag tables have no such service).
 - One JSON line per reference location: `{ root, source, sourceType, sourceAddress, sourcePath, device, reference,
   referenceTypeName, referencePath, location, referenceType, access, referencedAs, address, typeName }`.
+
+---
+
+## Category 12: Technology Objects (4 Tools)
+
+These tools work on the PLC's *Technology objects* folder (`TechnologicalObjectGroup`). Technology
+objects do not appear in `tia_list_blocks`. A PID instance DB that TIA generated from an SCL call is a plain
+instance DB, not a technology object. Blocks and technology objects share one name space:
+`tia_import_scl_block` refuses a block name that equals a technology object name. None of these tools has
+been run against a live TIA Portal.
+
+### `tia_list_technology_objects`
+- **Parameters:** `plc_name` (optional, exact, case-sensitive).
+- Lists the folder including subfolders. **Response data:** `[{ Name, Type, Version, Number, GroupPath, IsConsistent, Error }]`.
+  `Type` is the Openness system-library name, e.g. `PID_Temp`.
+
+### `tia_get_technology_object_parameters`
+- **Parameters:** `name` (required, exact); `filter` (optional case-sensitive name prefix, e.g. `Config.`); `plc_name`.
+- Returns each parameter's `Name` (the *Name in Openness*), `Value` (invariant text), `ClrType` and, when it
+  could not be read, `Error`; a read error affects only that entry.
+- Parameter names depend on the type and version. Example: PID_Temp V1.1 (S7-1200) has no `Config.ActivateHeating`;
+  that parameter exists from V2.0. Read the names here before writing them.
+
+### `tia_create_technology_object`
+- **Parameters:** `type`, `name`, `version` (required); `plc_name`.
+- `type` is the Openness system-library name: `PID_Temp`, `PID_Compact` or `PID_3Step`. `TO_PID_Temp`, `TO_PID_Compact`
+  and `TO_PID_3Step` are accepted and mapped. Other names go to TIA unchanged, and TIA rejects unsupported ones;
+  motion and counting objects are created without any hardware interconnection.
+- `version` is `major.minor` (`1.1` or `V1.1`); there is no automatic latest version. S7-1200 with FW 4.2 or later supports
+  PID_Temp 1.1, PID_Compact 2.3 or later and PID_3Step 2.3.
+- The object is created in the root *Technology objects* folder (`TechnologicalObjects.Create`); groups are not supported.
+- Fails with status `collision`, and changes nothing, when a technology object, a program block or a system block
+  (for example the PID_Temp FB) already has the name (case-insensitive). If the existing block is a plain instance DB of
+  the PID block, rename or delete it first, or choose another name.
+- The type and the `major.minor` version are checked by read-back.
+- Creating the object does not call it. Call it from a cyclic interrupt OB with the object as instance, e.g.
+  `"PID_Temp_1"(Setpoint := ..., Input := ...)`; hardware I/O is wired through those call parameters.
+
+### `tia_set_technology_object_parameters`
+- **Parameters:** `name` (required); `parameters` (required, non-empty array of `{ name, value }`; each name at most once,
+  compared case-insensitively); `plc_name`.
+- `value` is a JSON string in invariant culture (e.g. `"true"`, `"5"`, `"0.5"`). It is converted to the CLR type of the
+  parameter's current value: Boolean `true`/`false`, integers with a range check, finite float/double, char or string.
+  Parameter names are exact and case-sensitive.
+- All names and values are validated first; nothing is written if any check fails. The values are then written in
+  order, and each is read back.
+- **Per-parameter status:** `updated`; `api_failure` (TIA rejected the write; it may still have changed state);
+  `verification_failed` (written, but the read-back failed or differs, e.g. TIA recalculated the value); `not_written`
+  (not attempted).
+- Not transactional: on a failure in the write phase `Partial` is `true`, later entries are `not_written`, earlier writes
+  are not rolled back, and a warning says whether earlier parameters were written. Each entry lists `OldValue`,
+  `RequestedValue`, `NewValue`, `ClrType` and `Status`.
+- **Sample Invocation:**
+  ```json
+  {
+    "name": "PID_Temp_1",
+    "parameters": [
+      { "name": "Config.InputPerOn", "value": "true" },
+      { "name": "Config.ActivateCooling", "value": "false" }
+    ]
+  }
+  ```
+  Check the parameter names with `tia_get_technology_object_parameters` first; the names in this example are not
+  verified for PID_Temp V1.1.

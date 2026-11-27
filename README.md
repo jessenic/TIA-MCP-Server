@@ -4,13 +4,13 @@
 [![Simulation](https://img.shields.io/badge/Simulation-S7--PLCSIM%20Advanced%20V8.0-008080.svg)](https://support.industry.siemens.com)
 [![Protocol](https://img.shields.io/badge/MCP-2024--11--05-blue.svg)](https://modelcontextprotocol.io)
 [![Runtime](https://img.shields.io/badge/.NET%20Framework-4.8%20x64-512BD4.svg)](https://dotnet.microsoft.com)
-[![Version](https://img.shields.io/badge/Version-v2.13.0-blue.svg)](#version-history--bug-fixes)
-[![Tools](https://img.shields.io/badge/Tools-139%20Registered-brightgreen.svg)](#complete-tools-reference-dictionary-139-tools)
+[![Version](https://img.shields.io/badge/Version-v2.14.0-blue.svg)](#version-history--bug-fixes)
+[![Tools](https://img.shields.io/badge/Tools-153%20Registered-brightgreen.svg)](#complete-tools-reference-dictionary-153-tools)
 [![License](https://img.shields.io/badge/License-MIT-orange.svg)](LICENSE)
 
 A high-performance, persistent **Model Context Protocol (MCP)** server providing AI coding agents (such as **Google Antigravity**, **Claude Desktop**, **Cursor**, and **VS Code**) with direct programmatic control over **Siemens TIA Portal V21** and **S7-PLCSIM Advanced V8.0**.
 
-Equipped with **110 specialized industrial automation tools**, this server bridges generative AI with deterministic industrial hardware and software—enabling automated PLC logic authoring, model-based architecture ingestion (Draw.io / PlantUML / Mermaid), automated design-to-HMI pipelines (Figma to WinCC Unified), live simulation memory I/O, and automated Hardware-in-the-Loop (HIL) sequence verification with telemetry report generation.
+Equipped with **153 specialized industrial automation tools**, this server bridges generative AI with deterministic industrial hardware and software—enabling automated PLC logic authoring, model-based architecture ingestion (Draw.io / PlantUML / Mermaid), automated design-to-HMI pipelines (Figma to WinCC Unified), live simulation memory I/O, and automated Hardware-in-the-Loop (HIL) sequence verification with telemetry report generation.
 
 ---
 
@@ -35,7 +35,7 @@ Equipped with **110 specialized industrial automation tools**, this server bridg
  |  - Persistent COM connection                - S7-PLCSIM Advanced API V8.0             |
  |  - TiaPortal & Project handles              - Shared Memory Controller Link           |
  |  - Dynamic Openness Assembly Resolver       - High-Speed Symbolic Tag Cache           |
- |  - 50 Openness Tools (PLC, HMI, TestSuite)  - 12 Virtual Simulation & Testing Tools   |
+ |  - 131 Openness Tools (PLC, HMI, TestSuite) - 12 Virtual Simulation & Testing Tools   |
  +------------------------------+-------------------------------+------------------------+
                                 |                               |
        Siemens TIA Openness COM | PublicAPI                     | Simulation Runtime API
@@ -69,7 +69,7 @@ flowchart TD
     subgraph SERVER["⚡ TiaOpennessMcp Server (Persistent Daemon)"]
         TransportStdio["MCP stdio Handler<br/>Framing & JSON-RPC"]
         TransportHttp["HTTP / SSE Engine<br/>Port 5001"]
-        ToolRegistry["Tool Registry<br/>110 Industrial Automation Tools"]
+        ToolRegistry["Tool Registry<br/>153 Industrial Automation Tools"]
         TiaMgr["TiaManager (Singleton)<br/>Openness COM Bridge"]
         PlcSimMgr["PlcSimManager (Singleton)<br/>PLCSIM API V8.0 Bridge"]
     end
@@ -109,16 +109,21 @@ flowchart TD
     PlcSimMgr --> SIM
 ```
 
-### 1. TIA Portal Core & PLC Engineering (26 Tools)
+### 1. TIA Portal Core & PLC Engineering (31 Tools)
 - **Lifecycle & Instances**: Discover running PIDs (`tia_list_processes`), attach silently (`tia_connect`), open projects headless or with GUI (`tia_open_project`), save (`tia_save_project`), and close (`tia_close_project`).
 - **Hardware Topology**: Inspect racks, subnets, slots, CPU modules, and distributed I/O stations (`tia_list_devices`, `tia_get_device_tree`).
-- **Software Logic & Blocks**: Enumerate blocks with language and consistency state (`tia_list_blocks`), export block code as SimaticML XML with extracted SCL (`tia_get_block_code`), import/overwrite SimaticML (`tia_import_block`), import complete SCL source (`tia_import_scl_block`), and delete obsolete blocks (`tia_delete_block`). SCL replacement backs up and deletes the old block before importing; failed imports attempt restoration, while compile errors are reported without rollback.
-- **Data Types & Tags**: Author User Data Types (`tia_list_plc_types`, `tia_import_plc_type`) and manage tag tables (`tia_list_tag_tables`, `tia_get_tags`).
-- **Native Diagnostics**: Compile software containers via `ICompilable` and return exact error messages, line numbers, and warnings (`tia_compile`).
+- **Software Logic & Blocks**: Enumerate blocks with language and consistency state (`tia_list_blocks`), read block code (`tia_get_block_code`), import/overwrite SimaticML (`tia_import_block`), import complete SCL source (`tia_import_scl_block`), rename blocks in place (`tia_rename_block`), and delete obsolete blocks (`tia_delete_block`). SCL replacement backs up and deletes the old block before importing; failed imports attempt restoration, while compile errors are reported without rollback.
+- **Block code as source text**: `tia_get_block_code` returns the source text TIA Portal generates for SCL, STL and DB blocks and for PLC data types (`format: "auto"`, the default). LAD, FBD and GRAPH blocks, and blocks whose source cannot be generated, return SimaticML. `format: "xml"` always returns SimaticML.
+- **Large imports from files**: `tia_import_block`, `tia_import_scl_block` and `tia_import_plc_type` take either the inline text or a server-local `file_path`. `tia_import_scl_block` has a `backup` parameter: an inconsistent block is compiled once before the backup, and the import stops if it stays inconsistent.
+- **OB attributes**: `tia_set_block_attribute` sets `CyclicTime`, `PhaseOffset` or `PriorityNumber` of an OB in place, with an explicit unit (`ms` or `us`) and read-back. `tia_import_block` warns about OB cycle times that look like milliseconds written as microseconds.
+- **Data Types & Tags**: Author User Data Types (`tia_list_plc_types`, `tia_import_plc_type`), rename or delete them (`tia_rename_plc_type`, `tia_delete_plc_type`), and manage tag tables (`tia_list_tag_tables`, `tia_get_tags`).
+- **Native Diagnostics**: Compile software containers via `ICompilable` and return exact error messages, line numbers, and warnings (`tia_compile`). When nothing needed compiling, the result says so (`UpToDate`, `Note`). `tia_get_compile_state` lists the consistency and compile dates of every block and data type without compiling.
 
-### 2. WinCC Unified HMI Engineering (49 Tools)
+### 2. WinCC Unified HMI Engineering (51 Tools)
 - **Screen Management**: Create and delete Unified screens, and list or target screens recursively through nested screen groups (`hmi_list_screens`, `hmi_create_screen`, `hmi_delete_screen`).
-- **Widgets & UI Elements**: Programmatically position labels with HTML typography (`hmi_add_label`), pushbuttons (`hmi_add_button`), tag-bound toggle switches (`hmi_add_toggle_switch`), geometric shapes (`hmi_add_shape`), and process I/O fields (`hmi_add_io_field`).
+- **Widgets & UI Elements**: Programmatically position labels with HTML typography (`hmi_add_label`), pushbuttons (`hmi_add_button`), tag-bound toggle switches (`hmi_add_toggle_switch`), geometric shapes (`hmi_add_shape`), and process I/O fields (`hmi_add_io_field`). Pass texts as plain Unicode (ä, ö, °); the server wraps and escapes them.
+- **In-place item updates**: `hmi_update_screen_item` changes position, size, colors, `Visible`, `Enabled`, IO-field `OutputFormat`, text alignment, the screen of a screen window, `Text` and `Font` (nested or as `Font.Size`) without deleting the item, and reads each value back.
+- **Runtime settings**: Read the WinCC Unified Runtime settings (`hmi_get_runtime_settings`) and set the start screen in place (`hmi_set_start_screen`).
 - **Discrete Alarms**: Create or update discrete alarms with validated trigger tags, alarm classes, trigger modes, and multilingual event text (`hmi_create_discrete_alarm`).
 - **Range Dynamization**: Dynamize properties (e.g. `BackColor`, font color) to integer/real tags using `ConditionType.Range` (`hmi_set_tag_dynamization`).
 - **Mapping Entry Updates**: Update an existing tag or expression dynamization entry's value, alternate value, or flashing settings in place (`hmi_update_dynamization_entry`).
@@ -126,9 +131,11 @@ flowchart TD
 - **In-Place Script Updates**: Safely update button JavaScript handlers in-place without deleting or disrupting layout coordinates (`hmi_update_button_scripts`).
 - **JSON-Based HMI Engineering**: Export, import, and patch screens, tags, and discrete alarms using versioned `tia-mcp-hmi/1` JSON files (`hmi_export_json`, `hmi_read_export_file`, `hmi_begin_import`, `hmi_upload_import_file`, `hmi_import_json`, `hmi_patch_json`). Remote clients can transfer files through bounded Base64 chunks. Imports are transactional, verified, compiled, and never save the project.
 - **Communication & Text Lists**: Create device-level text lists (`hmi_create_text_list`), export text lists (`hmi_export_text_lists`), and establish HMI-to-PLC communication links (`hmi_create_connection`).
-- **Compile Diagnostics**: Full Unified runtime compilation diagnostics with item-level error reporting (`hmi_compile`).
+- **Compile Diagnostics**: Full Unified runtime compilation diagnostics with item-level error reporting (`hmi_compile`). The HMI is selected by software, device item or device name (`target_name`), or automatically when the project has only one HMI.
 
 HMI JSON exports are organized as `manifest.json`, `screens/`, `tags/`, `alarms/discrete.json`, and optional shared `styles.json`. File hashes are verified by default on import; use `verify_hashes: false` only when intentionally editing exported files without updating their manifest hashes. Imports support a dry run and optional item pruning; patch files support guarded set/bind/delete operations and verification requirements.
+
+An imported item without a `text`, `dynamizations` or `events` key keeps that part unchanged; an empty list removes it. Existing Singlebit and Bitmask mapping tables are updated in place, so an unchanged export imports again without errors. Flags enums such as `WindowFlags` take names separated by `,` or `|`. Import does not reorder existing screen items; `zOrder` in the manifest or a screen file reports (`keep`) or refuses (`require`) a different item order. The patch format is described in the [hmi-json skill](.agents/skills/hmi-json/SKILL.md#guarded-patch-workflow) and in `docs/TOOLS_REFERENCE.md`.
 
 Tag and Expression dynamizations preserve value converters and typed Simple/Range/Bitmask mappings.
 Faceplates retain their contained-type identity; internal tags retain their data type and unset limits.
@@ -196,19 +203,22 @@ runtime compiler verdict. Use runtime validation for final visual sign-off.
 - **Libraries**: Enumerate global libraries and search project-library types or faceplates using bounded results and exact open-project scope; discover PLC instances of exact project-library types.
 - **Project Texts**: Discover project text categories and export project texts using explicit cultures without overwriting an existing file.
 
-### 4. PLC, Project & HMI Operations (15 Tools)
+### 4. PLC, Project & HMI Operations (18 Tools)
 - **Read-only PLC Data**: Inspect exact tag/member/table attributes and user-constant type/value data with exact PLC/table/group resolution.
 - **PLC Structure & Constants**: Create block/tag-table groups and tag tables, and create/update supported user constants with exact target resolution and read-back.
 - **Project Setup**: Create a project only in an existing empty directory using the connected TIA Portal instance.
-- **HMI Structure & Navigation**: Create screen groups/screens, add verified navigation buttons, and rename screens, groups, or tag tables in place with explicit fail-on-conflict behavior.
+- **HMI Structure & Navigation**: Create screen groups/screens and HMI tag tables, add verified navigation buttons, and rename screens, groups, or tag tables in place with explicit fail-on-conflict behavior.
+- **HMI Tags**: Delete one HMI tag (`hmi_delete_tag`) or rename it in place (`hmi_rename_tag`). Both scan for references first and support `dry_run`. A referenced tag is not deleted by default. A rename reports which references still use the old name.
 - **Verification**: Each mutation has a case-by-case disposable-project test plan; live TIA verification remains for the operator.
 
 ### 5. S7-PLCSIM Advanced Live Simulation & Testing (12 Tools)
+- **Supported simulator**: S7-PLCSIM Advanced V8.0 or newer only (S7-1500 and ET 200SP virtual controllers). Standard S7-PLCSIM (V18-V21), and therefore S7-1200 simulation, has no public API and is not supported. `plcsim_list_instances` reports when standard S7-PLCSIM is running.
 - **Direct Runtime Link**: Connects to virtual S7-1500 controllers via shared memory API V8.0 (`plcsim_connect`).
 - **Operating Modes**: Query status (`plcsim_get_status`) and switch CPU operating modes (`plcsim_set_operating_state`: `Run`, `Stop`, `MemoryReset`).
 - **Clock Scaling**: Accelerate simulation deterministically (`plcsim_set_scale_factor`: e.g. `2.0x` or `5.0x` speed).
 - **Zero-Overhead Memory I/O**: High-speed symbolic tag reading and writing (`plcsim_read_tag`, `plcsim_write_tag`, `plcsim_read_tags`, `plcsim_write_tags`).
 - **Universal Sequence Validation**: Execute parameterized sequence tests on any state machine (`plcsim_run_sequence`), sample 80ms telemetry, verify state transitions, and generate validation reports.
+- **Diagnosis**: `plcsim_list_instances` returns an object with `runtimeAvailable`, the API folder and version, the instances, running standard S7-PLCSIM processes and a `message`. When the PLCSIM Advanced API is missing, every `plcsim_*` tool error explains why.
 
 ### 6. Siemens TestSuite Automation (2 Tools)
 - Enumerate configured project test cases (`tia_testsuite_list_tests`).
@@ -236,6 +246,13 @@ runtime compiler verdict. Use runtime validation for final visual sign-off.
 - **Archives**: `tia_archive_project` (`Project.Archive`, compressed `.zap21`) and `tia_retrieve_project` (`Projects.Retrieve`).
 - **Cross references**: `tia_export_cross_references` writes the PLC cross-reference table of blocks and tags as JSONL.
 - **Not possible through Openness V21**: installing GSD/GSDML files (do it in TIA Portal: *Options > Manage general station description files (GSD)*), Siemens Startdrive drives in CAx files, and downloading to devices (deliberately not offered).
+
+### 10. Technology Objects (4 Tools)
+- **List and read**: `tia_list_technology_objects` lists the PLC's *Technology objects* folder with type, version, DB number and folder. `tia_get_technology_object_parameters` reads parameters by their *Name in Openness* with value and CLR type.
+- **Create**: `tia_create_technology_object` creates a technology object such as `PID_Temp`, `PID_Compact` or `PID_3Step` with an explicit version (for example `1.1` for PID_Temp on S7-1200). It fails without changes when a technology object, block or system block already has the name.
+- **Set parameters**: `tia_set_technology_object_parameters` validates every value first, then writes them in order and reads each one back. It does not roll back earlier writes when a later one fails.
+- Creating the object does not call it. Call it from a cyclic interrupt OB, for example with `tia_import_scl_block`.
+- **Not verified against a live TIA Portal**: the real parameter names and types of each object version, and whether the writes persist after save.
 
 ---
 
@@ -375,7 +392,7 @@ stateDiagram-v2
 
 ---
 
-## Complete Tools Reference Dictionary (139 Tools)
+## Complete Tools Reference Dictionary (153 Tools)
 
 | # | Tool Name | Category | Primary Parameters | Description |
 |:---:|:---|:---:|:---|:---|
@@ -391,14 +408,14 @@ stateDiagram-v2
 | 10 | `tia_get_device_tree` | Hardware | `device_name` | Inspect device slots, modules, and subnets. |
 | 11 | `tia_list_plcs` | PLC Logic | *(none)* | Summary of all PLCs and software counts. |
 | 12 | `tia_list_blocks` | PLC Logic | `plc_name`, `block_type`, `folder` | Enumerate OB, FB, FC, and DB blocks with language & status. |
-| 13 | `tia_get_block_code` | PLC Logic | `block_name`, `plc_name` | Export block as SimaticML XML & extract SCL. |
-| 14 | `tia_import_block` | PLC Logic | `xml_content`, `plc_name`, `overwrite` | Import or update block logic via SimaticML XML. |
-| 14a | `tia_import_scl_block` | PLC Logic | `scl_code`, `plc_name`, `folder`, `compile_after_import`, `open_after_import` | Import a complete SCL block; replacement uses backup/delete/reimport with restore on import failure. |
-| 15 | `tia_delete_block` | PLC Logic | `block_name`, `plc_name` | Delete a PLC program block. |
+| 13 | `tia_get_block_code` | PLC Logic | `block_name`, `plc_name`, `format`, `include_xml`, `with_dependencies` | Generated source text for SCL/STL/DB blocks and UDTs; SimaticML for other languages or with `format: "xml"`. |
+| 14 | `tia_import_block` | PLC Logic | `xml_content` or `file_path`, `plc_name`, `overwrite` | Import or update block logic via SimaticML XML; warns about suspicious OB cycle settings. |
+| 14a | `tia_import_scl_block` | PLC Logic | `scl_code` or `file_path`, `plc_name`, `folder`, `backup`, `compile_after_import`, `open_after_import` | Import a complete SCL block; replacement uses backup/delete/reimport with restore on import failure. |
+| 15 | `tia_delete_block` | PLC Logic | `block_name`, `plc_name` | Delete a PLC program block; points to `tia_delete_plc_type` for a UDT name. |
 | 16 | `tia_list_plc_types` | Data Types | `plc_name` | List all User Data Types (UDTs). |
 | 17 | `tia_get_plc_type` | Data Types | `type_name`, `plc_name` | Export UDT definition as SimaticML XML. |
-| 18 | `tia_import_plc_type` | Data Types | `xml_content`, `plc_name`, `overwrite` | Import or update a UDT definition. |
-| 19 | `tia_compile` | Compilation | `plc_name` | Compile PLC software & return error diagnostic log. |
+| 18 | `tia_import_plc_type` | Data Types | `xml_content` or `file_path`, `plc_name`, `overwrite` | Import or update a UDT definition. |
+| 19 | `tia_compile` | Compilation | `plc_name` | Compile PLC software & return error diagnostic log; `UpToDate` and `Note` when nothing was compiled. |
 | 20 | `hmi_list_targets` | HMI Runtime | *(none)* | List all HMI software instances (e.g. `PC-System_1/HMI_RT_1`). |
 | 21 | `hmi_list_screens` | HMI Screen | `target_name` (opt) | List all screens with resolution and item counts. |
 | 22 | `hmi_create_screen` | HMI Screen | `screen_name`, `width`, `height` | Create a new WinCC Unified screen. |
@@ -410,7 +427,7 @@ stateDiagram-v2
 | 28 | `hmi_add_toggle_switch` | HMI Widget | `screen_name`, `name`, `off_text`, `on_text`, `process_tag` | Add a two-state toggle bound to `IsAlternateState`. |
 | 29 | `hmi_add_shape` | HMI Widget | `screen_name`, `type`, `width`, `height` | Add rectangle or circle with border and fill styling. |
 | 30 | `hmi_add_io_field` | HMI Widget | `screen_name`, `name`, `process_tag`, `output_format` | Add numeric/string Input-Output field bound to tag. |
-| 31 | `hmi_set_tag_dynamization`| HMI Logic | `screen_name`, `item_name`, `ranges` | Bind property (e.g. `BackColor`) to tag using Range entries. |
+| 31 | `hmi_set_tag_dynamization`| HMI Logic | `screen_name`, `item_name`, `property_name`, `tag_name`, `condition_type`, `ranges` | Bind property (e.g. `BackColor`) to tag using Range or Singlebit entries; an existing Singlebit table is updated in place. |
 | 32 | `hmi_update_dynamization_entry` | HMI Logic | `screen_name`, `item_name`, `property_name`, `entry_index` | Update selected mapping-entry values or flashing settings in place. |
 | 33 | `hmi_update_button_scripts`| HMI Logic | `screen_name`, `button_name`, `script` | Update existing button scripts **in-place** with JS validation. |
 | 34 | `hmi_list_tag_tables` | HMI Tags | `target_name` (opt) | List HMI tag tables. |
@@ -428,15 +445,15 @@ stateDiagram-v2
 | 46 | `hmi_create_text_list` | HMI Text | `name`, `list_type`, `entries` | Create value or range text list (e.g. status decoders). |
 | 47 | `hmi_delete_text_list` | HMI Text | `name` | Remove a text list. |
 | 48 | `hmi_export_text_lists` | HMI Text | `destination_folder`, `base_filename`| Export text lists to `.hmi.yml` files. |
-| 49 | `hmi_compile` | Compilation | `target_name` | Compile WinCC Unified runtime with diagnostics. |
+| 49 | `hmi_compile` | Compilation | `target_name` (opt), `target_device` (alias) | Compile WinCC Unified runtime with diagnostics; the only HMI is selected automatically. |
 | 50 | `tia_list_tag_tables` | PLC Tags | `plc_name` | List PLC tag tables. |
 | 51 | `tia_get_tags` | PLC Tags | `table_name`, `plc_name` | Read PLC tags with `%I`, `%Q`, `%M` addresses. |
 | 52 | `hmi_export_json` | HMI JSON | `output_directory` (optional), `compact`, `script_files`, `include_library`, `target_name` | Export hashed JSON and native faceplate/SVG library definitions; omit destination for remote transfer. |
-| 53 | `hmi_import_json` | HMI JSON | `input_directory` or `transfer_id`, `prune_items`, `dry_run`, `verify_hashes`, `target_name` | Validate and transactionally import HMI JSON; compile without saving. |
-| 54 | `hmi_patch_json` | HMI JSON | `file_path`, `dry_run`, `target_name` | Apply a guarded JSON patch to Unified HMI objects. |
+| 53 | `hmi_import_json` | HMI JSON | `input_directory` or `transfer_id`, `prune_items`, `dry_run`, `verify_hashes`, `target_name` | Validate and transactionally import HMI JSON; compile without saving. Missing keys keep existing sections; `zOrder` check. |
+| 54 | `hmi_patch_json` | HMI JSON | `file_path`, `dry_run`, `target_name` | Apply a guarded JSON patch to Unified HMI objects (`expectTag` guard, unknown fields reported). |
 | 55 | `tia_testsuite_list_tests`| TestSuite | `plc_name` | List configured Siemens TestSuite test cases. |
 | 56 | `tia_testsuite_load_test`| TestSuite | `file_path` | Import or reload `.tat` rule file with override. |
-| 57 | `plcsim_list_instances` | Simulation | *(none)* | List all registered S7-PLCSIM Advanced instances. |
+| 57 | `plcsim_list_instances` | Simulation | *(none)* | List S7-PLCSIM Advanced instances with runtime and API diagnosis (object result). |
 | 58 | `plcsim_connect` | Simulation | `instance_name` (default `"PLC_1"`) | Connect to S7-PLCSIM Advanced and cache symbolic tags. |
 | 59 | `plcsim_disconnect` | Simulation | *(none)* | Detach from active PLCSIM instance. |
 | 60 | `plcsim_get_status` | Simulation | *(none)* | Real-time status (Run/Stop, scale factor, tag counts). |
@@ -453,16 +470,16 @@ stateDiagram-v2
 | 71 | `hmi_begin_import` | HMI JSON | *(none)* | Create a staged remote HMI JSON import. |
 | 72 | `hmi_upload_import_file` | HMI JSON | `transfer_id`, `relative_path`, `content_base64`, `offset`, `total_bytes` | Upload a file in bounded sequential Base64 chunks. |
 | 73 | `hmi_get_screen_item` | HMI Screen | `screen_name`, `item_name` | Read all supported properties, event scripts, and full dynamization state for one item. |
-| 74 | `hmi_update_screen_item` | HMI Screen | `screen_name`, `item_name`, `item_properties` | Update allowlisted item properties in place and verify readback. |
+| 74 | `hmi_update_screen_item` | HMI Screen | `screen_name`, `item_name`, `item_properties` | Update allowlisted item properties (also `Enabled`, `Text`, `Font`, `Screen`, alignment, `OutputFormat`) in place and verify readback. |
 | 75 | `hmi_read_event_scripts` | HMI Logic | `screen_name`, `item_name` (opt) | Read screen or item event scripts and supported event names. |
 | 76 | `hmi_set_event_script` | HMI Logic | `screen_name`, `event_type`, `script`, `item_name` (opt) | Create or update one screen/item event script in place. |
 | 77 | `hmi_set_expression_dynamization` | HMI Logic | `screen_name`, `item_name`, `property_name`, `expression`, `result_type` | Set an expression formula while preserving existing mappings and other dynamizations. |
 | 78 | `hmi_get_js_type_definitions` | HMI Logic | *(none)* | Return the server-bundled, documented subset of WinCC Unified JavaScript declarations. |
 | 79 | `hmi_set_expression_dynamization_entries` | HMI Logic | `screen_name`, `item_name`, `property_name`, `entries` | Replace ordered condition/value rows for one expression dynamization. |
-| 80 | `tia_import_scl_block` | PLC Import | `scl_code`, `plc_name`, `folder`, `compile_after_import`, `open_after_import` | Import a complete SCL block with backup/restore behavior for same-name blocks. |
+| 80 | `tia_import_scl_block` | PLC Import | `scl_code` or `file_path`, `plc_name`, `folder`, `backup`, `compile_after_import`, `open_after_import` | Import a complete SCL block with backup/restore behavior for same-name blocks. |
 | 81 | `hmi_delete_dynamization` | HMI Logic | `screen_name`, `item_name`, `property_name`, `target_name` | Delete one property dynamization in place without replacing the item. |
 | 82 | `tia_get_block_info` | PLC Discovery | `block_name`, `plc_name`, `group_path` | Read exact block identity and verified metadata without fabricating IDs or revisions. |
-| 83 | `tia_get_block_attributes` | PLC Discovery | `block_name`, `plc_name`, `group_path` | Read supported consistency/protection attributes with per-attribute status. |
+| 83 | `tia_get_block_attributes` | PLC Discovery | `block_name`, `plc_name`, `group_path` | Read supported consistency/protection attributes, and OB cycle attributes, with per-attribute status. |
 | 84 | `tia_get_tag_table_info` | PLC Discovery | `table_name`, `plc_name`, `group_path` | Read exact table scope and contained-tag count. |
 | 85 | `tia_get_type_info` | PLC Discovery | `type_name`, `plc_name`, `group_path` | Read exact PLC type identity and verified consistency metadata. |
 | 86 | `tia_get_type_attributes` | PLC Discovery | `type_name`, `plc_name`, `group_path` | Read the verified PLC type consistency attribute. |
@@ -519,6 +536,20 @@ stateDiagram-v2
 | 137 | `tia_archive_project` | Backup | `target_directory`, `file_name`, `mode`, `save_first` | Archive the saved project as `.zap21`. |
 | 138 | `tia_retrieve_project` | Backup | `archive_path`, `target_directory`, `close_current` | Retrieve and open a `.zap21` archive. |
 | 139 | `tia_export_cross_references` | Backup | `output_path`, `plc_name`, `object_names`, `filter`, `include_tags` | PLC cross-reference table as JSONL. |
+| 140 | `hmi_create_tag_table` | HMI Mutation | `table_name`, `on_conflict`, `target_name` | Create an HMI tag table without overwriting an existing one. |
+| 141 | `hmi_delete_tag` | HMI Mutation | `tag_name`, `table_name`, `target_name`, `on_referenced`, `dry_run` | Delete one HMI tag after a reference scan; a referenced tag is kept by default. |
+| 142 | `hmi_rename_tag` | HMI Mutation | `tag_name`, `new_name`, `on_conflict`, `table_name`, `target_name`, `script_references`, `dry_run` | Rename one HMI tag in place and read back the references found before. |
+| 143 | `hmi_get_runtime_settings` | HMI Runtime | `target_name` | Read the WinCC Unified Runtime settings, including the start screen. |
+| 144 | `hmi_set_start_screen` | HMI Runtime | `screen_name`, `on_conflict`, `expected_current_start_screen`, `target_name` | Set the Runtime start screen in place, with read-back and validation. |
+| 145 | `tia_delete_plc_type` | Data Types | `type_name`, `plc_name`, `group_path` | Delete one PLC data type (UDT); TIA Portal decides whether it is allowed. |
+| 146 | `tia_rename_plc_type` | Data Types | `type_name`, `new_name`, `plc_name`, `group_path`, `on_conflict` | Rename a UDT in place, with read-back. |
+| 147 | `tia_rename_block` | PLC Logic | `block_name`, `new_name`, `plc_name`, `group_path`, `on_conflict` | Rename an OB/FB/FC/DB in place; the block number is kept. |
+| 148 | `tia_set_block_attribute` | PLC Logic | `block_name`, `attribute_name`, `value`, `unit`, `expected_current_value`, `plc_name`, `group_path` | Set `CyclicTime`, `PhaseOffset` or `PriorityNumber` of an OB in place, with read-back. |
+| 149 | `tia_get_compile_state` | Compilation | `plc_name`, `group_path`, `only_inconsistent`, `include_types` | Consistency and compile dates of blocks and UDTs, without compiling. |
+| 150 | `tia_list_technology_objects` | Technology Objects | `plc_name` | Technology objects with type, version, DB number and folder. |
+| 151 | `tia_get_technology_object_parameters` | Technology Objects | `name`, `filter`, `plc_name` | Parameter names, values and CLR types of one technology object. |
+| 152 | `tia_create_technology_object` | Technology Objects | `type`, `name`, `version`, `plc_name` | Create a technology object (e.g. `PID_Temp` 1.1); fails on a name collision. |
+| 153 | `tia_set_technology_object_parameters` | Technology Objects | `name`, `parameters`, `plc_name` | Validate, write and read back technology-object parameters. |
 
 ---
 
@@ -634,6 +665,17 @@ check container interface values and internal tags, and verify rollback. With
 inventory/hash/path checks and library copy inside a project rollback transaction.
 They never commit the test transaction or save the project.
 
+Run the offline checks added with v2.14.0 (after building; none of them connects to TIA Portal or PLCSIM):
+```powershell
+.\scripts\Test-HmiToolBehaviors.ps1     # HMI tag delete/rename, item updates, text encoding, compile target, runtime settings
+.\scripts\Test-PlcBlockTools.ps1        # UDT delete/rename, block rename, file_path sources, SCL backup decisions
+.\scripts\Test-PlcMeta.ps1              # OB attributes, block source format, compile state
+.\scripts\Test-TechnologyObjects.ps1    # technology object rules and parameter writes
+.\scripts\Test-Runtime.ps1              # UTF-8 stdio/HTTP transport, SCL encoding, PLCSIM diagnosis
+```
+They use fakes, reflection on the V21 types and pure helper functions. They do not prove that the
+Openness calls behave as expected in a live TIA Portal.
+
 ### 4. Siemens Openness Whitelist Authorization (One-Time Setup)
 Siemens TIA Portal requires external applications accessing its Openness API to be registered in the Windows Registry with their file path and SHA-256 hash.
 
@@ -705,7 +747,7 @@ Open or create your Antigravity MCP configuration file at:
 *(Replace `C:\\path\\to\\TIA-MCP-Server\\release` with your actual absolute path using escaped backslashes `\\`)*.
 
 #### B. Tool Schema Registration (Lazy Loading)
-To enable Antigravity to lazy-load all 139 tools on demand, copy the JSON schemas from the repository's `schemas/` folder into your Antigravity MCP directory:
+To enable Antigravity to lazy-load all 153 tools on demand, copy the JSON schemas from the repository's `schemas/` folder into your Antigravity MCP directory:
 ```powershell
 New-Item -ItemType Directory -Path "$env:USERPROFILE\.gemini\antigravity\mcp\tia-portal-v21" -Force
 Copy-Item -Path ".\schemas\*.json" -Destination "$env:USERPROFILE\.gemini\antigravity\mcp\tia-portal-v21\" -Force
@@ -753,7 +795,7 @@ Launch Claude Code and check registered tools:
 claude
 > /mcp
 ```
-All 139 tools (`tia_*`, `hmi_*`, `plcsim_*`, `docs_*`, `plc_online_*`) will appear in the active MCP tools list. You can immediately ask:
+All 153 tools (`tia_*`, `hmi_*`, `plcsim_*`, `docs_*`, `plc_online_*`) will appear in the active MCP tools list. You can immediately ask:
 > *"Inspect the device tree of the active PLC and compile the software."*
 
 ---
@@ -771,7 +813,7 @@ All 139 tools (`tia_*`, `hmi_*`, `plcsim_*`, `docs_*`, `plc_online_*`) will appe
   }
 }
 ```
-Restart Claude Desktop. The hammer icon (🛠️) in the input bar will display all 139 tools.
+Restart Claude Desktop. The hammer icon (🛠️) in the input bar will display all 153 tools.
 
 ---
 
@@ -841,7 +883,7 @@ Options:
   --pid <pid>                            Attach to specific TIA Portal process ID
   --config <path>, -c <path>             Load specific config.json file
   --test                                 Execute rapid TIA Portal connectivity test
-  --export-schemas [dir]                 Export all 110 MCP tool JSON schemas
+  --export-schemas [dir]                 Export all 153 MCP tool JSON schemas
   --render-hmi INPUT --output OUTPUT     Offline PNG/overlay/layout JSON rendering
     [--screen GROUP/NAME] [--language en-US] [--scale 2]
   --register-whitelist                   Register SHA-256 hash in Siemens AllowList
@@ -864,6 +906,30 @@ This repository includes 3 turnkey agent skills located in `.agents/skills/`:
 ---
 
 ## Version History & Bug Fixes
+
+### [v2.14.0] - 2026-11-27
+* #3: Non-ASCII text (ä, ö, å, °) is no longer corrupted. Stdio and HTTP requests are read as UTF-8, `tia_import_scl_block` writes its temporary source as UTF-8 with BOM, and the HMI text tools decode numeric references such as `&#196;`.
+* #4: Added `hmi_delete_tag`: delete one HMI tag after a best-effort reference scan; a referenced tag, or one whose scan was incomplete, is kept by default.
+* #5: `hmi_import_json` accepts flags enums such as `WindowFlags` as names separated by `,` or `|`, or `None`.
+* #6: Re-importing unchanged Singlebit/Bitmask dynamizations updates the mapping tables in place; a changed condition type or bit needs `onConflict: "replace"`, reordered entries are refused, and the dry run reports both. `hmi_set_tag_dynamization` runs in one transaction.
+* #7: In `hmi_import_json`, a missing or `null` `text`, `dynamizations` or `events` key keeps that part of the item unchanged; before, such items lost their dynamizations and events.
+* #8: `hmi_import_json` checks the screen item order against the file (`zOrder`: `keep` reports `zOrderWarnings`, `require` fails and rolls back).
+* #9: Script read-back ignores line endings and trailing whitespace (`hmi_import_json`, `hmi_set_event_script`, `hmi_create_navigation_button`).
+* #10: Added `hmi_rename_tag`: rename one HMI tag in place, read back the references found before, and optionally replace exact string literals in scripts.
+* #11: Added `tia_delete_plc_type`, `tia_rename_plc_type` and `tia_rename_block`.
+* #12: `tia_import_scl_block` has a `backup` parameter; an inconsistent existing block is compiled once before the backup, and the import stops without changes if it stays inconsistent.
+* #13: `tia_import_block`, `tia_import_scl_block` and `tia_import_plc_type` accept a server-local `file_path` instead of inline text; `.scl` files must be UTF-8.
+* #14: Added `tia_set_block_attribute` for OB `CyclicTime`, `PhaseOffset` and `PriorityNumber`; `tia_import_block` warns about OB cycle times that look like milliseconds, and `tia_get_block_attributes` returns the OB cycle attributes.
+* #15: `hmi_update_screen_item` also sets `Enabled`, `OutputFormat`, text alignment, a screen window's `Screen`, `Text` and `Font`.
+* #16: `tia_get_block_code` returns the source text TIA Portal generates for SCL, STL and DB blocks and for UDTs (`format`, `include_xml`, `with_dependencies`); `ExtractedScl` is deprecated.
+* #17: `hmi_compile` selects the HMI like the other HMI tools (`target_name`; `target_device` is an alias) and reports the compiled object.
+* #18: Added `tia_get_compile_state`; `tia_compile` reports `UpToDate` and a `Note` when nothing needed compiling.
+* #19: Added `hmi_get_runtime_settings` and `hmi_set_start_screen`.
+* #20: Added technology object tools: `tia_list_technology_objects`, `tia_get_technology_object_parameters`, `tia_create_technology_object` and `tia_set_technology_object_parameters`.
+* #21: `plcsim_list_instances` returns an object with runtime and API diagnosis instead of an array (breaking change); all `plcsim_*` tools explain a missing S7-PLCSIM Advanced API, and API folders newer than 8.0 are accepted.
+* #22: `hmi_patch_json` has an `expectTag` guard, keeps omitted `readOnly`/`useIndirectAddressing` values, checks `require` items before changes and reports unknown fields; the patch format is documented in full.
+* These fixes were tested offline only (fakes, reflection on the V21 types, pure helpers and schema checks). None of them was run against a live TIA Portal, WinCC Unified or S7-PLCSIM Advanced.
+* Updated the reported MCP server version and assembly metadata to v2.14.0.
 
 ### [v2.13.0] - 2026-11-26
 * Fixed `hmi_import_json` failing on every `HmiIOField` ("Exception has been thrown by the target of an invocation"): the compact type defaults include `ShowInputHint`, which Openness V21 can read but not set. Properties that already have the requested value are no longer written.

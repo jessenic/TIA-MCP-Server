@@ -193,7 +193,9 @@ Conventions:
    relevant mask (bit) needs `"onConflict": "replace"` on that dynamization, which
    recreates only the dynamization, never the item. The relevant mask is read-only in
    Openness, so a recreated table works only when TIA generates the requested bit;
-   otherwise change the bit in TIA Portal. To retag such items, use `bind` in
+   otherwise change the bit in TIA Portal. Keep the bitmask entries in TIA's exported
+   order: Openness cannot reorder them, so a reordered list is refused, also with
+   `replace`. A dry run reports these refusals. To retag such items, use `bind` in
    `hmi_patch_json`. Other
    dynamization/mapping kinds fail explicitly. Legacy `ExpressionDynamization`
    placeholders lack converter data: re-export rather than attempting to import them.

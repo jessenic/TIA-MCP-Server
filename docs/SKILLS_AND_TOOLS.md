@@ -1,7 +1,7 @@
 # Siemens TIA Portal V21 Openness MCP Server
 ## Complete Skills & Tools Reference Manual
 
-**Version:** 2.13.0
+**Version:** 2.14.0
 **Target Platform:** Siemens TIA Portal V21 (PublicAPI .NET Framework 4.8 x64)  
 **Supported Transports:** HTTP JSON-RPC 2.0, Server-Sent Events (SSE), stdio MCP  
 **Default Endpoints:** `http://localhost:5001/mcp`, `http://localhost:5001/sse`, `http://localhost:5001/status`
@@ -145,7 +145,7 @@ The `tia-portal-openness` skill instructs AI agents on standard operating proced
 
 ---
 
-## 4. Complete Tool Reference (139 Tools)
+## 4. Complete Tool Reference (153 Tools)
 
 ---
 
@@ -217,7 +217,7 @@ The `tia-portal-openness` skill instructs AI agents on standard operating proced
 
 ---
 
-### Category 3: PLC Software, Blocks & Compilation (16 Tools)
+### Category 3: PLC Software, Blocks & Compilation (21 Tools)
 
 #### 11. `tia_list_plcs`
 - **Description:** List all CPU devices and summarize their software metrics (block counts, UDT counts, tag table counts).
@@ -231,30 +231,36 @@ The `tia-portal-openness` skill instructs AI agents on standard operating proced
   - `folder` *(string, optional)*: Subfolder path inside Program Blocks.
 
 #### 13. `tia_get_block_code`
-- **Description:** Export a block as SimaticML XML and extract clean Structured Control Language (SCL) text.
+- **Description:** Read the code of a block. By default SCL, STL and DB blocks return the source text TIA Portal generates (`Source`); LAD, FBD and GRAPH blocks, and blocks whose source cannot be generated, return SimaticML (`XmlContent`) with the reason in `Warnings`. When no block has the name, a PLC data type (UDT) of that name is used. `ExtractedScl` is deprecated (a copy of `Source` for SCL blocks).
 - **Input Parameters:**
-  - `block_name` *(string, required)*: Name of the block (e.g. `"FB_MixingLine"`).
+  - `block_name` *(string, required)*: Name of the block or UDT (e.g. `"FB_MixingLine"`).
   - `plc_name` *(string, optional)*: Target PLC name.
+  - `format` *(string, optional, default: "auto")*: `"auto"`, `"source"` (no fallback) or `"xml"` (always SimaticML).
+  - `include_xml` *(boolean, optional, default: false)*: Also return SimaticML when source text is returned.
+  - `with_dependencies` *(boolean, optional, default: false)*: Include the blocks and types the block depends on. Such output cannot be passed to `tia_import_scl_block`.
 
 #### 14. `tia_import_block`
-- **Description:** Import or update a block from SimaticML XML.
+- **Description:** Import or update a block from SimaticML XML. OB `CyclicTime` and `PhaseOffset` are microseconds in SimaticML; suspicious OB settings are listed under `Warnings:` in the text result.
 - **Input Parameters:**
-  - `xml_content` *(string, required)*: Complete SimaticML XML string.
+  - `xml_content` *(string)*: Complete SimaticML XML string. Give this or `file_path`.
+  - `file_path` *(string)*: Fully qualified server-local `.xml` path (at most 50 MiB). Give this or `xml_content`.
   - `overwrite` *(boolean, optional, default: true)*: Overwrite existing block.
   - `plc_name` *(string, optional)*: Target PLC.
   - `folder` *(string, optional)*: Subfolder inside Program Blocks.
 
 #### 14a. `tia_import_scl_block`
-- **Description:** Import a complete SCL block source. Existing blocks with the same name are backed up, deleted, and replaced; failed imports attempt to restore the backup. This is whole-block replacement, not an in-place edit. Compilation defaults to enabled, and compiler errors do not roll back the import.
+- **Description:** Import a complete SCL block source. Existing blocks with the same name are backed up, deleted, and replaced; failed imports attempt to restore the backup. This is whole-block replacement, not an in-place edit. Compilation defaults to enabled, and compiler errors do not roll back the import. An inconsistent existing block is compiled once before the backup; if it stays inconsistent or is know-how protected, nothing is replaced unless `backup` is false. A block name that equals a technology object name is refused.
 - **Input Parameters:**
-  - `scl_code` *(string, required)*: Complete source for exactly one `FUNCTION`, `FUNCTION_BLOCK`, `ORGANIZATION_BLOCK`, or `DATA_BLOCK`.
+  - `scl_code` *(string)*: Complete source for exactly one `FUNCTION`, `FUNCTION_BLOCK`, `ORGANIZATION_BLOCK`, or `DATA_BLOCK`. Give this or `file_path`.
+  - `file_path` *(string)*: Fully qualified server-local `.scl` path; read as UTF-8 unless it has a BOM, and rejected if it is not valid UTF-8. Give this or `scl_code`.
   - `plc_name` *(string, optional)*: Target PLC.
   - `folder` *(string, optional)*: Existing PLC block group path. If omitted, an existing block's group is preserved; new blocks go in the root group.
+  - `backup` *(boolean, optional, default: true)*: Back up the existing block first. With false, a failed import cannot restore the old block.
   - `compile_after_import` *(boolean, optional, default: true)*: Compile after generation.
   - `open_after_import` *(boolean, optional, default: false)*: Open the imported block in the TIA Portal editor.
 
 #### 15. `tia_delete_block`
-- **Description:** Delete a block from the PLC software container.
+- **Description:** Delete a program block from the PLC software container. PLC data types are deleted with `tia_delete_plc_type`.
 - **Input Parameters:**
   - `block_name` *(string, required)*: Name of block to delete.
   - `plc_name` *(string, optional)*: Target PLC.
@@ -271,9 +277,10 @@ The `tia-portal-openness` skill instructs AI agents on standard operating proced
   - `plc_name` *(string, optional)*: Target PLC.
 
 #### 18. `tia_import_plc_type`
-- **Description:** Import or update a User Data Type (UDT) from SimaticML XML.
+- **Description:** Import or update a User Data Type (UDT) from SimaticML XML. Importing under a new name creates a second type; use `tia_rename_plc_type` to rename.
 - **Input Parameters:**
-  - `xml_content` *(string, required)*: SimaticML XML string.
+  - `xml_content` *(string)*: SimaticML XML string. Give this or `file_path`.
+  - `file_path` *(string)*: Fully qualified server-local `.xml` path. Give this or `xml_content`.
   - `overwrite` *(boolean, optional, default: true)*: Overwrite existing UDT.
   - `plc_name` *(string, optional)*: Target PLC.
 
@@ -297,10 +304,27 @@ The `tia-portal-openness` skill instructs AI agents on standard operating proced
     ]
   }
   ```
+- TIA Portal compiles only changed blocks, and Openness V21 has no rebuild-all option. When nothing needed compiling, the result adds `"UpToDate": true` and a `Note`, and warnings from an earlier compile are not shown again.
+
+#### `tia_get_compile_state`
+- **Description:** Read-only. Per block `IsConsistent`, `IsKnowHowProtected` and compile/modify dates; per PLC data type `IsConsistent` and `ModifiedDate`; totals. Compiles nothing.
+- **Input Parameters:** `plc_name`, `group_path`, `only_inconsistent` *(default: false)*, `include_types` *(default: true)*, all optional.
+
+#### `tia_rename_block` / `tia_rename_plc_type`
+- **Description:** Rename a program block or a PLC data type in place, verified by read-back. Fails with `collision` when any block, data type, system block or system data type already has the new name (case-insensitive). The block number is unchanged.
+- **Input Parameters:** `block_name` or `type_name` *(string, required)*, `new_name` *(string, required)*, `plc_name`, `group_path`, `on_conflict` *(`"fail"` only)*.
+
+#### `tia_delete_plc_type`
+- **Description:** Delete one PLC data type (UDT) by exact name. TIA Portal decides whether the delete is allowed; users of the type become inconsistent until changed.
+- **Input Parameters:** `type_name` *(string, required)*, `plc_name`, `group_path`.
+
+#### `tia_set_block_attribute`
+- **Description:** Set `CyclicTime`, `PhaseOffset` (cyclic interrupt OBs) or `PriorityNumber` of an OB in place, with read-back. Written only when TIA lists the attribute as writable; otherwise `not_supported`. The project is not compiled or saved.
+- **Input Parameters:** `block_name`, `attribute_name`, `value` *(integer)* (required); `unit` (`"ms"` or `"us"`, required for time values; 100 ms = 100000 us), `expected_current_value`, `plc_name`, `group_path`.
 
 ---
 
-### Category 4: WinCC Unified HMI Screen & Widget Engineering (49 Tools)
+### Category 4: WinCC Unified HMI Screen & Widget Engineering (51 Tools)
 
 #### 20. `hmi_list_targets`
 - **Description:** Discover all HMI runtime devices and software containers in the project.
@@ -357,7 +381,7 @@ Use `hmi_get_js_type_definitions` or the read-only resource `tia://docs/hmi-java
 - **Input Parameters:**
   - `screen_name` *(string, required)*: Target screen.
   - `name` *(string, required)*: Item name (e.g. `"lbl_Header"`).
-  - `text` *(string, required)*: Display text.
+  - `text` *(string, required)*: Display text as plain Unicode (no HTML entities; numeric references such as `&#196;` are decoded).
   - `left`, `top`, `width`, `height` *(integers, required)*: Geometry.
   - `font_size` *(number, optional, default: 11)*: Font size in pt.
   - `is_bold` *(boolean, optional, default: false)*: Bold text.
@@ -371,7 +395,7 @@ Use `hmi_get_js_type_definitions` or the read-only resource `tia://docs/hmi-java
 - **Input Parameters:**
   - `screen_name` *(string, required)*: Screen name.
   - `name` *(string, required)*: Button item name.
-  - `text` *(string, required)*: Button caption.
+  - `text` *(string, required)*: Button caption as plain Unicode (no HTML entities; numeric references are decoded).
   - `left`, `top`, `width`, `height` *(integers, required)*: Geometry.
   - `back_color` *(string, optional)*: Button color (e.g. `"#16A34A"`).
   - `fore_color` *(string, optional)*: Text color.
@@ -411,6 +435,7 @@ Use `hmi_get_js_type_definitions` or the read-only resource `tia://docs/hmi-java
   - `left`, `top`, `width`, `height` *(integers, required)*: Geometry.
   - `mode` *(string, optional, default: "Output")*: `"Output"` or `"InputOutput"`.
   - `process_tag` *(string, optional)*: HMI tag bound to ProcessValue.
+  - `output_format` *(string, optional)*: Output format, e.g. `"{F1} °C"`; omit to keep the current format.
   - `target_name` *(string, optional)*: Target HMI software.
 
 #### 30. `hmi_set_tag_dynamization`
@@ -423,6 +448,7 @@ Use `hmi_get_js_type_definitions` or the read-only resource `tia://docs/hmi-java
   - `condition_type` *(string, optional, default: "None")*: `"None"`, `"Range"`, or `"Singlebit"`.
   - `ranges` *(array of objects, optional)*: For `"Range"`, numeric lower/upper bounds; for `"Singlebit"`, exactly one `0..0` and one `1..1` entry whose values map the off/on states.
   - `target_name` *(string, optional)*: Target HMI software.
+- An existing Singlebit table is updated in place. Switching a table that has entries to another condition type, or replacing a non-tag dynamization, fails: call `hmi_delete_dynamization` first. All changes run in one transaction.
 - **Sample Invocation:**
   ```json
   {
@@ -525,12 +551,13 @@ Use `hmi_get_js_type_definitions` or the read-only resource `tia://docs/hmi-java
   - `target_name` *(string, optional)*: Target HMI software.
 
 #### 39. `hmi_compile`
-- **Description:** Compile HMI software and runtime device via Openness `ICompilable`. Returns compilation state, message logs, and error counts.
+- **Description:** Compile a WinCC Unified HMI via Openness `ICompilable`. The HMI is selected like in the other HMI tools; the only HMI in a project is selected automatically. Returns compilation state, message logs, error counts, and `Target`, `DeviceName` and `CompiledObject`.
 - **Input Parameters:**
-  - `target_device` *(string, optional)*: Target device (e.g. `"PC-System_1"`).
+  - `target_name` *(string, optional)*: Exact HMI software, device item or device name (e.g. `"HMI_RT_1"`). Required when the project has several HMIs; the error lists them.
+  - `target_device` *(string, optional)*: Deprecated alias of `target_name`.
 - **Sample Invocation & Output:**
   ```json
-  { "target_device": "PC-System_1" }
+  { "target_name": "HMI_RT_1" }
   ```
   ```json
   {
@@ -546,6 +573,19 @@ Use `hmi_get_js_type_definitions` or the read-only resource `tia://docs/hmi-java
     ]
   }
   ```
+
+#### `hmi_get_runtime_settings`
+- **Description:** Read-only. Returns the WinCC Unified Runtime settings: start screen (and whether it exists), screen resolution, auto log-off URL, input hint, panning, zooming, bit selection, font, GMP and e-signature settings, read errors and validation messages.
+- **Input Parameters:**
+  - `target_name` *(string, optional)*: Target HMI.
+
+#### `hmi_set_start_screen`
+- **Description:** Set the Runtime start screen in place, read it back and validate the Runtime settings. On a start-screen validation error or a wrong read-back, the previous start screen is restored and nothing is committed.
+- **Input Parameters:**
+  - `screen_name` *(string, required)*: Exact name of an existing screen (also inside a screen group).
+  - `on_conflict` *(string, required)*: `"fail"`.
+  - `expected_current_start_screen` *(string, optional)*: Guard; `""` means no start screen.
+  - `target_name` *(string, optional)*: Target HMI.
 
 #### 40. `hmi_list_connections`
 - **Description:** List all configured HMI communication links (name, driver, partner station, partner node, and disabled status).
@@ -637,8 +677,10 @@ Use `hmi_get_js_type_definitions` or the read-only resource `tia://docs/hmi-java
 
 ### Category 6: S7-PLCSIM Advanced Live Simulation & Testing (12 Tools)
 
+The `plcsim_*` tools support S7-PLCSIM Advanced V8.0 or newer only (S7-1500 and ET 200SP virtual controllers). Standard S7-PLCSIM (V18-V21), and therefore S7-1200 simulation, has no public API and is not supported. If a standard S7-PLCSIM instance has TCP/IP communication enabled, `plc_online_connect` to its IP address may be able to read tags (read-only; not verified).
+
 #### 51. `plcsim_list_instances`
-- **Description:** Enumerates all registered virtual S7-1500 controller instances managed by S7-PLCSIM Advanced runtime with ID, name, operating state, CPU type, and IP address.
+- **Description:** Returns an object, not an array (changed in v2.14.0): `runtimeAvailable`, `apiPath`, `apiVersion`, `apiAssemblyVersion`, `runtimeManagerAvailable`, `runtimeVersion`, `instances[]` (ID, name, operating state, CPU type, IP), `standardPlcSimProcesses[]`, `message` and `error`. The call succeeds also when the runtime is not available; check `runtimeAvailable`.
 - **Input Parameters:** *(none)*
 
 #### 52. `plcsim_connect`
@@ -739,7 +781,7 @@ Use `hmi_get_js_type_definitions` or the read-only resource `tia://docs/hmi-java
 
 ### Additional PLC & HMI Discovery (8 Tools)
 
-- `tia_get_block_info` / `tia_get_block_attributes`: exact PLC block metadata and supported attribute reads.
+- `tia_get_block_info` / `tia_get_block_attributes`: exact PLC block metadata and supported attribute reads; for OBs also the cycle attributes (`CyclicTime` and `PhaseOffset` in microseconds, `PriorityNumber`).
 - `tia_get_tag_table_info`: exact PLC tag-table scope and tag count.
 - `tia_get_type_info` / `tia_get_type_attributes`: exact PLC type metadata and supported consistency read.
 - `tia_get_db_member_attributes`: V21-reported attributes for one exact direct global-DB member; nested paths and inferred datatype fields are not claimed.
@@ -753,7 +795,7 @@ The tools report only V21 metadata verified by this implementation. See the
 [HMI](./plans/MCP_TOOL_TEST_PLAN_HMI.md) test plans for per-case offline checks and
 later live disposable-project verification.
 
-### Category 8: PLC, Project & HMI Operations (15 Tools)
+### Category 8: PLC, Project & HMI Operations (18 Tools)
 
 - `tia_get_plc_tag_info` / `tia_read_user_constant`: Read exact PLC tag
   metadata or a constant's declared type and literal, rejecting ambiguous
@@ -780,6 +822,13 @@ later live disposable-project verification.
 - `hmi_rename_screen`, `hmi_rename_screen_group`, and `hmi_rename_tag_table`:
   Rename existing objects in place. All HMI writes require explicit
   `on_conflict: "fail"`.
+- `hmi_delete_tag`: Delete one HMI tag by exact name after a best-effort
+  reference scan. With the default `on_referenced: "fail"`, a referenced tag,
+  or one whose scan was incomplete, is not deleted. `dry_run` only reports.
+- `hmi_rename_tag`: Rename one HMI tag in place. References found before the
+  rename are read back and reported; the tool does not rewrite them.
+  `script_references: "replace"` also rewrites script string literals that are
+  exactly the old name. Run with `dry_run: true` first.
 
 Mutations are non-transactional and have not been tested against a live TIA
 project here. Use the per-case plans:
@@ -796,6 +845,20 @@ project here. Use the per-case plans:
 - **PROFINET:** `tia_list_network`, `tia_create_subnet`, `tia_connect_to_subnet`, `tia_create_io_system`, `tia_connect_to_io_system`, `tia_set_network_node`.
 - **Exchange and backup:** `tia_export_aml`, `tia_import_aml` (preview by default), `tia_export_project_files` (stable files for Git), `tia_archive_project`, `tia_retrieve_project`, `tia_export_cross_references` (JSONL).
 - GSD/GSDML files cannot be installed through Openness V21; install them in TIA Portal first. See `tia://docs/tools-reference`, Category 11.
+
+### Category 12: Technology Objects (4 Tools)
+- `tia_list_technology_objects`: technology objects with type, version, DB number and folder. They are not listed by `tia_list_blocks`.
+- `tia_get_technology_object_parameters`: parameter names (*Name in Openness*), values and CLR types; optional name prefix `filter`.
+- `tia_create_technology_object`: create `PID_Temp`, `PID_Compact`, `PID_3Step` or another type TIA accepts, with an explicit `major.minor` version. Fails on a name collision with a technology object, block or system block.
+- `tia_set_technology_object_parameters`: values are strings converted to each parameter's CLR type; all are validated first, then written in order and read back. Earlier writes are not rolled back when a later one fails.
+
+**Recipe: PID_Temp on S7-1200** (not run against a live TIA Portal):
+1. `tia_list_blocks`: look for a plain PID_Temp instance DB left from an earlier SCL import. Rename or delete it, or choose another name.
+2. `tia_create_technology_object` with `type: "PID_Temp"`, `name: "PID_Temp_1"`, `version: "1.1"`.
+3. `tia_get_technology_object_parameters` with `name: "PID_Temp_1"` and `filter: "Config."` to learn the exact names.
+4. `tia_set_technology_object_parameters` with string values for the names found in step 3.
+5. `tia_import_scl_block` with a cyclic interrupt OB that calls `"PID_Temp_1"(...)`.
+6. `tia_compile`.
 
 ---
 
@@ -820,8 +883,8 @@ project here. Use the per-case plans:
 | Test Item | Verification Procedure | Expected Result | Status |
 | :--- | :--- | :--- | :---: |
 | **Server Startup** | `.\TiaOpennessMcp.exe` | Loads `config.json`, starts HTTP on port 5001 | **PASSED** |
-| **Health Check** | `GET http://localhost:5001/status` | Returns connection state, PID, and the registered tool count (110 in v2.9.0). | **Runtime check pending** |
-| **Tool Registry** | `POST /mcp` with `tools/list` | Lists all 110 registered tool definitions in v2.9.0. | **Runtime check pending** |
+| **Health Check** | `GET http://localhost:5001/status` | Returns connection state, PID, and the registered tool count (153 in v2.14.0). | **Runtime check pending** |
+| **Tool Registry** | `POST /mcp` with `tools/list` | Lists all 153 registered tool definitions in v2.14.0. | **Runtime check pending** |
 | **PLCSIM Live Connect** | `plcsim_connect` on `PLC_1` | Attaches to virtual S7-1500 controller, caches tags | **PASSED** |
 | **Live Tag I/O** | `plcsim_read_tag` & `write_tag` | Reads/writes DB variables with zero COM overhead | **PASSED** |
 | **Online Sequence Testing** | `.\TiaOpennessMcp.exe --run-sequence-test` | Executes parameterized sequence validation | **PASSED** |

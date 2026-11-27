@@ -128,8 +128,8 @@ After confirming the same disposable project and the exact HMI target:
 - [HMI navigation button](./plans/MCP_TOOL_TEST_PLAN_HMI_NAVIGATION.md)
 
 Use test-only screen/group/item names. Read the screen back after each change.
-Run `hmi_compile` with the HMI **device name** as `target_device`, as specified
-in the HMI skill. Runtime navigation is a separate optional check and must
+Run `hmi_compile` with the HMI software name as `target_name` (it can be omitted
+when the project has one HMI), as specified in the HMI skill. Runtime navigation is a separate optional check and must
 only target a safe test runtime with harmless screens. Do not activate controls
 connected to real process tags.
 
@@ -258,3 +258,20 @@ than a fifth pass.
 - Ambiguous group-path resolution for tag tables and constants (not run).
 - Exact-path resolution for tag tables and constants (not run).
 - Several success paths in Pass A (nested constant reads, library-type instance success, DB-member success) and paged listings.
+
+## 9. Open live checks for v2.14.0
+
+The v2.14.0 fixes for issues #3-#22 were tested offline only. Run these on a
+disposable project copy before relying on them:
+
+- #3: `hmi_add_label` and `tia_import_scl_block` with ä, ö, å and ° over stdio and HTTP/SSE; the text must arrive unchanged.
+- #4, #10: `hmi_delete_tag` and `hmi_rename_tag` on a referenced tag (alarm trigger, dynamization, script, logging tag); check which references TIA updates and whether a logged tag reports `referenced`.
+- #5, #6, #7, #8: `hmi_import_json` of an unchanged export with Singlebit items and `WindowFlags`; an item that has only `props`; `zOrder: "require"` on a screen with new items.
+- #11, #12, #13: `tia_rename_block`, `tia_rename_plc_type` (also to a system block name: expect `collision`), `tia_delete_plc_type` on a used UDT, an SCL replace over an inconsistent block, imports through `file_path`.
+- #14: `tia_set_block_attribute` on a cyclic interrupt OB; whether TIA lists `CyclicTime` as writable.
+- #15: `hmi_update_screen_item` with `Font.Size`, `Text`, `Enabled` and `Screen`.
+- #16, #18: `tia_get_block_code` source for SCL, DB, STL and a UDT; `tia_compile` twice (`UpToDate` on the second call); `tia_get_compile_state`.
+- #17, #19: `hmi_compile` with and without `target_name` (read `CompiledObject`, and check that a script error is reported); `hmi_set_start_screen` persists after save and reopen.
+- #20: `tia_create_technology_object` for PID_Temp 1.1 on an S7-1200, parameter names and writes, and an SCL OB that calls it.
+- #21: `plcsim_list_instances` with standard S7-PLCSIM running and with PLCSIM Advanced V8.
+- #22: `hmi_patch_json` bind with `expectTag` on a Singlebit item; a re-bind without `readOnly` keeps `ReadOnly`.
