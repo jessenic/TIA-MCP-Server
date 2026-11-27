@@ -63,6 +63,31 @@ namespace TiaOpennessMcp.Tia
         }
 
         /// <summary>
+        /// For a not-found result inside one folder: names the other folder(s) where an object with exactly the
+        /// requested name exists ("" = root folder). Returns null when there is none.
+        /// </summary>
+        public static string? OtherFolderHint(IEnumerable<KeyValuePair<string, string>> nameAndFolder, string requested, string? searchedFolder)
+        {
+            if (searchedFolder == null)
+                return null;
+            List<string> folders = nameAndFolder
+                .Where(entry => string.Equals(entry.Key, requested, StringComparison.Ordinal) &&
+                                !string.Equals(entry.Value, searchedFolder, StringComparison.Ordinal))
+                .Select(entry => entry.Value.Length == 0 ? "the root folder" : $"folder '{entry.Value}'")
+                .Distinct()
+                .ToList();
+            return folders.Count == 0 ? null : $"'{requested}' was found in {string.Join(", ", folders)}; pass that group_path or omit group_path.";
+        }
+
+        /// <summary>
+        /// Returns the actual-case name of the first entry matching requested case-insensitively, or null.
+        /// </summary>
+        public static string? FindNameIgnoringCase(IEnumerable<string> names, string requested)
+        {
+            return names.FirstOrDefault(name => string.Equals(name, requested, StringComparison.OrdinalIgnoreCase));
+        }
+
+        /// <summary>
         /// Lenient check for names that address an existing object: only null, empty, or whitespace-padded
         /// names are rejected, so any object TIA accepted can still be found. Returns an error text or null.
         /// </summary>

@@ -278,6 +278,12 @@ try {
             throw "Checked-in $($importTool.Name) description or required fields differ from the exported tool schema."
         }
     }
+    $deleteBlockSchema = Get-Content -LiteralPath (Join-Path $outputDirectory 'tia_delete_block.json') -Raw | ConvertFrom-Json
+    $checkedDeleteBlockSchema = Get-Content -LiteralPath (Join-Path $PSScriptRoot '..\schemas\tia_delete_block.json') -Raw | ConvertFrom-Json
+    if ($checkedDeleteBlockSchema.description -ne $deleteBlockSchema.description -or
+        $deleteBlockSchema.description -notlike '*tia_delete_plc_type*') {
+        throw 'Checked-in tia_delete_block description differs from the exported tool schema or does not point to tia_delete_plc_type.'
+    }
     foreach ($toolName in @('tia_rename_plc_type', 'tia_rename_block')) {
         $schema = Get-Content -LiteralPath (Join-Path $outputDirectory "$toolName.json") -Raw | ConvertFrom-Json
         if ((@($schema.parameters.properties.on_conflict.enum) -join ',') -ne 'fail' -or

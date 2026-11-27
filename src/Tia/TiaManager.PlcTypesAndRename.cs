@@ -11,7 +11,8 @@ namespace TiaOpennessMcp.Tia
 {
     // Delete and rename of PLC data types (UDTs) and rename of program blocks, in place, with exact-name
     // resolution, fail-on-conflict and read-back. Scope: the PLC software root tree (PlcSoftware.TypeGroup /
-    // BlockGroup); objects inside S7-1500 software units are not searched.
+    // BlockGroup); objects inside S7-1500 software units are not searched. The rename collision check also covers
+    // the system block folders and system data types.
     public partial class TiaManager
     {
         private const string RootTreeScopeNote = "Only the PLC software's own type and block folders are searched; objects inside software units are not.";
@@ -28,18 +29,22 @@ namespace TiaOpennessMcp.Tia
                 string? group = groupPath == null ? null : NormalizePlcMutationGroupPath(groupPath);
 
                 var plc = ResolveMutationPlc(plcName);
-                var candidates = CollectPlcTypeLocations(plc.TypeGroup)
+                List<PlcTypeLocation> allTypes = CollectPlcTypeLocations(plc.TypeGroup);
+                var candidates = allTypes
                     .Where(location => group == null || string.Equals(location.GroupPath, group, StringComparison.Ordinal))
                     .ToList();
                 NameSelection selection = PlcBlockToolLogic.SelectExactName(candidates.Select(location => location.Name).ToList(), typeName);
                 if (selection.Status != "ok")
                 {
+                    string? blockWithName = PlcBlockToolLogic.FindNameIgnoringCase(
+                        CollectPlcBlockLocations(plc.BlockGroup).Select(block => block.Name), typeName);
                     string message = selection.Status == "ambiguous"
                         ? $"More than one PLC data type is named '{typeName}'; pass group_path to select one."
                         : NotFoundMessage("PLC data type", typeName, group, selection.Hint,
-                            CollectPlcBlockLocations(plc.BlockGroup).Any(block => string.Equals(block.Name, typeName, StringComparison.OrdinalIgnoreCase))
-                                ? $"'{typeName}' is a program block; use tia_delete_block."
-                                : null);
+                            blockWithName != null
+                                ? $"'{blockWithName}' is a program block; use tia_delete_block."
+                                : null,
+                            PlcBlockToolLogic.OtherFolderHint(allTypes.Select(TypeEntry), typeName, group));
                     return PlcMutationResult.FailureOutcome(operation, selection.Status, plc.Name, typeName, group, message);
                 }
 
@@ -94,24 +99,36 @@ namespace TiaOpennessMcp.Tia
                     string message = selection.Status == "ambiguous"
                         ? $"More than one PLC data type is named '{typeName}'; pass group_path to select one."
                         : NotFoundMessage("PLC data type", typeName, group, selection.Hint,
-                            allBlocks.Any(block => string.Equals(block.Name, typeName, StringComparison.OrdinalIgnoreCase))
-                                ? $"'{typeName}' is a program block; use tia_rename_block."
-                                : null);
+                            PlcBlockToolLogic.FindNameIgnoringCase(allBlocks.Select(block => block.Name), typeName) is string blockWithName
+                                ? $"'{blockWithName}' is a program block; use tia_rename_block."
+                                : null,
+                            PlcBlockToolLogic.OtherFolderHint(allTypes.Select(TypeEntry), typeName, group));
                     return PlcMutationResult.FailureOutcome(operation, selection.Status, plc.Name, typeName, group, message);
                 }
 
                 PlcTypeLocation target = candidates[selection.Index];
-                var scopeNames = allTypes.Select(location => location.Name).Concat(allBlocks.Select(location => location.Name));
+                var scopeNames = allTypes.Select(location => location.Name)
+                    .Concat(allBlocks.Select(location => location.Name))
+                    .Concat(CollectSystemObjectNames(plc));
                 if (PlcBlockToolLogic.HasRenameCollision(scopeNames, target.Name, newName))
                 {
                     return PlcMutationResult.FailureOutcome(operation, "collision", plc.Name, typeName,
                         BuildResultPath(target.GroupPath, target.Name),
-                        $"A PLC data type or program block named '{newName}' already exists in PLC '{plc.Name}' (names are compared case-insensitively). Nothing was renamed.");
+                        $"A PLC data type or program block named '{newName}' already exists in PLC '{plc.Name}', including its system blocks and system data types (names are compared case-insensitively). Nothing was renamed.");
                 }
 
                 string oldName = target.Name;
                 mutationStarted = true;
-                target.Type.Name = newName;
+                try
+                {
+                    target.Type.Name = newName;
+                }
+                catch (Exception setterException) when (setterException is EngineeringException || setterException is COMException)
+                {
+                    // TIA rejected the new name; report no partial change when the read-back still shows the old name.
+                    mutationStarted = !NameUnchanged(() => CollectPlcTypeLocations(plc.TypeGroup).Select(TypeEntry), target.GroupPath, oldName, newName);
+                    throw;
+                }
 
                 var readBack = CollectPlcTypeLocations(plc.TypeGroup)
                     .Where(location => string.Equals(location.GroupPath, target.GroupPath, StringComparison.Ordinal))
@@ -161,25 +178,37 @@ namespace TiaOpennessMcp.Tia
                     string message = selection.Status == "ambiguous"
                         ? $"More than one program block is named '{blockName}'; pass group_path to select one."
                         : NotFoundMessage("Program block", blockName, group, selection.Hint,
-                            allTypes.Any(type => string.Equals(type.Name, blockName, StringComparison.OrdinalIgnoreCase))
-                                ? $"'{blockName}' is a PLC data type (UDT); use tia_rename_plc_type."
-                                : null);
+                            PlcBlockToolLogic.FindNameIgnoringCase(allTypes.Select(type => type.Name), blockName) is string typeWithName
+                                ? $"'{typeWithName}' is a PLC data type (UDT); use tia_rename_plc_type."
+                                : null,
+                            PlcBlockToolLogic.OtherFolderHint(allBlocks.Select(BlockEntry), blockName, group));
                     return PlcMutationResult.FailureOutcome(operation, selection.Status, plc.Name, blockName, group, message);
                 }
 
                 PlcBlockLocation target = candidates[selection.Index];
-                var scopeNames = allBlocks.Select(location => location.Name).Concat(allTypes.Select(location => location.Name));
+                var scopeNames = allBlocks.Select(location => location.Name)
+                    .Concat(allTypes.Select(location => location.Name))
+                    .Concat(CollectSystemObjectNames(plc));
                 if (PlcBlockToolLogic.HasRenameCollision(scopeNames, target.Name, newName))
                 {
                     return PlcMutationResult.FailureOutcome(operation, "collision", plc.Name, blockName,
                         BuildResultPath(target.GroupPath, target.Name),
-                        $"A program block or PLC data type named '{newName}' already exists in PLC '{plc.Name}' (names are compared case-insensitively). Nothing was renamed.");
+                        $"A program block or PLC data type named '{newName}' already exists in PLC '{plc.Name}', including its system blocks and system data types (names are compared case-insensitively). Nothing was renamed.");
                 }
 
                 string oldName = target.Name;
                 mutationStarted = true;
-                // Rename only; the block number (Number/AutoNumber) is left untouched.
-                target.Block.Name = newName;
+                try
+                {
+                    // Rename only; the block number (Number/AutoNumber) is left untouched.
+                    target.Block.Name = newName;
+                }
+                catch (Exception setterException) when (setterException is EngineeringException || setterException is COMException)
+                {
+                    // TIA rejected the new name; report no partial change when the read-back still shows the old name.
+                    mutationStarted = !NameUnchanged(() => CollectPlcBlockLocations(plc.BlockGroup).Select(BlockEntry), target.GroupPath, oldName, newName);
+                    throw;
+                }
 
                 var readBack = CollectPlcBlockLocations(plc.BlockGroup)
                     .Where(location => string.Equals(location.GroupPath, target.GroupPath, StringComparison.Ordinal))
@@ -233,14 +262,77 @@ namespace TiaOpennessMcp.Tia
             return groupPath == null ? null : NormalizePlcMutationGroupPath(groupPath);
         }
 
-        private static string NotFoundMessage(string kind, string name, string? group, string? caseHint, string? kindHint)
+        private static string NotFoundMessage(string kind, string name, string? group, string? caseHint, string? kindHint, string? folderHint = null)
         {
             string where = group == null ? "" : group.Length == 0 ? " in the root folder" : $" in folder '{group}'";
             var parts = new List<string> { $"{kind} '{name}' was not found{where}." };
+            if (folderHint != null) parts.Add(folderHint);
             if (kindHint != null) parts.Add(kindHint);
             if (caseHint != null) parts.Add(caseHint);
             parts.Add(RootTreeScopeNote);
             return string.Join(" ", parts);
+        }
+
+        private static KeyValuePair<string, string> TypeEntry(PlcTypeLocation location) =>
+            new KeyValuePair<string, string>(location.Name, location.GroupPath);
+
+        private static KeyValuePair<string, string> BlockEntry(PlcBlockLocation location) =>
+            new KeyValuePair<string, string>(location.Name, location.GroupPath);
+
+        /// <summary>
+        /// True when a read-back after a failed Name setter shows the old name still in its folder and the new name absent.
+        /// A failing read-back counts as "changed" (unknown), so the caller keeps reporting a possible partial change.
+        /// </summary>
+        private static bool NameUnchanged(Func<IEnumerable<KeyValuePair<string, string>>> readBack, string groupPath, string oldName, string newName)
+        {
+            try
+            {
+                var inGroup = readBack().Where(entry => string.Equals(entry.Value, groupPath, StringComparison.Ordinal)).ToList();
+                return inGroup.Any(entry => string.Equals(entry.Key, oldName, StringComparison.Ordinal)) &&
+                       !inGroup.Any(entry => string.Equals(entry.Key, newName, StringComparison.Ordinal));
+            }
+            catch (Exception ex) when (ex is EngineeringException || ex is COMException)
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Names of the blocks in the "System blocks" folders and of the system data types, for the rename collision
+        /// scope. Best effort: a folder that cannot be read is skipped (TIA then rejects a colliding name itself).
+        /// </summary>
+        private static List<string> CollectSystemObjectNames(PlcSoftware plc)
+        {
+            var names = new List<string>();
+
+            void WalkBlocks(PlcSystemBlockGroup group)
+            {
+                foreach (PlcBlock block in group.Blocks)
+                    names.Add(block.Name);
+                foreach (PlcSystemBlockGroup sub in group.Groups)
+                    WalkBlocks(sub);
+            }
+
+            try
+            {
+                foreach (PlcSystemBlockGroup systemGroup in plc.BlockGroup.SystemBlockGroups)
+                    WalkBlocks(systemGroup);
+            }
+            catch (Exception ex) when (ex is EngineeringException || ex is COMException)
+            {
+            }
+
+            try
+            {
+                foreach (PlcSystemTypeGroup systemGroup in plc.TypeGroup.SystemTypeGroups)
+                    foreach (PlcType type in systemGroup.Types)
+                        names.Add(type.Name);
+            }
+            catch (Exception ex) when (ex is EngineeringException || ex is COMException)
+            {
+            }
+
+            return names;
         }
 
         private static List<PlcTypeLocation> CollectPlcTypeLocations(PlcTypeGroup root)

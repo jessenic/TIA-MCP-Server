@@ -617,6 +617,13 @@ namespace TiaOpennessMcp.Tia
             }
 
             BlockLocation? existing = matches.Count == 1 ? matches[0] : null;
+
+            // Resolve the destination folder before anything can change the project, so a wrong folder fails first.
+            string destinationFolder = string.IsNullOrWhiteSpace(targetFolder)
+                ? existing?.FolderPath ?? ""
+                : targetFolder ?? "";
+            PlcBlockGroup destinationGroup = FindBlockGroup(plc.BlockGroup, destinationFolder);
+
             var preImportWarnings = new List<string>();
             bool? existingWasConsistent = null;
             CompilationReport? preImportCompilation = null;
@@ -628,10 +635,11 @@ namespace TiaOpennessMcp.Tia
                 bool? knowHowProtected = null;
                 bool compileAttempted = false;
                 bool? consistentAfterCompile = null;
+                // Reported in the result whether or not a backup is requested.
+                existingWasConsistent = TryReadBlockValue(() => existingBlock.IsConsistent);
                 if (backup)
                 {
                     knowHowProtected = TryReadBlockValue(() => existingBlock.IsKnowHowProtected);
-                    existingWasConsistent = TryReadBlockValue(() => existingBlock.IsConsistent);
                     if (existingWasConsistent == false && knowHowProtected != true)
                     {
                         // Inconsistent blocks cannot be exported; compile only this block once and re-check.
@@ -639,7 +647,19 @@ namespace TiaOpennessMcp.Tia
                         if (blockCompiler != null)
                         {
                             compileAttempted = true;
-                            CompilerResult compileResult = blockCompiler.Compile();
+                            CompilerResult compileResult;
+                            try
+                            {
+                                compileResult = blockCompiler.Compile();
+                            }
+                            catch (Exception compileException) when (compileException is EngineeringException || compileException is System.Runtime.InteropServices.COMException)
+                            {
+                                throw new InvalidOperationException(
+                                    $"The existing block '{blockName}' is inconsistent, so a single-block compile was attempted before the backup, and the compile failed ({compileException.Message}). " +
+                                    "The compile may have changed the block; it was not replaced. To replace it without a backup, call tia_import_scl_block again with backup:false " +
+                                    "(a failed import then cannot restore the old block), or fix the callee/UDT and run tia_compile first.",
+                                    compileException);
+                            }
                             preImportCompilation = new CompilationReport
                             {
                                 State = compileResult.State.ToString(),
@@ -665,6 +685,9 @@ namespace TiaOpennessMcp.Tia
                 ? Path.Combine(Path.GetTempPath(), $"tia_scl_backup_{Guid.NewGuid():N}.xml")
                 : null;
             bool existingDeleted = false;
+            string compileNote = preImportCompilation != null
+                ? $" Before this, the existing block '{blockName}' was compiled once (single-block compile) because it was inconsistent; that compile may have changed it."
+                : "";
 
             try
             {
@@ -677,21 +700,26 @@ namespace TiaOpennessMcp.Tia
                     catch (Exception exportException)
                     {
                         throw new InvalidOperationException(
-                            $"Could not back up the existing block '{blockName}' ({exportException.Message}); the block was not replaced. " +
+                            $"Could not back up the existing block '{blockName}' ({exportException.Message}); the block was not replaced.{compileNote} " +
                             "To replace it without a backup, call tia_import_scl_block again with backup:false (a failed import then cannot restore the old block).",
                             exportException);
                     }
                 }
 
-                string destinationFolder = string.IsNullOrWhiteSpace(targetFolder)
-                    ? existing?.FolderPath ?? ""
-                    : targetFolder ?? "";
-                PlcBlockGroup destinationGroup = FindBlockGroup(plc.BlockGroup, destinationFolder);
-
-                File.WriteAllText(sourceFile, sclCode, new UTF8Encoding(false));
-                string sourceName = Path.GetFileNameWithoutExtension(sourceFile);
-                PlcExternalSource source = plc.ExternalSourceGroup.ExternalSources.CreateFromFile(sourceName, sourceFile)
-                    ?? throw new InvalidOperationException("TIA Portal did not create an external SCL source.");
+                PlcExternalSource source;
+                try
+                {
+                    File.WriteAllText(sourceFile, sclCode, new UTF8Encoding(false));
+                    string sourceName = Path.GetFileNameWithoutExtension(sourceFile);
+                    source = plc.ExternalSourceGroup.ExternalSources.CreateFromFile(sourceName, sourceFile)
+                        ?? throw new InvalidOperationException("TIA Portal did not create an external SCL source.");
+                }
+                catch (Exception sourceException) when (compileNote.Length > 0)
+                {
+                    throw new InvalidOperationException(
+                        $"Could not create the external SCL source ({sourceException.Message}); the block was not replaced.{compileNote}",
+                        sourceException);
+                }
 
                 if (existing != null)
                 {

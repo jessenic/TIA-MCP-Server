@@ -115,6 +115,26 @@ internal static class PlcBlockToolTests
 
         NameSelection missing = PlcBlockToolLogic.SelectExactName(new string[0], "X");
         Check(missing.Status == "not_found" && missing.Hint == null, "no match is not_found without hint");
+
+        var located = new[]
+        {
+            new KeyValuePair<string, string>("typeA", "Types/Sub"),
+            new KeyValuePair<string, string>("typeA", ""),
+            new KeyValuePair<string, string>("TYPEB", "Other")
+        };
+        string folderHint = PlcBlockToolLogic.OtherFolderHint(located, "typeA", "Missing");
+        Check(folderHint != null && folderHint.Contains("folder 'Types/Sub'") && folderHint.Contains("the root folder"),
+            "not found in the given folder names the other folders holding the exact name");
+        string rootSearchHint = PlcBlockToolLogic.OtherFolderHint(located, "typeA", "");
+        Check(rootSearchHint != null && rootSearchHint.Contains("folder 'Types/Sub'") && !rootSearchHint.Contains("root folder"),
+            "group_path \"\" for a type in a subfolder points to that subfolder");
+        Check(PlcBlockToolLogic.OtherFolderHint(located, "typeA", null) == null,
+            "no folder hint when every folder was searched");
+        Check(PlcBlockToolLogic.OtherFolderHint(located, "typeB", "Missing") == null,
+            "folder hint needs an exact (case-sensitive) name");
+        Check(PlcBlockToolLogic.FindNameIgnoringCase(new[] { "FB_Seq" }, "fb_seq") == "FB_Seq" &&
+            PlcBlockToolLogic.FindNameIgnoringCase(new[] { "FB_Seq" }, "FC_X") == null,
+            "kind hint uses the actual-case name of the other object");
     }
 
     private static void TestRenameCollision()
