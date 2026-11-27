@@ -1,0 +1,14 @@
+{
+  "name": "tia_list_technology_objects",
+  "description": "List the technology objects of a PLC (the \u0027Technology objects\u0027 folder, including its subfolders) with system-library type, version, DB number and folder path. Technology objects are not listed by tia_list_blocks. An instance DB of PID_Temp created from an SCL call is a plain instance DB, not a technology object, and does not appear here.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "plc_name": {
+        "type": "string",
+        "description": "Exact PLC software name (case-sensitive); required when the project has multiple PLCs."
+      }
+    },
+    "additionalProperties": false
+  }
+}
