@@ -77,30 +77,47 @@ namespace TiaOpennessMcp.Tia
             foreach (Device dev in _project!.Devices)
                 FindHmiInDevice(dev, candidates);
 
-            var matches = string.IsNullOrWhiteSpace(targetName)
-                ? candidates
-                : candidates.Where(candidate =>
-                    string.Equals(candidate.DeviceName, targetName, StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(candidate.DeviceItemName, targetName, StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(candidate.SoftwareName, targetName, StringComparison.OrdinalIgnoreCase)).ToList();
+            HmiTargetInfo selected = SelectHmiTarget(candidates, targetName);
 
+            foreach (Device dev in _project.Devices)
+            {
+                HmiSoftware? software = FindHmiSoftwareInDeviceItems(dev.DeviceItems, dev.Name, selected);
+                if (software != null) return software;
+            }
+            throw new InvalidOperationException($"HMI Software target '{selected.SoftwareName}' could not be resolved.");
+        }
+
+        // Exact-name HMI target selection shared by every HMI tool: auto-picks the only HMI when no selector is
+        // given, otherwise matches the selector (case-insensitive, whole name) against the device, device item or
+        // software name. Zero or several matches fail and list the available targets.
+        internal static HmiTargetInfo SelectHmiTarget(IReadOnlyList<HmiTargetInfo> candidates, string? selector)
+        {
+            var matches = string.IsNullOrWhiteSpace(selector)
+                ? candidates.ToList()
+                : candidates.Where(candidate =>
+                    string.Equals(candidate.DeviceName, selector, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(candidate.DeviceItemName, selector, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(candidate.SoftwareName, selector, StringComparison.OrdinalIgnoreCase)).ToList();
+
+            string available = candidates.Count == 0
+                ? "none"
+                : string.Join(", ", candidates.Select(DescribeHmiTarget));
             if (matches.Count == 0)
             {
-                throw new InvalidOperationException($"No HMI Software target found matching '{targetName ?? "(any)"}'.");
+                throw new InvalidOperationException(
+                    $"No HMI Software target found matching '{selector ?? "(any)"}'. Available HMI targets: {available}.");
             }
             if (matches.Count > 1)
             {
                 throw new InvalidOperationException(
-                    $"HMI target selector '{targetName ?? "(any)"}' matched multiple targets: {string.Join(", ", matches.Select(m => m.SoftwareName))}.");
+                    $"HMI target selector '{selector ?? "(any)"}' matched multiple targets: {string.Join(", ", matches.Select(DescribeHmiTarget))}. " +
+                    "Pass the exact software, device item or device name as target_name.");
             }
-
-            foreach (Device dev in _project.Devices)
-            {
-                HmiSoftware? software = FindHmiSoftwareInDeviceItems(dev.DeviceItems, dev.Name, matches[0]);
-                if (software != null) return software;
-            }
-            throw new InvalidOperationException($"HMI Software target '{matches[0].SoftwareName}' could not be resolved.");
+            return matches[0];
         }
+
+        private static string DescribeHmiTarget(HmiTargetInfo target) =>
+            $"'{target.SoftwareName}' (device '{target.DeviceName}', item '{target.DeviceItemName}')";
 
         private static HmiSoftware? FindHmiSoftwareInDeviceItems(IEnumerable<DeviceItem> items, string deviceName, HmiTargetInfo target)
         {
@@ -1377,73 +1394,117 @@ namespace TiaOpennessMcp.Tia
 
         #region Device & HMI Compilation
 
-        public CompilationReport CompileHmi(string? targetDevice = null)
+        // Resolves the HMI with the same exact-name selector as the other HMI tools (device, device item or
+        // software name; the only HMI is auto-selected) and compiles it.
+        public CompilationReport CompileHmi(string? targetName = null)
+        {
+            EnsureProjectOpen();
+            var candidates = new List<HmiTargetInfo>();
+            foreach (Device dev in _project!.Devices)
+                FindHmiInDevice(dev, candidates);
+            return CompileHmiTarget(SelectHmiTarget(candidates, targetName));
+        }
+
+        // Compiles an already-resolved HMI target. ICompilable is taken from the lowest object that offers it:
+        // the device item holding the HMI software, its SoftwareContainer, the parent device items, and finally
+        // the device itself (the path that works for Unified Comfort panels such as the MTP1200).
+        internal CompilationReport CompileHmiTarget(HmiTargetInfo target)
         {
             EnsureProjectOpen();
 
+            Device? device = null;
+            List<DeviceItem>? itemPath = null;
+            foreach (Device dev in _project!.Devices)
+            {
+                if (!string.Equals(dev.Name, target.DeviceName, StringComparison.OrdinalIgnoreCase)) continue;
+                itemPath = FindHmiHostItemPath(dev.DeviceItems, dev.Name, target);
+                if (itemPath != null)
+                {
+                    device = dev;
+                    break;
+                }
+            }
+            if (device == null || itemPath == null || itemPath.Count == 0)
+            {
+                throw new InvalidOperationException($"HMI Software target '{target.SoftwareName}' could not be resolved.");
+            }
+
+            DeviceItem holder = itemPath[itemPath.Count - 1];
+            string ItemLabel(int depth) =>
+                $"DeviceItem '{device.Name}/{string.Join("/", itemPath.Take(depth + 1).Select(item => item.Name))}'";
+
+            var tried = new List<string>();
             ICompilable? compilable = null;
-            string targetPath = "";
+            string compiledObject = "";
 
-            if (!string.IsNullOrEmpty(targetDevice))
+            void Probe(Func<ICompilable?> getter, string label)
             {
-                var dev = _project!.Devices.Find(targetDevice);
-                if (dev != null)
+                if (compilable != null) return;
+                tried.Add(label);
+                ICompilable? candidate = getter();
+                if (candidate != null)
                 {
-                    foreach (DeviceItem item in dev.DeviceItems)
-                    {
-                        var comp = item.GetService<ICompilable>();
-                        if (comp != null && (item.Name.Contains("HMI") || item.Name.Contains("RT")))
-                        {
-                            compilable = comp;
-                            targetPath = $"{dev.Name}/{item.Name}";
-                            break;
-                        }
-                    }
-                    if (compilable == null)
-                    {
-                        compilable = dev.GetService<ICompilable>();
-                        targetPath = dev.Name;
-                    }
+                    compilable = candidate;
+                    compiledObject = label;
                 }
             }
 
-            if (compilable == null)
+            Probe(() => holder.GetService<ICompilable>(), ItemLabel(itemPath.Count - 1));
+            Probe(() => holder.GetService<SoftwareContainer>()?.GetService<ICompilable>(),
+                $"SoftwareContainer of '{target.SoftwareName}'");
+            for (int depth = itemPath.Count - 2; depth >= 0; depth--)
             {
-                // Search for any HMI device item with ICompilable
-                foreach (Device dev in _project!.Devices)
-                {
-                    foreach (DeviceItem item in dev.DeviceItems)
-                    {
-                        var comp = item.GetService<ICompilable>();
-                        if (comp != null && (item.Name.Contains("HMI") || item.Name.Contains("RT")))
-                        {
-                            compilable = comp;
-                            targetPath = $"{dev.Name}/{item.Name}";
-                            break;
-                        }
-                    }
-                    if (compilable != null) break;
-                }
+                DeviceItem ancestor = itemPath[depth];
+                Probe(() => ancestor.GetService<ICompilable>(), ItemLabel(depth));
             }
+            Probe(() => device.GetService<ICompilable>(), $"Device '{device.Name}'");
 
             if (compilable == null)
             {
-                throw new InvalidOperationException("No ICompilable HMI target found in project.");
+                throw new InvalidOperationException(
+                    $"No ICompilable found for HMI target '{target.SoftwareName}'. Tried: {string.Join(", ", tried)}.");
             }
 
-            Console.Error.WriteLine($"[TiaManager] Compiling HMI target '{targetPath}'...");
+            Console.Error.WriteLine($"[TiaManager] Compiling HMI target '{target.SoftwareName}' via {compiledObject}...");
             var res = compilable.Compile();
 
             var report = new CompilationReport
             {
                 State = res.State.ToString(),
                 ErrorCount = res.ErrorCount,
-                WarningCount = res.WarningCount
+                WarningCount = res.WarningCount,
+                Target = target.SoftwareName,
+                DeviceName = device.Name,
+                CompiledObject = compiledObject
             };
 
             CollectCompileMessages(res.Messages, report.Messages);
 
             return report;
+        }
+
+        // Returns the device-item chain (top-level item first) down to the item whose SoftwareContainer holds the target.
+        private static List<DeviceItem>? FindHmiHostItemPath(IEnumerable<DeviceItem> items, string deviceName, HmiTargetInfo target)
+        {
+            foreach (DeviceItem item in items)
+            {
+                var sc = item.GetService<SoftwareContainer>();
+                if (sc?.Software is HmiSoftware hmiSw &&
+                    string.Equals(deviceName, target.DeviceName, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(item.Name, target.DeviceItemName, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(hmiSw.Name, target.SoftwareName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return new List<DeviceItem> { item };
+                }
+
+                var nested = FindHmiHostItemPath(item.DeviceItems, deviceName, target);
+                if (nested != null)
+                {
+                    nested.Insert(0, item);
+                    return nested;
+                }
+            }
+            return null;
         }
 
         #endregion

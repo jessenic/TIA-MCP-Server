@@ -610,7 +610,7 @@ namespace TiaOpennessMcp.Tia
 
             HmiTargetInfo target = ListHmiTargets().Single(t =>
                 string.Equals(t.SoftwareName, hmi.Name, StringComparison.OrdinalIgnoreCase));
-            CompilationReport compilation = CompileHmi(target.DeviceName);
+            CompilationReport compilation = CompileHmiTarget(target);
             var result = CreateImportResult(plan, hmi.Name, false, pruneItems, compilation);
             if (compilation.ErrorCount > 0)
                 throw new InvalidOperationException(
@@ -655,7 +655,7 @@ namespace TiaOpennessMcp.Tia
 
             HmiTargetInfo target = ListHmiTargets().Single(t =>
                 string.Equals(t.SoftwareName, hmi.Name, StringComparison.OrdinalIgnoreCase));
-            CompilationReport compilation = CompileHmi(target.DeviceName);
+            CompilationReport compilation = CompileHmiTarget(target);
             if (compilation.ErrorCount > 0)
                 throw new InvalidOperationException(
                     $"HMI JSON patch was applied in memory but compilation reported {compilation.ErrorCount} error(s). " +

@@ -1358,6 +1358,16 @@ namespace TiaOpennessMcp.Tia
         public int ErrorCount { get; set; }
         public int WarningCount { get; set; }
         public List<CompileMessageItem> Messages { get; set; } = new List<CompileMessageItem>();
+
+        // HMI compile only (hmi_compile): which HMI software was compiled and through which object.
+        [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+        public string? Target { get; set; }
+
+        [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+        public string? DeviceName { get; set; }
+
+        [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+        public string? CompiledObject { get; set; }
     }
 
     public class CompileMessageItem

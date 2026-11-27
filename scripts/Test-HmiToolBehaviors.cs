@@ -184,6 +184,201 @@ internal static class HmiToolBehaviorTests
         TestItemPropertyConversion();
         TestManagerInputGuards();
         TestExpressionMappingEntryParsing();
+        TestHmiCompileTool(registry, fake);
+        TestHmiTargetSelection();
+        TestHmiRuntimeTools(registry, fake);
+        TestStartScreenHelpers();
+    }
+
+    private static void TestHmiCompileTool(ToolRegistry registry, FakeHmiToolOperations fake)
+    {
+        ToolDefinition compileTool = registry.GetTools().Single(tool => tool.Name == "hmi_compile");
+        Check(compileTool.InputSchema.Properties.ContainsKey("target_name") &&
+            compileTool.InputSchema.Properties.ContainsKey("target_device"),
+            "hmi_compile exposes target_name and the target_device alias");
+
+        CallToolResult noTarget = registry.Execute("hmi_compile", Arguments("{}"));
+        Check(!noTarget.IsError && fake.LastOperation == "compile" && fake.TargetName == null,
+            "hmi_compile without a target lets the backend auto-select the only HMI");
+        Check(FirstText(noTarget).Contains("\"CompiledObject\"") && FirstText(noTarget).Contains("HMI_RT_1"),
+            "hmi_compile returns the compiled target and object");
+
+        registry.Execute("hmi_compile", Arguments("{\"target_name\":\"HMI_RT_1\"}"));
+        Check(fake.LastOperation == "compile" && fake.TargetName == "HMI_RT_1",
+            "hmi_compile forwards a software name as target_name");
+
+        registry.Execute("hmi_compile", Arguments("{\"target_device\":\"HMI_1\"}"));
+        Check(fake.TargetName == "HMI_1", "hmi_compile forwards the target_device alias");
+
+        registry.Execute("hmi_compile", Arguments("{\"target_name\":\"HMI_RT_1\",\"target_device\":\"hmi_rt_1\"}"));
+        Check(fake.TargetName == "HMI_RT_1", "hmi_compile accepts matching target_name and target_device");
+
+        int callsBefore = fake.CallCount;
+        CallToolResult conflicting = registry.Execute("hmi_compile", Arguments("{\"target_name\":\"HMI_RT_1\",\"target_device\":\"HMI_2\"}"));
+        Check(conflicting.IsError && fake.CallCount == callsBefore,
+            "hmi_compile rejects differing target_name and target_device before backend dispatch");
+
+        string plcReport = JsonSerializer.Serialize(new CompilationReport { State = "Success" });
+        Check(!plcReport.Contains("Target") && !plcReport.Contains("DeviceName") && !plcReport.Contains("CompiledObject"),
+            "PLC compilation reports keep their JSON shape without the HMI-only fields");
+    }
+
+    private static void TestHmiTargetSelection()
+    {
+        var single = new List<HmiTargetInfo> { Target("HMI_1", "HMI_RT_1", "HMI_RT_1") };
+        Check(SelectTarget(single, null).SoftwareName == "HMI_RT_1", "the only HMI is selected without a selector");
+        Check(SelectTarget(single, "HMI_RT_1").SoftwareName == "HMI_RT_1", "software name selects the HMI");
+        Check(SelectTarget(single, "HMI_1").SoftwareName == "HMI_RT_1", "device name selects the HMI");
+        Check(SelectTarget(single, "hmi_rt_1").SoftwareName == "HMI_RT_1", "selection is case-insensitive");
+        Throws<InvalidOperationException>(() => SelectTarget(single, "HMI"),
+            "a partial name does not select an HMI");
+        try
+        {
+            SelectTarget(single, "PLC_1");
+            throw new InvalidOperationException("FAIL: an unknown selector must fail");
+        }
+        catch (InvalidOperationException error)
+        {
+            Check(error.Message.Contains("HMI_RT_1") && error.Message.Contains("HMI_1") && !error.Message.StartsWith("FAIL"),
+                "an unknown selector fails and lists the available HMI targets");
+        }
+
+        var two = new List<HmiTargetInfo>
+        {
+            Target("HMI_1", "HMI_RT_1", "HMI_RT_1"),
+            Target("PC-System_1", "HMI_RT_2", "HMI_RT_2")
+        };
+        try
+        {
+            SelectTarget(two, null);
+            throw new InvalidOperationException("FAIL: several HMIs without a selector must fail");
+        }
+        catch (InvalidOperationException error)
+        {
+            Check(error.Message.Contains("matched multiple") && error.Message.Contains("HMI_RT_1") && error.Message.Contains("HMI_RT_2"),
+                "several HMIs without a selector fail and list the candidates");
+        }
+        Check(SelectTarget(two, "PC-System_1").SoftwareName == "HMI_RT_2", "a device name picks one of several HMIs");
+        Throws<InvalidOperationException>(() => SelectTarget(new List<HmiTargetInfo>(), null),
+            "a project without an HMI fails");
+    }
+
+    private static void TestHmiRuntimeTools(ToolRegistry registry, FakeHmiToolOperations fake)
+    {
+        Check(registry.GetTools().Any(tool => tool.Name == "hmi_get_runtime_settings") &&
+            registry.GetTools().Any(tool => tool.Name == "hmi_set_start_screen"),
+            "runtime-settings tools are registered");
+
+        CallToolResult settings = registry.Execute("hmi_get_runtime_settings", Arguments("{\"target_name\":\"HMI_RT_1\"}"));
+        Check(!settings.IsError && fake.LastOperation == "get-runtime-settings" && fake.TargetName == "HMI_RT_1",
+            "runtime-settings read dispatches to the backend with its target");
+        Check(FirstText(settings).Contains("\"StartScreen\": \"Frame\""),
+            "runtime-settings read returns the backend's start screen");
+
+        CallToolResult set = registry.Execute("hmi_set_start_screen",
+            Arguments("{\"screen_name\":\"Frame\",\"target_name\":\"HMI_RT_1\",\"expected_current_start_screen\":\"Main\",\"on_conflict\":\"fail\"}"));
+        Check(!set.IsError && fake.LastOperation == "set-start-screen" && fake.ScreenName == "Frame" &&
+            fake.TargetName == "HMI_RT_1" && fake.ExpectedCurrentStartScreen == "Main" && fake.OnConflict == "fail",
+            "start-screen update forwards screen, target, expected current value, and conflict policy");
+
+        registry.Execute("hmi_set_start_screen", Arguments("{\"screen_name\":\"Frame\",\"expected_current_start_screen\":\"\",\"on_conflict\":\"fail\"}"));
+        Check(fake.ExpectedCurrentStartScreen == "", "an empty expected start screen is forwarded as empty, not dropped");
+
+        fake.NextStartScreenSuccess = false;
+        CallToolResult failed = registry.Execute("hmi_set_start_screen", Arguments("{\"screen_name\":\"Frame\",\"on_conflict\":\"fail\"}"));
+        fake.NextStartScreenSuccess = true;
+        Check(failed.IsError && FirstText(failed).Contains("validation_failed"),
+            "a failed start-screen update is reported as a tool error");
+
+        int callsBefore = fake.CallCount;
+        TextWriter originalError = Console.Error;
+        CallToolResult missingScreen;
+        CallToolResult missingConflict;
+        using (var expectedError = new StringWriter())
+        {
+            Console.SetError(expectedError);
+            try
+            {
+                missingScreen = registry.Execute("hmi_set_start_screen", Arguments("{\"on_conflict\":\"fail\"}"));
+                missingConflict = registry.Execute("hmi_set_start_screen", Arguments("{\"screen_name\":\"Frame\"}"));
+            }
+            finally
+            {
+                Console.SetError(originalError);
+            }
+        }
+        Check(missingScreen.IsError && missingConflict.IsError && fake.CallCount == callsBefore,
+            "start-screen update without screen_name or on_conflict fails before backend dispatch");
+
+        TiaManager manager = TiaManager.Instance;
+        Throws<ArgumentException>(() => manager.SetHmiStartScreen("Frame", null, null, "replace"),
+            "start-screen update rejects any conflict policy other than fail before project access");
+        Throws<ArgumentException>(() => manager.SetHmiStartScreen(" ", null, null, "fail"),
+            "start-screen update rejects a blank screen name before project access");
+    }
+
+    private static void TestStartScreenHelpers()
+    {
+        var names = new List<string> { "Frame", "Main", "Overview" };
+        Check((string)InvokeManagerHelperResult("ResolveExactScreenName", names, "Main") == "Main",
+            "an exact screen name resolves");
+        try
+        {
+            InvokeManagerHelperResult("ResolveExactScreenName", names, "main");
+            throw new InvalidOperationException("FAIL: a case-only match must fail");
+        }
+        catch (InvalidOperationException error)
+        {
+            Check(error.Message.Contains("case-sensitive") && error.Message.Contains("'Main'"),
+                "a case-only screen match fails and suggests the exact name");
+        }
+        try
+        {
+            InvokeManagerHelperResult("ResolveExactScreenName", names, "Missing");
+            throw new InvalidOperationException("FAIL: an unknown screen must fail");
+        }
+        catch (InvalidOperationException error)
+        {
+            Check(error.Message.Contains("not found") && error.Message.Contains("Overview"),
+                "an unknown screen fails and lists the available screens");
+        }
+        Throws<InvalidOperationException>(
+            () => InvokeManagerHelperResult("ResolveExactScreenName", new List<string> { "Main", "Main" }, "Main"),
+            "a screen name found twice is ambiguous");
+        Throws<ArgumentException>(
+            () => InvokeManagerHelperResult("ResolveExactScreenName", names, " "),
+            "a blank screen name is rejected");
+
+        InvokeManagerHelper("RequireExpectedStartScreen", "Main", null);
+        InvokeManagerHelper("RequireExpectedStartScreen", "Main", "Main");
+        InvokeManagerHelper("RequireExpectedStartScreen", "", "");
+        Throws<InvalidOperationException>(
+            () => InvokeManagerHelper("RequireExpectedStartScreen", "Main", "Frame"),
+            "a differing expected start screen fails");
+        Throws<InvalidOperationException>(
+            () => InvokeManagerHelper("RequireExpectedStartScreen", "Main", "main"),
+            "the expected start screen is compared case-sensitively");
+        _checks++;
+
+        var validation = new List<HmiRuntimeValidationEntry>
+        {
+            new HmiRuntimeValidationEntry { PropertyName = "StartScreen", Errors = new List<string> { "Screen does not exist." } },
+            new HmiRuntimeValidationEntry { PropertyName = "ScreenResolution", Errors = new List<string> { "Unrelated." } },
+            new HmiRuntimeValidationEntry { PropertyName = "StartScreen", Warnings = new List<string> { "Only a warning." } }
+        };
+        var blocking = (List<HmiRuntimeValidationEntry>)InvokeManagerHelperResult("GetStartScreenValidationErrors", validation);
+        Check(blocking.Count == 1 && blocking[0].Errors[0] == "Screen does not exist.",
+            "only start-screen validation errors block the update; other settings and warnings do not");
+    }
+
+    private static HmiTargetInfo Target(string device, string item, string software)
+    {
+        return new HmiTargetInfo { DeviceName = device, DeviceItemName = item, SoftwareName = software };
+    }
+
+    private static HmiTargetInfo SelectTarget(List<HmiTargetInfo> candidates, string selector)
+    {
+        return (HmiTargetInfo)InvokeManagerHelperResult("SelectHmiTarget", candidates, selector);
     }
 
     private static void TestItemPropertyConversion()
@@ -342,6 +537,8 @@ internal static class HmiToolBehaviorTests
         public JsonElement ExpressionEntries;
         public string ResultType = "";
         public string OnConflict = "";
+        public string ExpectedCurrentStartScreen;
+        public bool NextStartScreenSuccess = true;
 
         public object DeleteHmiDynamization(
             string screenName,
@@ -445,6 +642,48 @@ internal static class HmiToolBehaviorTests
             ExpressionEntries = entries.Clone();
             OnConflict = onConflict;
             return new { propertyName, entries = entries.Clone(), onConflict };
+        }
+
+        public CompilationReport CompileHmi(string targetName = null)
+        {
+            Record("compile", "", null, targetName);
+            return new CompilationReport
+            {
+                State = "Success",
+                Target = "HMI_RT_1",
+                DeviceName = "HMI_1",
+                CompiledObject = "Device 'HMI_1'"
+            };
+        }
+
+        public HmiRuntimeSettingsInfo GetHmiRuntimeSettings(string targetName = null)
+        {
+            Record("get-runtime-settings", "", null, targetName);
+            return new HmiRuntimeSettingsInfo
+            {
+                TargetSoftwareName = "HMI_RT_1",
+                StartScreen = "Frame",
+                StartScreenExists = true
+            };
+        }
+
+        public HmiStartScreenResult SetHmiStartScreen(
+            string screenName,
+            string targetName,
+            string expectedCurrentStartScreen,
+            string onConflict)
+        {
+            Record("set-start-screen", screenName, null, targetName);
+            ExpectedCurrentStartScreen = expectedCurrentStartScreen;
+            OnConflict = onConflict;
+            return new HmiStartScreenResult
+            {
+                Success = NextStartScreenSuccess,
+                Status = NextStartScreenSuccess ? "changed" : "validation_failed",
+                TargetSoftwareName = "HMI_RT_1",
+                OldStartScreen = "Main",
+                StartScreen = NextStartScreenSuccess ? screenName : "Main"
+            };
         }
 
         private void Record(string operation, string screenName, string itemName, string targetName)

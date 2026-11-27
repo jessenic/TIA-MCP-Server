@@ -1,0 +1,33 @@
+{
+  "name": "hmi_set_start_screen",
+  "description": "Set the WinCC Unified Runtime start screen in place to an existing screen (exact, case-sensitive name; screens in screen groups are found too). No screens or screen items are changed. The value is read back and the Runtime settings are validated; if validation reports a start-screen error the previous start screen is restored and the call fails. For a frame screen with a screen window, set the frame screen as the start screen.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "screen_name": {
+        "type": "string",
+        "description": "Exact name of the existing screen to start Runtime with."
+      },
+      "target_name": {
+        "type": "string",
+        "description": "Exact HMI device, device-item, or software name; required when multiple targets exist."
+      },
+      "expected_current_start_screen": {
+        "type": "string",
+        "description": "Optional guard: the start screen you expect is set now (exact name, \u0027\u0027 for none). If it differs, the call fails and nothing changes."
+      },
+      "on_conflict": {
+        "type": "string",
+        "description": "Required conflict behavior; only \u0027fail\u0027 is supported.",
+        "enum": [
+          "fail"
+        ]
+      }
+    },
+    "required": [
+      "screen_name",
+      "on_conflict"
+    ],
+    "additionalProperties": false
+  }
+}

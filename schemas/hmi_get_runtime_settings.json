@@ -1,0 +1,14 @@
+{
+  "name": "hmi_get_runtime_settings",
+  "description": "Read the WinCC Unified Runtime settings of an HMI: start screen (and whether that screen exists), screen resolution, auto log-off URL, central input hint/panning/zooming, bit-selection settings, language-compatible fonts, GMP and e-signature comment settings, plus the Runtime settings validation messages. Read-only.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "target_name": {
+        "type": "string",
+        "description": "Exact HMI device, device-item, or software name; required when multiple targets exist."
+      }
+    },
+    "additionalProperties": false
+  }
+}
