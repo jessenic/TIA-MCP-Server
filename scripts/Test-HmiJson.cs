@@ -519,8 +519,19 @@ class HmiJsonTests
             == "UpdateBitmaskInPlace", "Singlebit colour change is updated in place");
         object swapped = Invoke("PlanMappingTableUpdate", singlebit,
             Converter("Singlebit", Bitmask("SingleBit", 1, 1, "#E80000"), Bitmask("SingleBit", 0, 1, "#E2E5E8")));
-        Check(Get(swapped, "Mode").ToString() == "UpdateBitmaskInPlace" && Json(Get(swapped, "Pairing")) == "[1,0]",
-            "swapped Singlebit entries pair by state");
+        // The read-back compares entries by position, so a reordered table is refused instead of failing verification.
+        Check(Get(swapped, "Mode").ToString() == "RefuseEntryOrder" && ((string)Get(swapped, "Reason")).Contains("order"),
+            "swapped Singlebit entries are refused with an entry-order reason");
+        string orderRefusal = (string)Invoke("DescribeMappingTablePlanConflict", "Lamp_1", "BackColor", swapped, "replace");
+        Check(orderRefusal != null && orderRefusal.Contains("Lamp_1.BackColor") && orderRefusal.Contains("TIA's entry order"),
+            "entry-order refusal applies even with onConflict replace: " + orderRefusal);
+        Check(Invoke("DescribeMappingTablePlanConflict", "Lamp_1", "BackColor", plan, null) == null,
+            "in-place plan has no conflict");
+        object movedPlan = Invoke("PlanMappingTableUpdate", singlebit,
+            Converter("Singlebit", Bitmask("SingleBit", 0, 8, "#E2E5E8"), Bitmask("SingleBit", 8, 8, "#E80000")));
+        Check(Invoke("DescribeMappingTablePlanConflict", "Lamp_1", "BackColor", movedPlan, null) != null &&
+            Invoke("DescribeMappingTablePlanConflict", "Lamp_1", "BackColor", movedPlan, "Replace") == null,
+            "replace plan conflicts only without onConflict replace (dry run and apply share this check)");
         object moved = Invoke("PlanMappingTableUpdate", singlebit,
             Converter("Singlebit", Bitmask("SingleBit", 0, 8, "#E2E5E8"), Bitmask("SingleBit", 8, 8, "#E80000")));
         Check(Get(moved, "Mode").ToString() == "ReplaceDynamization" && ((string)Get(moved, "Reason")).Contains("relevant"),
@@ -620,6 +631,14 @@ class HmiJsonTests
         var description = (Dictionary<string, object>)Invoke("DescribePatchOperation", operation);
         Check((string)description["readOnly"] == "keep" && (string)description["expectTag"] == "Old",
             "dry-run description shows kept bind flags and expectTag");
+        object explicitPatch = Parse("HmiJsonPatch",
+            "{\"format\":\"tia-mcp-hmi-patch/1\",\"operations\":[{\"op\":\"bind\",\"screen\":\"Main\",\"item\":\"Lamp\"," +
+            "\"property\":\"BackColor\",\"tag\":\"New\",\"readOnly\":true,\"useIndirectAddressing\":false}]}");
+        var explicitDescription = (Dictionary<string, object>)Invoke("DescribePatchOperation",
+            ((IList)Get(explicitPatch, "Operations"))[0]);
+        Check(explicitDescription["readOnly"] is bool && (bool)explicitDescription["readOnly"] &&
+            explicitDescription["useIndirectAddressing"] is bool && !(bool)explicitDescription["useIndirectAddressing"],
+            "dry-run description gives explicit bind flags as JSON booleans");
     }
 
     static void Live(int pid, string target, bool libraryTests)
@@ -660,17 +679,27 @@ class HmiJsonTests
                     bitmaskTarget.Dynamizations.Find("BackColor"));
                 Check(Json(bitmaskDocument) == Json(bitmaskReadBack),
                     "live bitmask converter API create and read-back");
+                // Issue #6: applying the same Singlebit document again updates the existing table in place.
+                Invoke("ApplyDynamizations", hmi, bitmaskTarget, bitmaskDynamizations, true);
+                Check(Json(bitmaskDocument) == Json(Invoke("CreateDynamizationDocument",
+                    bitmaskTarget.Dynamizations.Find("BackColor"))) &&
+                    ((ExpressionDynamization)bitmaskTarget.Dynamizations.Find("BackColor")).ValueConverter
+                        .MappingTable.Entries.Count == 2,
+                    "live Singlebit re-apply updates the existing table in place");
                 var existingTag = hmi.Tags.FirstOrDefault();
                 if (existingTag != null)
                 {
                     var singlebitTarget = temporary.ScreenItems.Create<HmiButton>("__SinglebitTarget");
                     singlebitTarget.Dynamizations.Create<TagDynamization>("BackColor");
-                    manager.SetTagDynamization(name, singlebitTarget.Name, "BackColor", existingTag.Name,
-                        "Singlebit", new List<HmiRangeEntryInput>
-                        {
-                            new HmiRangeEntryInput { From = 0, To = 0, Value = "#E2E5E8" },
-                            new HmiRangeEntryInput { From = 1, To = 1, Value = "#E80000" }
-                        }, target);
+                    // The public method opens its own transaction; inside this rollback-only transaction the
+                    // body is called directly. Called twice: the second call must update the table in place.
+                    for (int pass = 0; pass < 2; pass++)
+                        InstanceInvoke(manager, "SetTagDynamizationInTransaction", name, singlebitTarget.Name,
+                            "BackColor", existingTag.Name, "Singlebit", new List<HmiRangeEntryInput>
+                            {
+                                new HmiRangeEntryInput { From = 0, To = 0, Value = "#E2E5E8" },
+                                new HmiRangeEntryInput { From = 1, To = 1, Value = "#E80000" }
+                            }, target);
                     var singlebitTable = ((TagDynamization)singlebitTarget.Dynamizations.Find("BackColor"))
                         .ValueConverter.MappingTable;
                     var singlebitEntries = singlebitTable.Entries.OfType<MappingTableEntryBitmask>().ToList();

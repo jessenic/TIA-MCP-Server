@@ -1,6 +1,6 @@
 {
   "name": "hmi_patch_json",
-  "description": "Validate or apply declarative Unified HMI JSON set/bind/delete operations with require and verify guards; changes are transactional, compiled, and never saved. bind only changes the tag of a tag dynamization and never the mapping table; omitted readOnly/useIndirectAddressing keep their current values; expectTag guards the current tag. require.screens[].items must exist before any change. Unknown fields are ignored and reported in warnings. Format: hmi-json skill or tia://docs/tools-reference.",
+  "description": "Validate or apply declarative Unified HMI JSON set/bind/delete operations with require and verify guards; changes are transactional, compiled, and never saved. bind only changes the tag of a tag dynamization and never the mapping table; omitted readOnly/useIndirectAddressing keep their current values; expectTag guards the current tag. require.screens[].items must exist before any change. Unknown fields are ignored and reported in warnings. Format: hmi-json skill, section Guarded patch workflow.",
   "parameters": {
     "type": "object",
     "properties": {

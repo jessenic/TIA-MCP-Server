@@ -592,7 +592,10 @@ namespace TiaOpennessMcp.Tia
             ValidateHmiRequirements(hmi, plan.Manifest.Require);
 
             if (dryRun)
+            {
+                CheckHmiImportMappingTables(hmi, plan);
                 return CreateImportResult(plan, hmi.Name, true, pruneItems, null, CheckHmiImportZOrder(hmi, plan, true));
+            }
 
             List<string> zOrderWarnings;
             using (ExclusiveAccess access = _tiaPortal!.ExclusiveAccess("Import Unified HMI JSON"))
@@ -2405,7 +2408,8 @@ namespace TiaOpennessMcp.Tia
         {
             RebuildEntries,
             UpdateBitmaskInPlace,
-            ReplaceDynamization
+            ReplaceDynamization,
+            RefuseEntryOrder
         }
 
         private sealed class MappingTableUpdatePlan
@@ -2456,6 +2460,20 @@ namespace TiaOpennessMcp.Tia
                     $"[{string.Join(", ", desired.Entries.Select(e => e.Relevant))}]); the relevant mask (bit) is " +
                     "read-only in Openness, so a recreated table only works when TIA generates the requested bit";
                 return replace;
+            }
+            if (pairing.Where((index, position) => index != position).Any())
+            {
+                // The read-back compares entries by position, so a reordered table can never verify. Only TIA's own
+                // entry order (as exported) is accepted for an in-place update.
+                return new MappingTableUpdatePlan
+                {
+                    Mode = MappingTableUpdateMode.RefuseEntryOrder,
+                    Pairing = pairing,
+                    Reason = "the bitmask entries are listed in a different order than in TIA (existing conditions " +
+                        $"[{string.Join(", ", existing.Entries.Select(e => ReadBitmaskCondition(e)))}], requested " +
+                        $"[{string.Join(", ", desired.Entries.Select(e => ReadBitmaskCondition(e)))}]); keep TIA's entry " +
+                        "order as exported by hmi_export_json"
+                };
             }
             return new MappingTableUpdatePlan { Mode = MappingTableUpdateMode.UpdateBitmaskInPlace, Pairing = pairing };
         }
@@ -2516,6 +2534,67 @@ namespace TiaOpennessMcp.Tia
                 "(the screen item is kept), or keep the exported mapping table.";
         }
 
+        private static string FormatMappingTableOrderRefusal(string itemName, string property, string reason)
+        {
+            return $"Refusing to update the mapping table of '{itemName}.{property}': {reason}. " +
+                "Bitmask entries cannot be reordered through Openness, and onConflict 'replace' does not change this.";
+        }
+
+        /// <summary>
+        /// Returns the refusal for a mapping table plan, or null when the plan may be applied with the given onConflict.
+        /// Shared by the apply path and the dry run so both report the same refusal.
+        /// </summary>
+        private static string? DescribeMappingTablePlanConflict(
+            string itemName, string property, MappingTableUpdatePlan plan, string? onConflict)
+        {
+            if (plan.Mode == MappingTableUpdateMode.RefuseEntryOrder)
+                return FormatMappingTableOrderRefusal(itemName, property, plan.Reason);
+            if (plan.Mode == MappingTableUpdateMode.ReplaceDynamization &&
+                !string.Equals(onConflict, "replace", StringComparison.OrdinalIgnoreCase))
+                return FormatMappingTableConflict(itemName, property, plan.Reason);
+            return null;
+        }
+
+        /// <summary>
+        /// Dry-run check: plans every existing Tag/Expression mapping table that the import would change (read-only)
+        /// and throws the same refusal the apply path would throw. A dynamization of another type that the import
+        /// replaces is skipped here; the apply path handles it.
+        /// </summary>
+        private static void CheckHmiImportMappingTables(HmiSoftware hmi, HmiJsonImportPlan plan)
+        {
+            var conflicts = new List<string>();
+            foreach (HmiJsonScreen screenDocument in plan.Screens)
+            {
+                HmiScreen? screen = FindHmiScreen(hmi, screenDocument.Name, screenDocument.Group);
+                if (screen == null) continue;
+                foreach (HmiJsonItem itemDocument in screenDocument.Items)
+                {
+                    if (itemDocument.Dynamizations == null) continue;
+                    HmiScreenItemBase? item = screen.ScreenItems.Find(itemDocument.Name);
+                    if (item == null) continue;
+                    foreach (HmiJsonDynamization document in itemDocument.Dynamizations)
+                    {
+                        if (document.ValueConverter == null ||
+                            (document.Type != "Tag" && document.Type != "Expression"))
+                            continue;
+                        DynamizationBase? existing = item.Dynamizations.Find(document.Property);
+                        ValueConverter? converter = document.Type == "Tag"
+                            ? (existing as TagDynamization)?.ValueConverter
+                            : (existing as ExpressionDynamization)?.ValueConverter;
+                        if (converter == null) continue;
+                        string? conflict = DescribeMappingTablePlanConflict(item.Name, document.Property,
+                            PlanExistingMappingTable(converter, document.ValueConverter), document.OnConflict);
+                        if (conflict != null)
+                            conflicts.Add($"Screen '{screenDocument.Name}': {conflict}");
+                    }
+                }
+            }
+            if (conflicts.Count > 0)
+                throw new InvalidOperationException(
+                    $"The import would be refused for {conflicts.Count} mapping table(s): " +
+                    string.Join(" ", conflicts.Take(20)) + (conflicts.Count > 20 ? " ..." : ""));
+        }
+
         private static void ApplyValueConverter(
             ValueConverter converter,
             HmiJsonValueConverter document,
@@ -2533,7 +2612,8 @@ namespace TiaOpennessMcp.Tia
                 UpdateBitmaskEntriesInPlace(table, document, plan.Pairing!);
                 return;
             }
-            if (plan?.Mode == MappingTableUpdateMode.ReplaceDynamization)
+            if (plan?.Mode == MappingTableUpdateMode.ReplaceDynamization ||
+                plan?.Mode == MappingTableUpdateMode.RefuseEntryOrder)
                 throw new InvalidOperationException("A mapping table that needs replacement cannot be updated in place.");
             if (table.Entries.OfType<MappingTableEntryBitmask>().Any())
                 throw new InvalidOperationException(
@@ -2704,11 +2784,12 @@ namespace TiaOpennessMcp.Tia
                 if (existingConverter != null && document.ValueConverter != null)
                 {
                     tablePlan = PlanExistingMappingTable(existingConverter, document.ValueConverter);
+                    string? tableConflict = DescribeMappingTablePlanConflict(
+                        item.Name, document.Property, tablePlan, document.OnConflict);
+                    if (tableConflict != null)
+                        throw new InvalidOperationException(tableConflict);
                     if (tablePlan.Mode == MappingTableUpdateMode.ReplaceDynamization)
                     {
-                        if (!string.Equals(document.OnConflict, "replace", StringComparison.OrdinalIgnoreCase))
-                            throw new InvalidOperationException(
-                                FormatMappingTableConflict(item.Name, document.Property, tablePlan.Reason));
                         // Only the dynamization is recreated; the screen item stays in place.
                         existing!.Delete();
                         existing = null;
@@ -3188,8 +3269,10 @@ namespace TiaOpennessMcp.Tia
             if (operation.Op == "bind")
             {
                 description["expectTag"] = operation.ExpectTag;
-                description["readOnly"] = operation.ReadOnly?.ToString().ToLowerInvariant() ?? "keep";
-                description["useIndirectAddressing"] = operation.UseIndirectAddressing?.ToString().ToLowerInvariant() ?? "keep";
+                // A given flag is reported as a JSON boolean; "keep" only when the patch omits it.
+                description["readOnly"] = operation.ReadOnly.HasValue ? (object)operation.ReadOnly.Value : "keep";
+                description["useIndirectAddressing"] = operation.UseIndirectAddressing.HasValue
+                    ? (object)operation.UseIndirectAddressing.Value : "keep";
                 description["onConflict"] = operation.OnConflict ?? "fail";
             }
             return description;

@@ -789,6 +789,32 @@ namespace TiaOpennessMcp.Tia
             List<HmiRangeEntryInput>? ranges = null,
             string? targetName = null)
         {
+            // All changes run in one transaction: a failure in a later step (entry creation, layout or final check)
+            // rolls back the tag assignment and any deleted Range entries instead of leaving the item half changed.
+            FindHmiSoftware(targetName); // fails with the usual message when no project or HMI is available
+            using (ExclusiveAccess access = _tiaPortal!.ExclusiveAccess("Set Unified HMI tag dynamization"))
+            using (Transaction transaction = access.Transaction(_project!, "Set Unified HMI tag dynamization"))
+            {
+                string result = SetTagDynamizationInTransaction(
+                    screenName, itemName, propertyName, tagName, conditionType, ranges, targetName);
+                transaction.CommitOnDispose();
+                return result;
+            }
+        }
+
+        /// <summary>
+        /// Body of hmi_set_tag_dynamization. The caller must hold an exclusive access and an open transaction
+        /// (the rollback-only live regression test calls this directly inside its own transaction).
+        /// </summary>
+        private string SetTagDynamizationInTransaction(
+            string screenName,
+            string itemName,
+            string propertyName,
+            string tagName,
+            string conditionType,
+            List<HmiRangeEntryInput>? ranges,
+            string? targetName)
+        {
             bool isRange = conditionType.Equals("Range", StringComparison.OrdinalIgnoreCase);
             bool isSingleBit = conditionType.Equals("Singlebit", StringComparison.OrdinalIgnoreCase);
             if (!isRange && !isSingleBit && !conditionType.Equals("None", StringComparison.OrdinalIgnoreCase))
