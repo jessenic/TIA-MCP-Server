@@ -1,1 +1,14 @@
-{"name":"tia_compile","description":"Compile PLC software to check syntax, consistency, and generate machine code. Returns errors, warnings, and messages.","parameters":{"additionalProperties":false,"properties":{"plc_name":{"description":"Name of the target PLC to compile (optional, defaults to first PLC).","type":"string"}},"type":"object"}}
+{
+  "name": "tia_compile",
+  "description": "Compile PLC software to check syntax, consistency, and generate machine code. Returns errors, warnings, and messages. TIA Portal compiles only changed blocks; Openness has no rebuild-all option. When no block needed compiling the result has UpToDate true and a Note, and warnings from an earlier compile are not repeated (see tia_get_compile_state).",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "plc_name": {
+        "type": "string",
+        "description": "Name of the target PLC to compile (optional, defaults to first PLC)."
+      }
+    },
+    "additionalProperties": false
+  }
+}

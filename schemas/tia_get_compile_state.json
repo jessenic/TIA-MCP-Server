@@ -1,0 +1,28 @@
+{
+  "name": "tia_get_compile_state",
+  "description": "List the compile state of PLC blocks and PLC data types without compiling (read-only): IsConsistent, IsKnowHowProtected, CompileDate, ModifiedDate, CodeModifiedDate and InterfaceModifiedDate per block, IsConsistent per type, and totals. IsConsistent is null when TIA does not report it. Openness cannot read the warnings TIA stored from an earlier compile.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "plc_name": {
+        "type": "string",
+        "description": "Exact PLC software name; required when the project has multiple PLCs."
+      },
+      "group_path": {
+        "type": "string",
+        "description": "Exact block-group path to list (with its subgroups); omit or use an empty string for all blocks. Types are always listed from the root."
+      },
+      "only_inconsistent": {
+        "type": "boolean",
+        "description": "List only blocks and types that are not consistent or whose state is unknown (default false). Totals always count everything.",
+        "default": false
+      },
+      "include_types": {
+        "type": "boolean",
+        "description": "Also list PLC data types (default true).",
+        "default": true
+      }
+    },
+    "additionalProperties": false
+  }
+}

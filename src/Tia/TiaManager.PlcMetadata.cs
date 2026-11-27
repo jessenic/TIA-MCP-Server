@@ -63,12 +63,16 @@ namespace TiaOpennessMcp.Tia
             var matches = FindMetadataBlocks(plc.BlockGroup, blockName, groupPath);
             var location = RequireUniqueMetadataTarget(matches, $"block '{blockName}'", groupPath);
 
+            var attributes = ReadKnownAttributes(location.Block, "IsConsistent", "IsKnowHowProtected");
+            if (location.Block is OB ob)
+                attributes.AddRange(ReadObAttributes(ob));
+
             return new PlcKnownAttributesResult
             {
                 PlcName = plc.Name,
                 ObjectName = location.Block.Name,
                 GroupPath = location.GroupPath,
-                Attributes = ReadKnownAttributes(location.Block, "IsConsistent", "IsKnowHowProtected")
+                Attributes = attributes
             };
         }
 
@@ -305,6 +309,10 @@ namespace TiaOpennessMcp.Tia
         public string Name { get; set; } = "";
         public string Status { get; set; } = "";
         public object? Value { get; set; }
+        [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+        public string? Unit { get; set; }
+        [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+        public double? ValueMs { get; set; }
     }
 
     public class PlcKnownAttributesResult

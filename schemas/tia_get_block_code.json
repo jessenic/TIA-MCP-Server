@@ -1,1 +1,41 @@
-{"name":"tia_get_block_code","description":"Export and read the SimaticML XML and SCL source code for a specified PLC block.","parameters":{"additionalProperties":false,"properties":{"block_name":{"description":"Name of the block to export (e.g. 'Main', 'PumpControl', 'DB_Config').","type":"string"},"plc_name":{"description":"Name of the target PLC (optional, defaults to first PLC).","type":"string"}},"required":["block_name"],"type":"object"}}
+{
+  "name": "tia_get_block_code",
+  "description": "Read the code of a PLC block. By default (format \u0027auto\u0027) SCL, STL and DB blocks return the source text TIA Portal generates (Source, file extension .scl/.awl/.db) without SimaticML; other languages (LAD, FBD, GRAPH) and blocks whose source cannot be generated return SimaticML in XmlContent, with the reason in Warnings. format \u0027xml\u0027 always returns SimaticML; format \u0027source\u0027 fails instead of falling back. Source generation can fail while TIA Portal is online with the PLC. When no block has the name, a PLC data type (UDT) of that name is used (BlockType \u0027PlcType\u0027, ProgrammingLanguage \u0027UDT\u0027, source extension .udt). The source of a single SCL block (without dependencies) can be edited and passed to tia_import_scl_block. ExtractedScl is a deprecated copy of Source for SCL blocks. With include_xml, a failing SimaticML export is reported in Warnings instead of failing the call.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "block_name": {
+        "type": "string",
+        "description": "Name of the block, or of a PLC data type (UDT), to export (e.g. \u0027Main\u0027, \u0027PumpControl\u0027, \u0027DB_Config\u0027, \u0027UDT_Motor\u0027)."
+      },
+      "plc_name": {
+        "type": "string",
+        "description": "Name of the target PLC (optional, defaults to first PLC)."
+      },
+      "format": {
+        "type": "string",
+        "description": "\u0027auto\u0027 (default): generated source for SCL/STL/DB blocks and PLC data types, SimaticML otherwise or when generation fails. \u0027source\u0027: generated source only, fails if not possible. \u0027xml\u0027: SimaticML only.",
+        "enum": [
+          "auto",
+          "source",
+          "xml"
+        ],
+        "default": "auto"
+      },
+      "include_xml": {
+        "type": "boolean",
+        "description": "Also return the SimaticML in XmlContent when source text is returned (default false; the XML is often 80-100 kB).",
+        "default": false
+      },
+      "with_dependencies": {
+        "type": "boolean",
+        "description": "Generate the source together with the blocks and types it depends on (default false). Such output holds several blocks and cannot be passed to tia_import_scl_block.",
+        "default": false
+      }
+    },
+    "required": [
+      "block_name"
+    ],
+    "additionalProperties": false
+  }
+}

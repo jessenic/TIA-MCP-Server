@@ -1,6 +1,6 @@
 {
   "name": "tia_import_block",
-  "description": "Import or update a PLC block from SimaticML XML, given inline (xml_content) or as a server-local .xml file (file_path, preferred for large blocks).",
+  "description": "Import or update a PLC block from SimaticML XML, given inline (xml_content) or as a server-local .xml file (file_path, preferred for large blocks). OB attributes CyclicTime and PhaseOffset in SimaticML are microseconds (100 ms = \u003CCyclicTime\u003E100000\u003C/CyclicTime\u003E); there is no \u0027PhaseShift\u0027 attribute. The XML is imported unchanged; suspicious OB settings are listed as warnings after the result text, and the cycle settings TIA stored for imported cyclic interrupt OBs are read back.",
   "parameters": {
     "type": "object",
     "properties": {
