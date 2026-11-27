@@ -1,0 +1,52 @@
+{
+  "name": "tia_set_block_attribute",
+  "description": "Set one allow-listed attribute of an OB in place (PlcBlock.SetAttribute; the block is not deleted or re-imported): CyclicTime (cyclic interrupt interval) and PhaseOffset of a cyclic interrupt OB, or PriorityNumber. Time values need an explicit unit \u0027ms\u0027 or \u0027us\u0027; Openness and SimaticML store microseconds (100 ms = 100000 us). expected_current_value (same unit) makes the call fail with \u0027conflict\u0027 when the current value differs. The new value is read back; the project is not compiled or saved. F-CPU safety OBs are not supported.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "block_name": {
+        "type": "string",
+        "description": "Exact OB name, e.g. \u0027Cyclic interrupt\u0027."
+      },
+      "attribute_name": {
+        "type": "string",
+        "description": "Attribute to set. CyclicTime and PhaseOffset only on cyclic interrupt OBs (SecondaryType CyclicInterrupt).",
+        "enum": [
+          "CyclicTime",
+          "PhaseOffset",
+          "PriorityNumber"
+        ]
+      },
+      "value": {
+        "type": "integer",
+        "description": "New value as an integer, in \u0027unit\u0027 for CyclicTime and PhaseOffset. CyclicTime 1..60000 ms, PhaseOffset smaller than CyclicTime."
+      },
+      "unit": {
+        "type": "string",
+        "description": "Unit of value and expected_current_value: required for CyclicTime and PhaseOffset, must be omitted for PriorityNumber.",
+        "enum": [
+          "ms",
+          "us"
+        ]
+      },
+      "expected_current_value": {
+        "type": "integer",
+        "description": "Optional guard: the value you expect the attribute to have now, in the same unit."
+      },
+      "plc_name": {
+        "type": "string",
+        "description": "Exact PLC software name; required when the project has multiple PLCs."
+      },
+      "group_path": {
+        "type": "string",
+        "description": "Exact block-group path, required when the block name is duplicated. Use an empty string for the root group."
+      }
+    },
+    "required": [
+      "block_name",
+      "attribute_name",
+      "value"
+    ],
+    "additionalProperties": false
+  }
+}

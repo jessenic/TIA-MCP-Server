@@ -198,7 +198,9 @@ namespace TiaOpennessMcp.Tools
                 });
 
             // 12. tia_get_block_code
-            Register("tia_get_block_code", "Export and read the SimaticML XML and SCL source code for a specified PLC block.",
+            Register("tia_get_block_code", "Read the code of a PLC block. By default (format 'auto') SCL, STL and DB blocks return the source text TIA Portal generates (Source, file extension .scl/.awl/.db) without SimaticML; other languages (LAD, FBD, GRAPH) and blocks whose source cannot be generated return SimaticML in XmlContent, with the reason in Warnings. " +
+                "format 'xml' always returns SimaticML; format 'source' fails instead of falling back. Source generation needs the PLC offline in TIA Portal. " +
+                "The source of a single SCL block (without dependencies) can be edited and passed to tia_import_scl_block. ExtractedScl is a deprecated copy of Source for SCL blocks.",
                 schema =>
                 {
                     schema.Properties["block_name"] = new ToolProperty
@@ -211,17 +213,43 @@ namespace TiaOpennessMcp.Tools
                         Type = "string",
                         Description = "Name of the target PLC (optional, defaults to first PLC)."
                     };
+                    schema.Properties["format"] = new ToolProperty
+                    {
+                        Type = "string",
+                        Description = "'auto' (default): generated source for SCL/STL/DB blocks, SimaticML otherwise or when generation fails. 'source': generated source only, fails if not possible. 'xml': SimaticML only.",
+                        Enum = new List<string> { "auto", "source", "xml" },
+                        Default = "auto"
+                    };
+                    schema.Properties["include_xml"] = new ToolProperty
+                    {
+                        Type = "boolean",
+                        Description = "Also return the SimaticML in XmlContent when source text is returned (default false; the XML is often 80-100 kB).",
+                        Default = false
+                    };
+                    schema.Properties["with_dependencies"] = new ToolProperty
+                    {
+                        Type = "boolean",
+                        Description = "Generate the source together with the blocks and types it depends on (default false). Such output holds several blocks and cannot be passed to tia_import_scl_block.",
+                        Default = false
+                    };
                     schema.Required = new List<string> { "block_name" };
                 },
                 args =>
                 {
                     string block = GetStringProp(args, "block_name") ?? throw new ArgumentException("block_name is required.");
                     string? plc = GetStringProp(args, "plc_name");
-                    return CallToolResult.Json(TiaManager.Instance.GetBlockCode(plc, block));
+                    return CallToolResult.Json(TiaManager.Instance.GetBlockCode(
+                        plc,
+                        block,
+                        GetStringProp(args, "format"),
+                        GetBoolProp(args, "include_xml", false),
+                        GetBoolProp(args, "with_dependencies", false)));
                 });
 
             // 13. tia_import_block
-            Register("tia_import_block", "Import or update a PLC block from SimaticML XML.",
+            Register("tia_import_block", "Import or update a PLC block from SimaticML XML. " +
+                "OB attributes CyclicTime and PhaseOffset in SimaticML are microseconds (100 ms = <CyclicTime>100000</CyclicTime>); there is no 'PhaseShift' attribute. " +
+                "The XML is imported unchanged; suspicious OB settings are listed as warnings after the result text, and the cycle settings TIA stored for imported cyclic interrupt OBs are read back.",
                 schema =>
                 {
                     schema.Properties["xml_content"] = new ToolProperty
@@ -434,7 +462,8 @@ namespace TiaOpennessMcp.Tools
                 });
 
             // 20. tia_compile
-            Register("tia_compile", "Compile PLC software to check syntax, consistency, and generate machine code. Returns errors, warnings, and messages.",
+            Register("tia_compile", "Compile PLC software to check syntax, consistency, and generate machine code. Returns errors, warnings, and messages. " +
+                "TIA Portal compiles only changed blocks; Openness has no rebuild-all option. When no block needed compiling the result has UpToDate true and a Note, and warnings from an earlier compile are not repeated (see tia_get_compile_state).",
                 schema =>
                 {
                     schema.Properties["plc_name"] = new ToolProperty
@@ -1885,7 +1914,8 @@ namespace TiaOpennessMcp.Tools
                         GetStringProp(args, "plc_name"), blockName, GetStringProp(args, "group_path")));
                 });
 
-            Register("tia_get_block_attributes", "Read the verified PLC block attributes IsConsistent and IsKnowHowProtected for one exact block.",
+            Register("tia_get_block_attributes", "Read the verified PLC block attributes IsConsistent and IsKnowHowProtected for one exact block. " +
+                "For an OB also SecondaryType, CyclicTime and PhaseOffset (microseconds, with Unit 'us' and ValueMs), PriorityNumber and the read-only CyclicApplicationCycleTime; an attribute the OB does not have is reported with Status 'not_supported'.",
                 schema =>
                 {
                     schema.Properties["block_name"] = new ToolProperty { Type = "string", Description = "Exact PLC block name." };
@@ -2380,6 +2410,7 @@ namespace TiaOpennessMcp.Tools
             RegisterPlcOnlineTools();
             RegisterHardwareTools();
             RegisterBackupTools();
+            RegisterPlcMetaTools();
         }
 
         // Read-only online access to a real S7-1200/S7-1500 over S7CommPlus with TLS (TIA V17+ projects).

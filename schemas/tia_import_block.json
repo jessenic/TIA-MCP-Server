@@ -1,1 +1,30 @@
-{"name":"tia_import_block","description":"Import or update a PLC block from SimaticML XML.","parameters":{"additionalProperties":false,"properties":{"folder":{"description":"Target group folder path for the block (optional).","type":"string"},"overwrite":{"default":true,"description":"Whether to overwrite existing block if it exists (default true).","type":"boolean"},"plc_name":{"description":"Name of the target PLC (optional, defaults to first PLC).","type":"string"},"xml_content":{"description":"The SimaticML XML string containing the block definition.","type":"string"}},"required":["xml_content"],"type":"object"}}
+{
+  "name": "tia_import_block",
+  "description": "Import or update a PLC block from SimaticML XML. OB attributes CyclicTime and PhaseOffset in SimaticML are microseconds (100 ms = \u003CCyclicTime\u003E100000\u003C/CyclicTime\u003E); there is no \u0027PhaseShift\u0027 attribute. The XML is imported unchanged; suspicious OB settings are listed as warnings after the result text, and the cycle settings TIA stored for imported cyclic interrupt OBs are read back.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "xml_content": {
+        "type": "string",
+        "description": "The SimaticML XML string containing the block definition."
+      },
+      "plc_name": {
+        "type": "string",
+        "description": "Name of the target PLC (optional, defaults to first PLC)."
+      },
+      "overwrite": {
+        "type": "boolean",
+        "description": "Whether to overwrite existing block if it exists (default true).",
+        "default": true
+      },
+      "folder": {
+        "type": "string",
+        "description": "Target group folder path for the block (optional)."
+      }
+    },
+    "required": [
+      "xml_content"
+    ],
+    "additionalProperties": false
+  }
+}

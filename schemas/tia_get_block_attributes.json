@@ -1,9 +1,8 @@
 {
   "name": "tia_get_block_attributes",
-  "description": "Read the verified PLC block attributes IsConsistent and IsKnowHowProtected for one exact block.",
+  "description": "Read the verified PLC block attributes IsConsistent and IsKnowHowProtected for one exact block. For an OB also SecondaryType, CyclicTime and PhaseOffset (microseconds, with Unit \u0027us\u0027 and ValueMs), PriorityNumber and the read-only CyclicApplicationCycleTime; an attribute the OB does not have is reported with Status \u0027not_supported\u0027.",
   "parameters": {
     "type": "object",
-    "additionalProperties": false,
     "properties": {
       "block_name": {
         "type": "string",
@@ -20,6 +19,7 @@
     },
     "required": [
       "block_name"
-    ]
+    ],
+    "additionalProperties": false
   }
 }

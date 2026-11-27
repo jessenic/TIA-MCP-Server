@@ -272,6 +272,59 @@ try {
         }
     }
 
+    # PLC metadata tools: OB attribute setter, compile state, block code format, compile note.
+    $plcMetaContracts = @{
+        tia_set_block_attribute = @('block_name', 'attribute_name', 'value')
+        tia_get_compile_state = @()
+        tia_get_block_code = @('block_name')
+        tia_get_block_attributes = @('block_name')
+        tia_import_block = @('xml_content')
+        tia_compile = @()
+    }
+    foreach ($toolName in $plcMetaContracts.Keys) {
+        $schema = Get-Content -LiteralPath (Join-Path $outputDirectory "$toolName.json") -Raw | ConvertFrom-Json
+        foreach ($parameter in $plcMetaContracts[$toolName]) {
+            if ($parameter -notin $schema.parameters.required) {
+                throw "$toolName must require '$parameter'."
+            }
+        }
+        if ($schema.parameters.additionalProperties -ne $false) {
+            throw "$toolName must reject undeclared parameters."
+        }
+        $checked = Get-Content -LiteralPath (Join-Path $PSScriptRoot "..\schemas\$toolName.json") -Raw | ConvertFrom-Json
+        if ($checked.description -ne $schema.description) {
+            throw "Checked-in $toolName description differs from its registered schema."
+        }
+        $exportedProperties = @($schema.parameters.properties.PSObject.Properties)
+        if ($exportedProperties.Count -ne @($checked.parameters.properties.PSObject.Properties).Count) {
+            throw "Checked-in $toolName parameter count differs from its registered schema."
+        }
+        foreach ($property in $exportedProperties) {
+            $checkedProperty = $checked.parameters.properties.($property.Name)
+            if ($null -eq $checkedProperty -or
+                $checkedProperty.type -ne $property.Value.type -or
+                $checkedProperty.description -ne $property.Value.description -or
+                $checkedProperty.default -ne $property.Value.default -or
+                (@($checkedProperty.enum) -join ',') -ne (@($property.Value.enum) -join ',')) {
+                throw "Checked-in $toolName.$($property.Name) differs from its registered schema."
+            }
+        }
+    }
+    $setterSchema = Get-Content -LiteralPath (Join-Path $outputDirectory 'tia_set_block_attribute.json') -Raw | ConvertFrom-Json
+    if ((@($setterSchema.parameters.properties.attribute_name.enum) -join ',') -ne 'CyclicTime,PhaseOffset,PriorityNumber' -or
+        (@($setterSchema.parameters.properties.unit.enum) -join ',') -ne 'ms,us' -or
+        $setterSchema.parameters.properties.value.type -ne 'integer' -or
+        $setterSchema.parameters.properties.expected_current_value.type -ne 'integer') {
+        throw 'tia_set_block_attribute must expose the OB attribute allow-list, ms/us units and integer values.'
+    }
+    $blockCodeSchema = Get-Content -LiteralPath (Join-Path $outputDirectory 'tia_get_block_code.json') -Raw | ConvertFrom-Json
+    if ((@($blockCodeSchema.parameters.properties.format.enum) -join ',') -ne 'auto,source,xml' -or
+        $blockCodeSchema.parameters.properties.format.default -ne 'auto' -or
+        $blockCodeSchema.parameters.properties.include_xml.default -ne $false -or
+        $blockCodeSchema.parameters.properties.with_dependencies.default -ne $false) {
+        throw 'tia_get_block_code must default to format auto without XML.'
+    }
+
     Write-Output "PASS: $($files.Count) tool schemas; $arrayCount typed array parameters; checked-in schemas match."
 }
 finally {
