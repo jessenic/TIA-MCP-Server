@@ -46,7 +46,7 @@ try {
         foreach ($property in $exported.parameters.properties.PSObject.Properties) {
             if ($property.Value.type -ne 'array') { continue }
             $arrayCount++
-            $expectedType = if ($property.Name -in @('ranges', 'entries')) { 'object' } else { 'string' }
+            $expectedType = if ($property.Name -in @('ranges', 'entries', 'parameters')) { 'object' } else { 'string' }
             if ($property.Value.items.type -ne $expectedType) {
                 throw "$($exported.name).$($property.Name) must have $expectedType items."
             }

@@ -2514,6 +2514,7 @@ namespace TiaOpennessMcp.Tools
             RegisterHmiRuntimeTools();
             RegisterPlcBlockTools();
             RegisterPlcMetaTools();
+            RegisterTechnologyObjectTools();
         }
 
         // Read-only online access to a real S7-1200/S7-1500 over S7CommPlus with TLS (TIA V17+ projects).

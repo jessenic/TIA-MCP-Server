@@ -1,0 +1,31 @@
+{
+  "name": "tia_create_technology_object",
+  "description": "Create a technology object in the PLC\u0027s \u0027Technology objects\u0027 folder (TechnologicalObjects.Create). type is the Openness system-library name: PID_Temp, PID_Compact, PID_3Step (TO_PID_Temp, TO_PID_Compact and TO_PID_3Step are mapped to these); other names are passed to TIA unchanged and TIA rejects unsupported ones. version is required, there is no automatic latest: S7-1200 (FW \u003E= 4.2) supports PID_Temp 1.1, PID_Compact 2.3 or later and PID_3Step 2.3; check the TIA documentation for other CPUs. Fails without changing anything if any technology object or block already has the name (case-insensitive); never overwrites or deletes. A PID instance DB created from an SCL call is a plain instance DB, not a technology object: rename or delete it first or pick another name. Creating the object does not call it: call it from a cyclic interrupt OB with the object\u0027s name as instance, e.g. \u0022PID_Temp_1\u0022(Setpoint := ..., Input := ...); hardware inputs and outputs are wired through those call parameters. Motion and counting objects are created without any hardware interconnection.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "type": {
+        "type": "string",
+        "description": "System-library name of the technology object, e.g. \u0027PID_Temp\u0027, \u0027PID_Compact\u0027 or \u0027PID_3Step\u0027."
+      },
+      "name": {
+        "type": "string",
+        "description": "Name for the new technology object, e.g. \u0027PID_Temp_1\u0027."
+      },
+      "version": {
+        "type": "string",
+        "description": "Technology-object version as major.minor, e.g. \u00271.1\u0027 or \u0027V1.1\u0027 for PID_Temp on S7-1200."
+      },
+      "plc_name": {
+        "type": "string",
+        "description": "Exact PLC software name (case-sensitive); required when the project has multiple PLCs."
+      }
+    },
+    "required": [
+      "type",
+      "name",
+      "version"
+    ],
+    "additionalProperties": false
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "name": "tia_get_technology_object_parameters",
+  "description": "Read the parameters of one technology object by their \u0027Name in Openness\u0027 (TechnologicalInstanceDB.Parameters), with each current value as invariant text and its CLR type. Use this before tia_set_technology_object_parameters to learn the exact names and types, which differ per object type and version (e.g. PID_Temp V1.1 on S7-1200 has no Config.ActivateHeating; that exists from V2.0).",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Exact technology-object name (case-sensitive), e.g. \u0027PID_Temp_1\u0027."
+      },
+      "filter": {
+        "type": "string",
+        "description": "Optional case-sensitive name prefix, e.g. \u0027Config.\u0027 or \u0027Retain.CtrlParams.\u0027."
+      },
+      "plc_name": {
+        "type": "string",
+        "description": "Exact PLC software name (case-sensitive); required when the project has multiple PLCs."
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "additionalProperties": false
+  }
+}

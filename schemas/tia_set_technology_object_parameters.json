@@ -1,0 +1,45 @@
+{
+  "name": "tia_set_technology_object_parameters",
+  "description": "Write existing parameters of one technology object in place by their \u0027Name in Openness\u0027, e.g. Config.InputPerOn or Config.ActivateCooling for PID_Temp. Every value is a string that is converted to the CLR type of the parameter\u0027s current value (Boolean true/false, integers and floating point in invariant culture). All names and values are validated before anything is written; then they are written in order and each is verified by read-back. Not transactional: if a later write fails, earlier writes stay and the result has Partial=true. Read the names first with tia_get_technology_object_parameters.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Exact technology-object name (case-sensitive), e.g. \u0027PID_Temp_1\u0027."
+      },
+      "parameters": {
+        "type": "array",
+        "description": "Non-empty list of parameters to write, in order; each name at most once.",
+        "items": {
+          "type": "object",
+          "description": "",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Exact parameter \u0027Name in Openness\u0027, e.g. \u0027Config.InputPerOn\u0027."
+            },
+            "value": {
+              "type": "string",
+              "description": "New value as an invariant-culture JSON string, e.g. true, 5 or 0.5 sent as a string."
+            }
+          },
+          "required": [
+            "name",
+            "value"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "plc_name": {
+        "type": "string",
+        "description": "Exact PLC software name (case-sensitive); required when the project has multiple PLCs."
+      }
+    },
+    "required": [
+      "name",
+      "parameters"
+    ],
+    "additionalProperties": false
+  }
+}
