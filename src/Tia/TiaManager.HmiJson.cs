@@ -96,6 +96,7 @@ namespace TiaOpennessMcp.Tia
                 }
             }
             warnings.AddRange(FindDynamizedItemPropertyWarnings(item, updates));
+            warnings.AddRange(FindTextReplacementWarnings(item, updates));
             IReadOnlyList<string> languages = GetHmiLanguages(hmi);
 
             using (ExclusiveAccess access = _tiaPortal!.ExclusiveAccess("Update Unified HMI screen item properties"))
@@ -1960,7 +1961,9 @@ namespace TiaOpennessMcp.Tia
         {
             if (TryExtractPlainText(text, out _))
                 return text;
-            return WrapPlainTextAsHtml(text);
+            // Escape only: hmi_export_json writes the paragraph text back as a plain string, so a text that
+            // literally contains "&#196;" must survive an export/import round trip unchanged (no reference decoding).
+            return WrapEscapedParagraph(text);
         }
 
         private static string ParseTextContent(JsonElement value)
@@ -2524,7 +2527,9 @@ namespace TiaOpennessMcp.Tia
                     actual.RaisedStateTagBitNumber != expected.RaisedStateTagBitNumber ||
                     actual.AcknowledgmentControlTag != expected.AcknowledgmentControlTag ||
                     !string.Equals(actual.TriggerMode.ToString(), expected.TriggerMode, StringComparison.OrdinalIgnoreCase) ||
-                    !AreNullableJsonValuesEqual(SerializeMultilingualText(actual.EventText, plan.Manifest.Languages), expected.EventText))
+                    !AreNullableJsonValuesEqual(
+                        SerializeMultilingualText(actual.EventText, plan.Manifest.Languages),
+                        NormalizeExpectedNullableText(expected.EventText)))
                     throw new InvalidOperationException($"Discrete alarm '{expected.Name}' failed read-back verification.");
             }
         }

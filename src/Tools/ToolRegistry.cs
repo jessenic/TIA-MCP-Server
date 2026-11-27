@@ -585,7 +585,7 @@ namespace TiaOpennessMcp.Tools
                     schema.Properties["item_properties"] = new ToolProperty
                     {
                         Type = "object",
-                        Description = "Non-empty object of supported property/value pairs; names are case-insensitive. Allowed: Visible, Enabled, Left, Top, Width, Height, CenterX, CenterY, Radius, BackColor, ForeColor, BorderColor, BorderWidth, OutputFormat, HorizontalTextAlignment, VerticalTextAlignment, Screen, Text, Font {Size, Weight, Italic, Underline, StrikeOut, Name, Bold} and dotted Font.<property> paths (for example \"Font.Size\": 14). Each property may be given only once. A property the item type does not have fails before any change.",
+                        Description = "Non-empty object of supported property/value pairs; use the property names exactly as listed. Allowed: Visible, Enabled, Left, Top, Width, Height, CenterX, CenterY, Radius, BackColor, ForeColor, BorderColor, BorderWidth, OutputFormat, HorizontalTextAlignment, VerticalTextAlignment, Screen, Text, Font {Size, Weight, Italic, Underline, StrikeOut, Name, Bold} and dotted Font.<property> paths (for example \"Font.Size\": 14). Each property may be given only once. A property the item type does not have fails before any change.",
                         Properties = new Dictionary<string, ToolProperty>
                         {
                             ["Visible"] = new ToolProperty { Type = "boolean", Description = "Whether the item is visible." },
@@ -610,8 +610,8 @@ namespace TiaOpennessMcp.Tools
                                 Type = null,
                                 AnyOf = new List<ToolProperty>
                                 {
-                                    new ToolProperty { Type = "string", Description = "Plain Unicode text (ä, ö, å, °) for every active language; do not use HTML entities. Only the paragraph text is replaced; the existing <body>/<p> attributes such as style are kept." },
-                                    new ToolProperty { Type = "object", Description = "{\"html\": \"<body><p>...</p></body>\"} raw markup for every language, or a language map such as {\"en-US\": \"Start\", \"fi-FI\": \"Käynnistä\"} that covers every active language (values are plain text or {\"html\": ...})." }
+                                    new ToolProperty { Type = "string", Description = "Plain Unicode text (ä, ö, å, °) for every active language; do not use HTML entities. The whole text becomes one paragraph that keeps the existing <body> and first <p> attributes such as style; further paragraphs and inline formatting are dropped (reported under 'warnings'). A string that starts with <body is taken as raw markup and must be well-formed." },
+                                    new ToolProperty { Type = "object", Description = "{\"html\": \"<body><p>...</p></body>\"} raw markup for every language (recommended for markup), or a language map such as {\"en-US\": \"Start\", \"fi-FI\": \"Käynnistä\"} that covers every active language (values are plain text or {\"html\": ...})." }
                                 },
                                 Description = "Item text (buttons, texts, text boxes): a plain string or an object, see the alternatives."
                             },

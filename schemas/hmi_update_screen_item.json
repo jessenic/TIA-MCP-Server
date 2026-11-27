@@ -14,7 +14,7 @@
       },
       "item_properties": {
         "type": "object",
-        "description": "Non-empty object of supported property/value pairs; names are case-insensitive. Allowed: Visible, Enabled, Left, Top, Width, Height, CenterX, CenterY, Radius, BackColor, ForeColor, BorderColor, BorderWidth, OutputFormat, HorizontalTextAlignment, VerticalTextAlignment, Screen, Text, Font {Size, Weight, Italic, Underline, StrikeOut, Name, Bold} and dotted Font.\u003Cproperty\u003E paths (for example \u0022Font.Size\u0022: 14). Each property may be given only once. A property the item type does not have fails before any change.",
+        "description": "Non-empty object of supported property/value pairs; use the property names exactly as listed. Allowed: Visible, Enabled, Left, Top, Width, Height, CenterX, CenterY, Radius, BackColor, ForeColor, BorderColor, BorderWidth, OutputFormat, HorizontalTextAlignment, VerticalTextAlignment, Screen, Text, Font {Size, Weight, Italic, Underline, StrikeOut, Name, Bold} and dotted Font.\u003Cproperty\u003E paths (for example \u0022Font.Size\u0022: 14). Each property may be given only once. A property the item type does not have fails before any change.",
         "properties": {
           "Visible": {
             "type": "boolean",
@@ -100,11 +100,11 @@
             "anyOf": [
               {
                 "type": "string",
-                "description": "Plain Unicode text (\u00E4, \u00F6, \u00E5, \u00B0) for every active language; do not use HTML entities. Only the paragraph text is replaced; the existing \u003Cbody\u003E/\u003Cp\u003E attributes such as style are kept."
+                "description": "Plain Unicode text (\u00E4, \u00F6, \u00E5, \u00B0) for every active language; do not use HTML entities. The whole text becomes one paragraph that keeps the existing \u003Cbody\u003E and first \u003Cp\u003E attributes such as style; further paragraphs and inline formatting are dropped (reported under \u0027warnings\u0027). A string that starts with \u003Cbody is taken as raw markup and must be well-formed."
               },
               {
                 "type": "object",
-                "description": "{\u0022html\u0022: \u0022\u003Cbody\u003E\u003Cp\u003E...\u003C/p\u003E\u003C/body\u003E\u0022} raw markup for every language, or a language map such as {\u0022en-US\u0022: \u0022Start\u0022, \u0022fi-FI\u0022: \u0022K\u00E4ynnist\u00E4\u0022} that covers every active language (values are plain text or {\u0022html\u0022: ...})."
+                "description": "{\u0022html\u0022: \u0022\u003Cbody\u003E\u003Cp\u003E...\u003C/p\u003E\u003C/body\u003E\u0022} raw markup for every language (recommended for markup), or a language map such as {\u0022en-US\u0022: \u0022Start\u0022, \u0022fi-FI\u0022: \u0022K\u00E4ynnist\u00E4\u0022} that covers every active language (values are plain text or {\u0022html\u0022: ...})."
               }
             ],
             "description": "Item text (buttons, texts, text boxes): a plain string or an object, see the alternatives."

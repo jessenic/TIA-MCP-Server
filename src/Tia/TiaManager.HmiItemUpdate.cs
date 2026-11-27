@@ -132,7 +132,10 @@ namespace TiaOpennessMcp.Tia
                         string.Join(", ", HmiItemPropertyUpdateNames.OrderBy(n => n, StringComparer.Ordinal)) +
                         ", Font (" + string.Join(", ", HmiItemFontPropertyUpdateNames) + ") and dotted Font.<property> paths.");
                 if (canonicalName == HmiItemTextPropertyName)
+                {
                     ValidateMultilingualText(update.Value, HmiItemTextPropertyName);
+                    ValidateItemTextMarkupStrings(update.Value, HmiItemTextPropertyName);
+                }
                 Add(canonicalName, update.Value, name);
             }
 
@@ -302,7 +305,78 @@ namespace TiaOpennessMcp.Tia
             // existing paragraph style is still kept.
             if (TryExtractPlainText(requested, out string plain))
                 return ReplaceParagraphText(existing, plain, decodeNumericReferences: false);
+            // Styled markup such as <body><p style="...">Label</p></body> (the form AGENTS.md asks for) is raw
+            // markup, as in hmi_add_label/hmi_add_button. NormalizeItemPropertyUpdates already rejected a '<body'
+            // string that does not parse.
+            if (LooksLikeBodyMarkup(requested))
+                return requested;
             return ReplaceParagraphText(existing, requested);
+        }
+
+        /// <summary>
+        /// A plain string that starts with '&lt;body' is taken as raw markup and must parse as a &lt;body&gt;
+        /// element; otherwise it would be escaped and shown with its tags. Checked before any project access.
+        /// </summary>
+        private static void ValidateItemTextMarkupStrings(JsonElement value, string name)
+        {
+            if (value.ValueKind == JsonValueKind.String)
+            {
+                string text = value.GetString()!;
+                if (LooksLikeBodyMarkup(text) && !IsWellFormedBodyMarkup(text))
+                    throw new InvalidDataException(
+                        $"'{name}' starts with '<body' but is not well-formed <body> markup. Pass plain text, or put " +
+                        "valid markup in {\"html\": \"<body><p>...</p></body>\"}.");
+                return;
+            }
+            if (value.ValueKind == JsonValueKind.Object && !value.TryGetProperty("html", out _))
+                foreach (JsonProperty language in value.EnumerateObject())
+                    ValidateItemTextMarkupStrings(language.Value, name + "." + language.Name);
+        }
+
+        /// <summary>
+        /// Warns when a plain-string Text replaces markup that has more than one paragraph or formatted child
+        /// elements: the result is a single paragraph and the other content is dropped.
+        /// </summary>
+        private static List<string> FindTextReplacementWarnings(
+            object item,
+            IEnumerable<KeyValuePair<string, JsonElement>> updates)
+        {
+            var warnings = new List<string>();
+            foreach (KeyValuePair<string, JsonElement> update in updates)
+            {
+                if (update.Key != HmiItemTextPropertyName)
+                    continue;
+                var plainValues = new List<JsonElement>();
+                if (update.Value.ValueKind == JsonValueKind.String)
+                    plainValues.Add(update.Value);
+                else if (update.Value.ValueKind == JsonValueKind.Object && !update.Value.TryGetProperty("html", out _))
+                    plainValues.AddRange(update.Value.EnumerateObject().Select(p => p.Value)
+                        .Where(v => v.ValueKind == JsonValueKind.String));
+                // Raw (styled) markup replaces the whole text on purpose; only paragraph-text replacements warn.
+                if (plainValues.All(v => LooksLikeBodyMarkup(v.GetString()) && !TryExtractPlainText(v.GetString()!, out _)))
+                    continue;
+                object? multilingualText = TryGetPartValue(item, HmiItemTextPropertyName);
+                if (multilingualText == null)
+                    continue;
+                bool dropsContent;
+                try
+                {
+                    dropsContent = GetMultilingualItems(multilingualText).Any(textItem =>
+                        HasMarkupBeyondSingleParagraph(
+                            textItem.GetType().GetProperty("Text")?.GetValue(textItem, null)?.ToString()));
+                }
+                catch (Exception)
+                {
+                    // Detection only: a read failure must not block the update.
+                    dropsContent = false;
+                }
+                if (dropsContent)
+                    warnings.Add(
+                        "Text: the existing markup has more than one paragraph or formatted parts (span, br, ...). " +
+                        "A plain string replaces it with a single paragraph that keeps only the first paragraph's " +
+                        "attributes; use {\"html\": ...} to keep several lines or inline formatting.");
+            }
+            return warnings;
         }
 
         private static bool AreItemPropertyValuesEqual(object? expected, object? actual)

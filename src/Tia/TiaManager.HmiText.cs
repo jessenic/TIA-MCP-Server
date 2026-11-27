@@ -76,6 +76,61 @@ namespace TiaOpennessMcp.Tia
             return JsonSerializer.SerializeToElement(languageMap);
         }
 
+        /// <summary>
+        /// <see cref="NormalizeExpectedText"/> for optional texts (discrete alarm eventText): a missing or null
+        /// value stays as it is, so the null semantics of the read-back comparison are unchanged.
+        /// </summary>
+        private static JsonElement? NormalizeExpectedNullableText(JsonElement? expected)
+        {
+            if (!expected.HasValue || expected.Value.ValueKind == JsonValueKind.Null)
+                return expected;
+            return NormalizeExpectedText(expected.Value);
+        }
+
+        /// <summary>True when a plain string looks like WinCC Unified markup (starts with &lt;body).</summary>
+        internal static bool LooksLikeBodyMarkup(string? text)
+        {
+            return text != null && text.TrimStart().StartsWith("<body", StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>True when markup parses as XML whose root is a &lt;body&gt; element without a namespace.</summary>
+        internal static bool IsWellFormedBodyMarkup(string? text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return false;
+            try
+            {
+                XElement? root = XDocument.Parse(text).Root;
+                return root != null && root.Name.LocalName == "body" && root.Name.Namespace == XNamespace.None;
+            }
+            catch (XmlException)
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// True when replacing the paragraph text of this markup would drop content: more than one paragraph, other
+        /// elements in the body, or child elements (span, br, ...) inside the first paragraph.
+        /// </summary>
+        internal static bool HasMarkupBeyondSingleParagraph(string? markup)
+        {
+            if (string.IsNullOrWhiteSpace(markup))
+                return false;
+            try
+            {
+                XElement? body = XDocument.Parse(markup).Root;
+                if (body == null)
+                    return false;
+                List<XElement> children = body.Elements().ToList();
+                return children.Count > 1 || children.Count == 1 && children[0].Elements().Any();
+            }
+            catch (XmlException)
+            {
+                return false;
+            }
+        }
+
         private static bool IsRawHtmlText(JsonElement value)
         {
             return value.ValueKind == JsonValueKind.Object &&

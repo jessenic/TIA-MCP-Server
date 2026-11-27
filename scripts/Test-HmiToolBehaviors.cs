@@ -287,6 +287,38 @@ internal static class HmiToolBehaviorTests
             () => InvokeManagerHelper("ApplyAndVerifyItemPropertyUpdates", item, missingLanguage, languages),
             "language-map Text must cover every active language");
 
+        var styledMarkup = (List<KeyValuePair<string, JsonElement>>)InvokeManagerHelperResult(
+            "NormalizeItemPropertyUpdates",
+            JsonValue("{\"Text\":\"<body><p style=\\\"margin: 0; text-align: center;\\\">Label</p></body>\"}"));
+        InvokeManagerHelper("ApplyAndVerifyItemPropertyUpdates", item, styledMarkup, languages);
+        Check(item.Text.Items[0].Text == "<body><p style=\"margin: 0; text-align: center;\">Label</p></body>" &&
+            item.Text.Items[1].Text == "<body><p style=\"margin: 0; text-align: center;\">Label</p></body>",
+            "a styled <body> markup string is written as raw markup, as hmi_add_label/hmi_add_button do");
+        Throws<InvalidDataException>(
+            () => InvokeManagerHelperResult("NormalizeItemPropertyUpdates", JsonValue("{\"Text\":\"<body><p>broken\"}")),
+            "a malformed <body> markup string is rejected before project access");
+        Throws<InvalidDataException>(
+            () => InvokeManagerHelperResult("NormalizeItemPropertyUpdates",
+                JsonValue("{\"Text\":{\"en-US\":\"ok\",\"fi-FI\":\"<body><p>broken\"}}")),
+            "a malformed <body> markup string in a language map is rejected before project access");
+
+        item.Text.Items[0].Text = "<body><p style='a'>Line 1</p><p>Line 2</p></body>";
+        item.Text.Items[1].Text = "<body><p>Rivi</p></body>";
+        var plainText = (List<KeyValuePair<string, JsonElement>>)InvokeManagerHelperResult(
+            "NormalizeItemPropertyUpdates", JsonValue("{\"Text\":\"One line\"}"));
+        var rawText = (List<KeyValuePair<string, JsonElement>>)InvokeManagerHelperResult(
+            "NormalizeItemPropertyUpdates", JsonValue("{\"Text\":{\"html\":\"<body><p>A</p><p>B</p></body>\"}}"));
+        var dropWarnings = (List<string>)InvokeManagerHelperResult("FindTextReplacementWarnings", item, plainText);
+        var rawWarnings = (List<string>)InvokeManagerHelperResult("FindTextReplacementWarnings", item, rawText);
+        Check(dropWarnings.Count == 1 && dropWarnings[0].Contains("single paragraph") && rawWarnings.Count == 0,
+            "a plain Text that replaces multi-paragraph markup is reported under warnings; raw html is not");
+        item.Text.Items[0].Text = "<body><p>Line <span>1</span></p></body>";
+        Check(((List<string>)InvokeManagerHelperResult("FindTextReplacementWarnings", item, plainText)).Count == 1,
+            "a plain Text that replaces inline formatting is reported under warnings");
+        item.Text.Items[0].Text = "<body><p style='a'>Only</p></body>";
+        Check(((List<string>)InvokeManagerHelperResult("FindTextReplacementWarnings", item, plainText)).Count == 0,
+            "a single styled paragraph gives no text warning");
+
         var stubborn = new TestStubbornItem();
         var topUpdate = (List<KeyValuePair<string, JsonElement>>)InvokeManagerHelperResult(
             "NormalizeItemPropertyUpdates", JsonValue("{\"Top\":5}"));
@@ -310,9 +342,9 @@ internal static class HmiToolBehaviorTests
             (string)InvokeManagerHelperResult("FormatHtmlText", "") == "<body><p></p></body>" &&
             (string)InvokeManagerHelperResult("FormatHtmlText", "<body><p>x</p></body>") == "<body><p>x</p></body>",
             "add-tool wrapper decodes numeric references and keeps its markup passthrough");
-        Check((string)InvokeManagerHelperResult("ToHmiMarkup", "&#196;") == "<body><p>Ä</p></body>" &&
+        Check((string)InvokeManagerHelperResult("ToHmiMarkup", "&#196; & <x>") == "<body><p>&amp;#196; &amp; &lt;x&gt;</p></body>" &&
             (string)InvokeManagerHelperResult("ToHmiMarkup", "<body><p>x</p></body>") == "<body><p>x</p></body>",
-            "import wrapper decodes numeric references and keeps its plain-markup passthrough");
+            "import wrapper only escapes (a literal &#196; survives export/import) and keeps its plain-markup passthrough");
         Check((string)InvokeManagerHelperResult("DecodeNumericCharacterReferences", "{F1} &#176;C") == "{F1} °C",
             "output_format decoding turns numeric references into characters");
         Check((string)InvokeManagerHelperResult("ReplaceParagraphText", "not <markup", "x", true) == "<body><p>x</p></body>" &&
@@ -322,7 +354,13 @@ internal static class HmiToolBehaviorTests
                 "<body><p a=\"1\" b='2'>x</p></body>", "<body><p b=\"2\" a=\"1\">x</p></body>") &&
             !(bool)InvokeManagerHelperResult("AreHmiMarkupEqual", "<body><p>x</p></body>", "<body><p>y</p></body>"),
             "markup comparison ignores attribute order and quoting but not text");
-        Check(((JsonElement)InvokeManagerHelperResult("NormalizeExpectedText", JsonValue("\"&#196;\""))).GetString() == "Ä" &&
+        Check(((JsonElement?)InvokeManagerHelperResult("NormalizeExpectedNullableText", (JsonElement?)JsonValue("\"Lämpötila &#176;C\""))).Value.GetString() == "Lämpötila &#176;C" &&
+            ((JsonElement?)InvokeManagerHelperResult("NormalizeExpectedNullableText", (JsonElement?)JsonValue("{\"html\":\"<body><p>X</p></body>\"}"))).Value.GetString() == "X" &&
+            ((JsonElement?)InvokeManagerHelperResult("NormalizeExpectedNullableText", (JsonElement?)JsonValue("null"))).Value.ValueKind == JsonValueKind.Null,
+            "alarm eventText read-back normalizes the expected text (literal numeric reference kept, {html} compacted, null kept)");
+        Check(InvokeManagerHelperResult("NormalizeExpectedNullableText", new object[] { null }) == null,
+            "alarm eventText read-back keeps a missing expected text missing");
+        Check(((JsonElement)InvokeManagerHelperResult("NormalizeExpectedText", JsonValue("\"&#196;\""))).GetString() == "&#196;" &&
             ((JsonElement)InvokeManagerHelperResult("NormalizeExpectedText", JsonValue("{\"html\":\"<body><p>X</p></body>\"}"))).GetString() == "X" &&
             ((JsonElement)InvokeManagerHelperResult("NormalizeExpectedText", JsonValue("{\"en-US\":\"A\",\"fi-FI\":\"A\"}"))).GetString() == "A",
             "import text read-back normalizes expected strings, raw html, and equal language maps");
