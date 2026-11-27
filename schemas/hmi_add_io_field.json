@@ -1,1 +1,58 @@
-{"name":"hmi_add_io_field","description":"Add or update an IO field on a screen bound to a process value tag.","parameters":{"additionalProperties":false,"properties":{"height":{"description":"Height.","type":"integer"},"left":{"description":"X position.","type":"integer"},"mode":{"description":"'Output' or 'InputOutput' (default: Output).","type":"string"},"name":{"description":"IO Field item name.","type":"string"},"output_format":{"description":"Output format, e.g. '{F1} °C' for one decimal and a unit (optional; omit to keep the current format).","type":"string"},"process_tag":{"description":"HMI tag to bind to ProcessValue.","type":"string"},"screen_name":{"description":"Screen name.","type":"string"},"target_name":{"description":"Target HMI software name (optional).","type":"string"},"top":{"description":"Y position.","type":"integer"},"width":{"description":"Width.","type":"integer"}},"required":["screen_name","name","left","top","width","height"],"type":"object"}}
+{
+  "name": "hmi_add_io_field",
+  "description": "Add or update an IO field on a screen bound to a process value tag.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "screen_name": {
+        "type": "string",
+        "description": "Screen name."
+      },
+      "name": {
+        "type": "string",
+        "description": "IO Field item name."
+      },
+      "left": {
+        "type": "integer",
+        "description": "X position."
+      },
+      "top": {
+        "type": "integer",
+        "description": "Y position."
+      },
+      "width": {
+        "type": "integer",
+        "description": "Width."
+      },
+      "height": {
+        "type": "integer",
+        "description": "Height."
+      },
+      "mode": {
+        "type": "string",
+        "description": "\u0027Output\u0027 or \u0027InputOutput\u0027 (default: Output)."
+      },
+      "process_tag": {
+        "type": "string",
+        "description": "HMI tag to bind to ProcessValue."
+      },
+      "output_format": {
+        "type": "string",
+        "description": "Output format, e.g. \u0027{F1} \u00B0C\u0027 for one decimal and a unit (optional; omit to keep the current format). Plain Unicode text, not HTML; do not use HTML entities (numeric references such as \u0026#176; are decoded)."
+      },
+      "target_name": {
+        "type": "string",
+        "description": "Target HMI software name (optional)."
+      }
+    },
+    "required": [
+      "screen_name",
+      "name",
+      "left",
+      "top",
+      "width",
+      "height"
+    ],
+    "additionalProperties": false
+  }
+}

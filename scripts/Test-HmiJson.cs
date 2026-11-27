@@ -251,9 +251,44 @@ class HmiJsonTests
         Check((bool)Invoke("SameLibraryInventory", inventory, inventory), "library GUID inventory matches itself");
         var empty = (IList)Activator.CreateInstance(inventory.GetType());
         Check(!(bool)Invoke("SameLibraryInventory", inventory, empty), "missing library definition rejected");
+        ItemPropertyPathTests();
         if (args.Length > 2)
             Live(int.Parse(args[2]), args[3], args.Length > 4 && bool.Parse(args[4]));
         Console.WriteLine("PASS: " + checks + " HMI JSON regression checks.");
+    }
+
+    // hmi_update_screen_item leaf paths against the real V21 Openness types (typeof only, no TIA connection).
+    static void ItemPropertyPathTests()
+    {
+        Type button = typeof(HmiButton);
+        Type ioField = typeof(HmiIOField);
+        Type text = typeof(Siemens.Engineering.HmiUnified.UI.Shapes.HmiText);
+        Type screenWindow = typeof(HmiScreenWindow);
+        Invoke("ValidateItemPropertyPath", button, "Font.Size", JsonElementOf("14"));
+        Invoke("ValidateItemPropertyPath", button, "Font.Weight", JsonElementOf("\"Bold\""));
+        Invoke("ValidateItemPropertyPath", button, "Font.Name", JsonElementOf("\"SiemensSans\""));
+        Invoke("ValidateItemPropertyPath", button, "Font.Italic", JsonElementOf("true"));
+        Invoke("ValidateItemPropertyPath", button, "Enabled", JsonElementOf("false"));
+        Invoke("ValidateItemPropertyPath", button, "Text", JsonElementOf("\"Start\""));
+        Invoke("ValidateItemPropertyPath", ioField, "OutputFormat", JsonElementOf("\"{F2}\""));
+        Invoke("ValidateItemPropertyPath", ioField, "Font.Size", JsonElementOf("12"));
+        Invoke("ValidateItemPropertyPath", ioField, "HorizontalTextAlignment", JsonElementOf("\"Right\""));
+        Invoke("ValidateItemPropertyPath", text, "HorizontalTextAlignment", JsonElementOf("\"Center\""));
+        Invoke("ValidateItemPropertyPath", text, "VerticalTextAlignment", JsonElementOf("\"Center\""));
+        Invoke("ValidateItemPropertyPath", screenWindow, "Screen", JsonElementOf("\"Main\""));
+        checks++;
+        Reject(() => Invoke("ValidateItemPropertyPath", ioField, "Text", JsonElementOf("\"x\"")), "IO field has no Text");
+        Reject(() => Invoke("ValidateItemPropertyPath", text, "HorizontalTextAlignment", JsonElementOf("5")), "alignment must be a name");
+        Reject(() => Invoke("ValidateItemPropertyPath", text, "VerticalTextAlignment", JsonElementOf("\"Middle\"")), "Middle is not an HmiVerticalAlignment");
+        Reject(() => Invoke("ValidateItemPropertyPath", button, "Font.Weight", JsonElementOf("\"Heavy\"")), "unknown font weight");
+        Reject(() => Invoke("ValidateItemPropertyPath", screenWindow, "Font.Size", JsonElementOf("12")), "screen window has no Font");
+        Reject(() => Invoke("ValidateItemPropertyPath", button, "Screen", JsonElementOf("\"Main\"")), "button has no Screen");
+    }
+
+    static JsonElement JsonElementOf(string json)
+    {
+        using (JsonDocument document = JsonDocument.Parse(json))
+            return document.RootElement.Clone();
     }
 
     static void NewDynamizationTests()

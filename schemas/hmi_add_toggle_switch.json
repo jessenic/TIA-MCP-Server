@@ -2,18 +2,48 @@
   "name": "hmi_add_toggle_switch",
   "description": "Add or update a tag-bound toggle switch with separate off/on captions.",
   "parameters": {
-    "additionalProperties": false,
+    "type": "object",
     "properties": {
-      "screen_name": { "description": "Screen name.", "type": "string" },
-      "name": { "description": "Toggle switch item name.", "type": "string" },
-      "off_text": { "description": "Caption shown in the normal state.", "type": "string" },
-      "on_text": { "description": "Caption shown in the alternate state.", "type": "string" },
-      "left": { "description": "X position.", "type": "integer" },
-      "top": { "description": "Y position.", "type": "integer" },
-      "width": { "description": "Width.", "type": "integer" },
-      "height": { "description": "Height.", "type": "integer" },
-      "process_tag": { "description": "HMI tag bound to IsAlternateState.", "type": "string" },
-      "target_name": { "description": "Target HMI software name (optional).", "type": "string" }
+      "screen_name": {
+        "type": "string",
+        "description": "Screen name."
+      },
+      "name": {
+        "type": "string",
+        "description": "Toggle switch item name."
+      },
+      "off_text": {
+        "type": "string",
+        "description": "Caption shown in the normal state. Plain Unicode text (\u00E4, \u00F6, \u00E5, \u00B0); the server wraps and escapes it as HTML, so do not use HTML entities."
+      },
+      "on_text": {
+        "type": "string",
+        "description": "Caption shown in the alternate state. Plain Unicode text (\u00E4, \u00F6, \u00E5, \u00B0); the server wraps and escapes it as HTML, so do not use HTML entities."
+      },
+      "left": {
+        "type": "integer",
+        "description": "X position."
+      },
+      "top": {
+        "type": "integer",
+        "description": "Y position."
+      },
+      "width": {
+        "type": "integer",
+        "description": "Width."
+      },
+      "height": {
+        "type": "integer",
+        "description": "Height."
+      },
+      "process_tag": {
+        "type": "string",
+        "description": "HMI tag bound to IsAlternateState."
+      },
+      "target_name": {
+        "type": "string",
+        "description": "Target HMI software name (optional)."
+      }
     },
     "required": [
       "screen_name",
@@ -26,6 +56,6 @@
       "height",
       "process_tag"
     ],
-    "type": "object"
+    "additionalProperties": false
   }
 }

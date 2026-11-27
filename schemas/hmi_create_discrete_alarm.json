@@ -2,16 +2,40 @@
   "name": "hmi_create_discrete_alarm",
   "description": "Create or update a WinCC Unified discrete alarm with an alarm class, HMI tag trigger, and multilingual event text.",
   "parameters": {
-    "additionalProperties": false,
+    "type": "object",
     "properties": {
-      "alarm_name": { "description": "Discrete alarm name.", "type": "string" },
-      "alarm_class": { "description": "Existing HMI alarm class name.", "type": "string" },
-      "raised_state_tag": { "description": "Existing HMI tag that raises the alarm.", "type": "string" },
-      "raised_state_tag_bit_number": { "description": "Bit number in the trigger tag (default: 0).", "type": "integer" },
-      "trigger_mode": { "description": "Discrete alarm trigger mode (default: OnRisingEdge).", "type": "string" },
-      "text": { "description": "Alarm event text.", "type": "string" },
-      "acknowledgment_control_tag": { "description": "Optional existing HMI tag used to control acknowledgment.", "type": "string" },
-      "target_name": { "description": "Target HMI software name (optional).", "type": "string" }
+      "alarm_name": {
+        "type": "string",
+        "description": "Discrete alarm name."
+      },
+      "alarm_class": {
+        "type": "string",
+        "description": "Existing HMI alarm class name."
+      },
+      "raised_state_tag": {
+        "type": "string",
+        "description": "Existing HMI tag that raises the alarm."
+      },
+      "raised_state_tag_bit_number": {
+        "type": "integer",
+        "description": "Bit number in the trigger tag (default: 0)."
+      },
+      "trigger_mode": {
+        "type": "string",
+        "description": "Discrete alarm trigger mode (default: OnRisingEdge)."
+      },
+      "text": {
+        "type": "string",
+        "description": "Alarm event text. Plain Unicode text (\u00E4, \u00F6, \u00E5, \u00B0); the server wraps and escapes it as HTML, so do not use HTML entities."
+      },
+      "acknowledgment_control_tag": {
+        "type": "string",
+        "description": "Optional existing HMI tag used to control acknowledgment."
+      },
+      "target_name": {
+        "type": "string",
+        "description": "Target HMI software name (optional)."
+      }
     },
     "required": [
       "alarm_name",
@@ -19,6 +43,6 @@
       "raised_state_tag",
       "text"
     ],
-    "type": "object"
+    "additionalProperties": false
   }
 }

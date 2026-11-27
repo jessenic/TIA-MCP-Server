@@ -54,23 +54,6 @@ namespace TiaOpennessMcp.Tia
                 ["HmiToggleSwitch"] = typeof(HmiToggleSwitch)
             };
 
-        private static readonly HashSet<string> HmiItemPropertyUpdateAllowlist =
-            new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            {
-                "Visible",
-                "Left",
-                "Top",
-                "Width",
-                "Height",
-                "CenterX",
-                "CenterY",
-                "Radius",
-                "BackColor",
-                "ForeColor",
-                "BorderColor",
-                "BorderWidth"
-            };
-
         public object GetHmiScreenItem(string screenName, string itemName, string? targetName = null)
         {
             var hmi = FindHmiSoftware(targetName);
@@ -91,23 +74,8 @@ namespace TiaOpennessMcp.Tia
             JsonElement properties,
             string? targetName = null)
         {
-            if (properties.ValueKind != JsonValueKind.Object)
-                throw new InvalidDataException("item_properties must be a JSON object.");
-
-            var updates = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
-            var seenProperties = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (JsonProperty update in properties.EnumerateObject())
-            {
-                if (!seenProperties.Add(update.Name))
-                    throw new InvalidDataException($"item_properties contains duplicate property '{update.Name}'.");
-                if (!HmiItemPropertyUpdateAllowlist.Contains(update.Name))
-                    throw new InvalidDataException(
-                        $"Unsupported item property '{update.Name}'. Allowed properties: " +
-                        string.Join(", ", HmiItemPropertyUpdateAllowlist.OrderBy(name => name, StringComparer.Ordinal)) + ".");
-                updates.Add(update.Name, update.Value.Clone());
-            }
-            if (updates.Count == 0)
-                throw new InvalidDataException("item_properties must contain at least one supported property.");
+            // Input checks first: they need no TIA connection and fail before any project access.
+            List<KeyValuePair<string, JsonElement>> updates = NormalizeItemPropertyUpdates(properties);
 
             var hmi = FindHmiSoftware(targetName);
             var screen = FindHmiScreen(hmi, screenName);
@@ -116,30 +84,33 @@ namespace TiaOpennessMcp.Tia
             HmiScreenItemBase item = screen.ScreenItems.Find(itemName)
                 ?? throw new InvalidOperationException($"Item '{itemName}' not found on screen '{screenName}'.");
 
+            var warnings = new List<string>();
             foreach (KeyValuePair<string, JsonElement> update in updates)
             {
-                PropertyInfo property = FindProperty(item.GetType(), update.Key);
-                if (property.SetMethod?.IsPublic != true)
-                    throw new InvalidDataException($"Property '{update.Key}' is read-only on '{item.GetType().Name}'.");
-                ValidatePatchProperty(item.GetType(), update.Key, update.Value);
+                ValidateItemPropertyPath(item.GetType(), update.Key, update.Value);
+                if (update.Key == HmiItemScreenPropertyName)
+                {
+                    string? screenWarning = ValidateScreenWindowTarget(hmi, screen, update.Value);
+                    if (screenWarning != null)
+                        warnings.Add(screenWarning);
+                }
             }
+            warnings.AddRange(FindDynamizedItemPropertyWarnings(item, updates));
+            warnings.AddRange(FindTextReplacementWarnings(item, updates));
+            IReadOnlyList<string> languages = GetHmiLanguages(hmi);
 
             using (ExclusiveAccess access = _tiaPortal!.ExclusiveAccess("Update Unified HMI screen item properties"))
             using (Transaction transaction = access.Transaction(_project!, "Update Unified HMI screen item properties"))
             {
-                foreach (KeyValuePair<string, JsonElement> update in updates)
-                {
-                    PropertyInfo property = FindProperty(item.GetType(), update.Key);
-                    SetPropertyValue(item, property, update.Value);
-                }
-
-                VerifyObjectProperties(item, updates);
+                ApplyAndVerifyItemPropertyUpdates(item, updates, languages);
                 transaction.CommitOnDispose();
             }
 
-            return JsonSerializer.SerializeToElement(
-                CreateItemDocument(item, GetHmiLanguages(hmi), screenPath: screen.Name),
-                HmiJsonOptions);
+            return AddItemUpdateWarnings(
+                JsonSerializer.SerializeToElement(
+                    CreateItemDocument(item, languages, screenPath: screen.Name),
+                    HmiJsonOptions),
+                warnings);
         }
 
         public object SetExpressionDynamization(
@@ -2118,7 +2089,9 @@ namespace TiaOpennessMcp.Tia
         {
             if (TryExtractPlainText(text, out _))
                 return text;
-            return "<body><p>" + SecurityElement.Escape(text) + "</p></body>";
+            // Escape only: hmi_export_json writes the paragraph text back as a plain string, so a text that
+            // literally contains "&#196;" must survive an export/import round trip unchanged (no reference decoding).
+            return WrapEscapedParagraph(text);
         }
 
         private static string ParseTextContent(JsonElement value)
@@ -2939,7 +2912,9 @@ namespace TiaOpennessMcp.Tia
                     actual.RaisedStateTagBitNumber != expected.RaisedStateTagBitNumber ||
                     actual.AcknowledgmentControlTag != expected.AcknowledgmentControlTag ||
                     !string.Equals(actual.TriggerMode.ToString(), expected.TriggerMode, StringComparison.OrdinalIgnoreCase) ||
-                    !AreNullableJsonValuesEqual(SerializeMultilingualText(actual.EventText, plan.Manifest.Languages), expected.EventText))
+                    !AreNullableJsonValuesEqual(
+                        SerializeMultilingualText(actual.EventText, plan.Manifest.Languages),
+                        NormalizeExpectedNullableText(expected.EventText)))
                     throw new InvalidOperationException($"Discrete alarm '{expected.Name}' failed read-back verification.");
             }
         }
@@ -3046,7 +3021,7 @@ namespace TiaOpennessMcp.Tia
                 PropertyInfo property = FindProperty(target.GetType(), expected.Key);
                 object? value = property.GetValue(target, null);
                 if (value == null || !AreJsonValuesEqual(
-                    SerializeMultilingualText(value, languages), expected.Value))
+                    SerializeMultilingualText(value, languages), NormalizeExpectedText(expected.Value)))
                     throw new InvalidOperationException(
                         $"Text '{target.GetType().Name}.{property.Name}' failed read-back verification.");
             }

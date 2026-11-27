@@ -125,8 +125,14 @@ namespace TiaOpennessMcp.Protocol
 
     public class ToolProperty
     {
+        // Null only together with AnyOf, for a value that accepts several JSON types.
         [JsonPropertyName("type")]
-        public string Type { get; set; } = "string";
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? Type { get; set; } = "string";
+
+        [JsonPropertyName("anyOf")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<ToolProperty>? AnyOf { get; set; }
 
         [JsonPropertyName("description")]
         public string Description { get; set; } = "";

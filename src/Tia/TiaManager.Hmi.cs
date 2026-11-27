@@ -767,6 +767,9 @@ namespace TiaOpennessMcp.Tia
             else
                 io.IOFieldType = HmiIOFieldType.Output;
 
+            // OutputFormat is plain text, not HTML: decode numeric references (&#176; -> °) and set the rest as given.
+            if (outputFormat != null)
+                outputFormat = DecodeNumericCharacterReferences(outputFormat);
             if (outputFormat != null && io.OutputFormat != outputFormat)
                 io.OutputFormat = outputFormat;
 
@@ -1530,7 +1533,7 @@ namespace TiaOpennessMcp.Tia
         {
             if (string.IsNullOrEmpty(text)) return "<body><p></p></body>";
             if (text.StartsWith("<body", StringComparison.OrdinalIgnoreCase)) return text;
-            return $"<body><p>{SecurityElement.Escape(text)}</p></body>";
+            return WrapPlainTextAsHtml(text);
         }
 
         private static Color? ParseColor(string? colorStr)
