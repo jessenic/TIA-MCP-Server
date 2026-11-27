@@ -1,0 +1,39 @@
+{
+  "name": "hmi_delete_tag",
+  "description": "Delete one Unified HMI tag by exact name, including tags in tag tables inside tag-table groups. Before deleting, a best-effort scan looks for references in alarms, other tags (handshake, limit and logging trigger tags), screen and item dynamizations, button parts and scripts, and TIA cross-references when available. By default (on_referenced=\u0027fail\u0027) a referenced tag is not deleted and the references are returned. dry_run=true only reports. Members of structured tags, system tags and whole tag tables cannot be deleted with this tool.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "tag_name": {
+        "type": "string",
+        "description": "Exact HMI tag name (case-sensitive)."
+      },
+      "table_name": {
+        "type": "string",
+        "description": "Optional exact tag-table name (or \u0027group/table\u0027 path) that must contain the tag. Tag names are unique per HMI software, so this is only a safety check."
+      },
+      "target_name": {
+        "type": "string",
+        "description": "Exact HMI device, device-item, or software name; required when multiple targets exist."
+      },
+      "on_referenced": {
+        "type": "string",
+        "description": "\u0027fail\u0027 (default) refuses to delete a tag that the scan finds referenced; \u0027ignore\u0027 deletes it and returns the references that now point to a missing tag.",
+        "enum": [
+          "fail",
+          "ignore"
+        ],
+        "default": "fail"
+      },
+      "dry_run": {
+        "type": "boolean",
+        "description": "Only resolve the tag and report its references; change nothing (default: false).",
+        "default": false
+      }
+    },
+    "required": [
+      "tag_name"
+    ],
+    "additionalProperties": false
+  }
+}

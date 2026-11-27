@@ -154,6 +154,8 @@ try {
         hmi_rename_screen = @('screen_name', 'group_path', 'new_name', 'on_conflict')
         hmi_rename_screen_group = @('group_path', 'new_name', 'on_conflict')
         hmi_rename_tag_table = @('table_name', 'new_name', 'on_conflict')
+        hmi_delete_tag = @('tag_name')
+        hmi_rename_tag = @('tag_name', 'new_name', 'on_conflict')
     }
     foreach ($toolName in $requiredAdditionalContracts.Keys) {
         $schemaPath = Join-Path $outputDirectory "$toolName.json"
@@ -206,7 +208,8 @@ try {
         'hmi_create_tag_table',
         'hmi_rename_screen',
         'hmi_rename_screen_group',
-        'hmi_rename_tag_table'
+        'hmi_rename_tag_table',
+        'hmi_rename_tag'
     )) {
         $schema = Get-Content -LiteralPath (Join-Path $outputDirectory "$toolName.json") -Raw | ConvertFrom-Json
         if ((@($schema.parameters.properties.on_conflict.enum) -join ',') -ne 'fail') {
