@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Text;
 
 namespace TiaOpennessMcp.Tools
 {
@@ -14,7 +15,8 @@ namespace TiaOpennessMcp.Tools
         /// <summary>
         /// Validates the source. Whitespace-only values count as absent. For a file, the path must be fully
         /// qualified (drive root or UNC), exist, have one of the allowed extensions and be 1 byte..50 MiB.
-        /// When readText is true the file is read (BOM detected, UTF-8 otherwise) and returned in Text.
+        /// When readText is true the file is read (BOM detected, strict UTF-8 otherwise; invalid UTF-8 is
+        /// rejected with InvalidDataException) and returned in Text.
         /// </summary>
         public static PlcImportSourceResult Resolve(
             string? inlineContent,
@@ -61,8 +63,43 @@ namespace TiaOpennessMcp.Tools
             return new PlcImportSourceResult
             {
                 FullPath = fullPath,
-                Text = readText ? File.ReadAllText(fullPath) : null
+                Text = readText ? ReadText(fullPath) : null
             };
+        }
+
+        /// <summary>
+        /// Decodes the file by its BOM (UTF-8, UTF-16 LE/BE, UTF-32 LE/BE), or as strict UTF-8 without one.
+        /// Bytes that are not valid UTF-8 (for example an ANSI/Windows-1252 file) are rejected instead of being
+        /// replaced with U+FFFD, so a corrupted text never reaches the project.
+        /// </summary>
+        public static string ReadText(string fullPath)
+        {
+            byte[] bytes = File.ReadAllBytes(fullPath);
+            Encoding? bomEncoding = null;
+            int bomLength = 0;
+            if (bytes.Length >= 4 && bytes[0] == 0xFF && bytes[1] == 0xFE && bytes[2] == 0x00 && bytes[3] == 0x00)
+            { bomEncoding = new UTF32Encoding(false, false, true); bomLength = 4; }
+            else if (bytes.Length >= 4 && bytes[0] == 0x00 && bytes[1] == 0x00 && bytes[2] == 0xFE && bytes[3] == 0xFF)
+            { bomEncoding = new UTF32Encoding(true, false, true); bomLength = 4; }
+            else if (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF)
+            { bomEncoding = new UTF8Encoding(false, true); bomLength = 3; }
+            else if (bytes.Length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE)
+            { bomEncoding = new UnicodeEncoding(false, false, true); bomLength = 2; }
+            else if (bytes.Length >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF)
+            { bomEncoding = new UnicodeEncoding(true, false, true); bomLength = 2; }
+
+            Encoding encoding = bomEncoding ?? new UTF8Encoding(false, true);
+            try
+            {
+                return encoding.GetString(bytes, bomLength, bytes.Length - bomLength);
+            }
+            catch (DecoderFallbackException ex)
+            {
+                string what = bomEncoding == null ? "not valid UTF-8 and has no BOM" : "not valid " + bomEncoding.WebName;
+                throw new InvalidDataException(
+                    $"Import file is {what} (invalid byte at offset {bomLength + Math.Max(ex.Index, 0)}): {fullPath}. " +
+                    "Save it as UTF-8 (with or without BOM) and try again; nothing was changed in the project.", ex);
+            }
         }
 
         /// <summary>True for 'X:\...' or 'X:/...' and UNC '\\server\share\...' paths; false for relative,

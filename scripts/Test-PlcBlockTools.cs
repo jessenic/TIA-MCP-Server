@@ -242,6 +242,21 @@ internal static class PlcBlockToolTests
         Throws<ArgumentException>(() => PlcImportSource.Resolve(null, valid, "scl_code", new[] { ".scl" }, true),
             "SCL accepts only .scl files", ".scl");
 
+        string sclNoBom = Path.Combine(_temporary, "FB_NoBom.scl");
+        File.WriteAllText(sclNoBom, "// Lämpötila\r\n", new UTF8Encoding(false));
+        PlcImportSourceResult noBom = PlcImportSource.Resolve(null, sclNoBom, "scl_code", new[] { ".scl" }, true);
+        Check(noBom.Text == "// Lämpötila\r\n", "SCL file in UTF-8 without a BOM round-trips non-ASCII text");
+
+        string sclUtf16 = Path.Combine(_temporary, "FB_Utf16.scl");
+        File.WriteAllText(sclUtf16, "// Lämpötila", new UnicodeEncoding(false, true));
+        Check(PlcImportSource.Resolve(null, sclUtf16, "scl_code", new[] { ".scl" }, true).Text == "// Lämpötila",
+            "SCL file in UTF-16 LE with a BOM is decoded by its BOM");
+
+        string sclAnsi = Path.Combine(_temporary, "FB_Ansi.scl");
+        File.WriteAllBytes(sclAnsi, new byte[] { 0x2F, 0x2F, 0x20, 0x27, 0x4C, 0xE4, 0x6D, 0x70, 0xF6, 0x27, 0x0D, 0x0A });
+        Throws<InvalidDataException>(() => PlcImportSource.Resolve(null, sclAnsi, "scl_code", new[] { ".scl" }, true),
+            "SCL file in Windows-1252 without a BOM is rejected instead of being read with U+FFFD", "not valid UTF-8");
+
         MethodInfo declaration = typeof(TiaManager).GetMethod("GetSclBlockDeclaration", BindingFlags.NonPublic | BindingFlags.Instance);
         object parsed = declaration.Invoke(TiaManager.Instance, new object[] { sclSource.Text });
         Check(parsed.ToString().Contains("FB_\u00C4") && parsed.ToString().Contains("FUNCTION_BLOCK"),
@@ -265,6 +280,7 @@ internal static class PlcBlockToolTests
         ExpectError(registry, "tia_import_scl_block", "{}", "Provide exactly one of scl_code or file_path");
         ExpectError(registry, "tia_import_scl_block", Json(new { file_path = valid }), ".scl");
         ExpectError(registry, "tia_import_scl_block", Json(new { file_path = scl, backup = false }), "Not attached to TIA Portal");
+        ExpectError(registry, "tia_import_scl_block", Json(new { file_path = Path.Combine(_temporary, "FB_Ansi.scl") }), "not valid UTF-8");
 
         CallToolResult padded = Execute(registry, "tia_delete_plc_type", Json(new { type_name = " typeX" }));
         Check(padded.IsError && FirstText(padded).Contains("\"invalid_input\""),

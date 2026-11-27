@@ -313,7 +313,7 @@ namespace TiaOpennessMcp.Tools
                     schema.Properties["file_path"] = new ToolProperty
                     {
                         Type = "string",
-                        Description = "Fully qualified server-local path to a .scl file with exactly one block declaration (read as UTF-8 unless it has a BOM). Use this or scl_code, not both."
+                        Description = "Fully qualified server-local path to a .scl file with exactly one block declaration (read as UTF-8 unless it has a BOM; a file that is not valid UTF-8, such as an ANSI file, is rejected). Use this or scl_code, not both."
                     };
                     schema.Properties["plc_name"] = new ToolProperty
                     {

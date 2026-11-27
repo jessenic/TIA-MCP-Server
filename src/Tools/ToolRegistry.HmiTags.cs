@@ -29,7 +29,7 @@ namespace TiaOpennessMcp.Tools
                 "Delete one Unified HMI tag by exact name, including tags in tag tables inside tag-table groups. " +
                 "Before deleting, a best-effort scan looks for references in alarms (state, acknowledgment, parameter and trigger tags), other tags (handshake, limit and logging trigger tags), the exclusive-operation runtime settings, screen and item dynamizations, button parts and scripts; " +
                 "TIA cross-references ('used by') are listed separately in CrossReferences when available. " +
-                "By default (on_referenced='fail') a tag with scan hits or cross-references is not deleted and the references are returned. dry_run=true only reports (status 'dry_run'). " +
+                "By default (on_referenced='fail') a tag with scan hits or cross-references is not deleted and the references are returned; if part of the scan could not be read (ScanFailures), the delete is refused with status 'scan_incomplete'. dry_run=true only reports (status 'dry_run'). " +
                 "Members of structured tags, system tags and whole tag tables cannot be deleted with this tool.",
                 schema =>
                 {
@@ -41,7 +41,7 @@ namespace TiaOpennessMcp.Tools
                         Type = "string",
                         Enum = new List<string> { "fail", "ignore" },
                         Default = "fail",
-                        Description = "'fail' (default) refuses to delete a tag that the scan finds referenced; 'ignore' deletes it and returns the references that now point to a missing tag."
+                        Description = "'fail' (default) refuses to delete a tag that the scan finds referenced or could not fully check; 'ignore' deletes it and returns the references that now point to a missing tag."
                     };
                     schema.Properties["dry_run"] = new ToolProperty { Type = "boolean", Default = false, Description = "Only resolve the tag and report its references; change nothing (default: false)." };
                     schema.Required = new List<string> { "tag_name" };

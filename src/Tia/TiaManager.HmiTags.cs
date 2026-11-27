@@ -94,9 +94,11 @@ namespace TiaOpennessMcp.Tia
                 ApplyScan(result, preview);
                 result.Success = true;
                 result.Status = "dry_run";
-                result.Message = !IsReferenced(result)
-                    ? "Dry run: the tag can be deleted; no blocking references were found by the best-effort scan. Nothing was changed."
-                    : $"Dry run: {DescribeReferences(result)} found. With on_referenced='fail' the delete would be refused. Nothing was changed.";
+                result.Message = IsReferenced(result)
+                    ? $"Dry run: {DescribeReferences(result)} found. With on_referenced='fail' the delete would be refused. Nothing was changed."
+                    : result.ScanFailures.Count > 0
+                        ? $"Dry run: the reference scan could not read {string.Join(", ", result.ScanFailures)}. With on_referenced='fail' the delete would be refused (status 'scan_incomplete'). Nothing was changed."
+                        : "Dry run: the tag can be deleted; no blocking references were found by the best-effort scan. Nothing was changed.";
                 return result;
             }
 
@@ -118,6 +120,14 @@ namespace TiaOpennessMcp.Tia
                         result.Status = "referenced";
                         result.Message = $"HMI tag '{tagName}' is still referenced ({DescribeReferences(result)}); nothing was deleted. " +
                             "Remove the references first, or pass on_referenced='ignore' to delete anyway.";
+                        return result;
+                    }
+                    if (onReferenced == "fail" && result.ScanFailures.Count > 0)
+                    {
+                        result.Success = false;
+                        result.Status = "scan_incomplete";
+                        result.Message = $"The reference scan for '{tagName}' could not read {string.Join(", ", result.ScanFailures)}; nothing was deleted. " +
+                            "Review the warnings, then pass on_referenced='ignore' to delete anyway.";
                         return result;
                     }
 
@@ -336,6 +346,7 @@ namespace TiaOpennessMcp.Tia
         private static void ApplyScan(HmiTagDeleteResult result, HmiTagUsageScan scan)
         {
             result.References = scan.References;
+            result.ScanFailures = scan.FailedCategories.ToList();
             result.CrossReferences = scan.CrossReferences;
             result.ScriptOccurrences = scan.ScriptOccurrences;
             result.CrossReferenceServiceAvailable = scan.CrossReferenceServiceAvailable;
@@ -352,6 +363,7 @@ namespace TiaOpennessMcp.Tia
         private static void ApplyScan(HmiTagRenameResult result, HmiTagUsageScan scan, string newName)
         {
             result.StructuredReferences = scan.References;
+            result.ScanFailures = scan.FailedCategories.ToList();
             foreach (HmiTagReference reference in scan.References)
                 reference.ExpectedAfter = HmiTagReferenceText.RewriteTagReference(reference.Value, result.OldName, newName);
             result.CrossReferences = scan.CrossReferences;
@@ -434,6 +446,32 @@ namespace TiaOpennessMcp.Tia
                 ?? type.GetInterfaces()
                     .Select(contract => contract.GetMethod("SyntaxCheck", Type.EmptyTypes))
                     .FirstOrDefault(method => method != null);
+        }
+
+        // Code properties of an event-handler script (IHmiScript in V21): ScriptCode and GlobalDefinitionAreaScriptCode.
+        // Each one is its own script site, so both are scanned, block a delete and are rewritten by a rename.
+        public static List<HmiEventScriptCodeSite> GetEventScriptCodeSites(object? script, string locationPrefix, object? propertyName, object? eventType)
+        {
+            var sites = new List<HmiEventScriptCodeSite>();
+            if (script == null) return sites;
+            string suffix = (propertyName == null ? "" : propertyName + ".") + eventType;
+            PropertyInfo? code = FindScriptProperty(script, "ScriptCode");
+            if (code != null)
+                sites.Add(new HmiEventScriptCodeSite { Location = locationPrefix + ":" + suffix, CodeProperty = code });
+            PropertyInfo? global = FindScriptProperty(script, "GlobalDefinitionAreaScriptCode");
+            if (global != null)
+                sites.Add(new HmiEventScriptCodeSite { Location = locationPrefix + "_global_definitions:" + suffix, CodeProperty = global });
+            return sites;
+        }
+
+        // Public property on the concrete type first, then on its interfaces (explicit implementations).
+        private static PropertyInfo? FindScriptProperty(object script, string name)
+        {
+            Type type = script.GetType();
+            return type.GetProperty(name, BindingFlags.Instance | BindingFlags.Public)
+                ?? type.GetInterfaces()
+                    .Select(contract => contract.GetProperty(name))
+                    .FirstOrDefault(property => property != null);
         }
 
         private static List<string> GetScriptSyntaxErrors(object? script)
@@ -546,6 +584,7 @@ namespace TiaOpennessMcp.Tia
             public List<HmiScriptTagOccurrence> ScriptOccurrences { get; } = new List<HmiScriptTagOccurrence>();
             public List<HmiScriptSite> ScriptSites { get; } = new List<HmiScriptSite>();
             public List<string> Warnings { get; } = new List<string>();
+            public List<string> FailedCategories { get; } = new List<string>();
             public bool? CrossReferenceServiceAvailable { get; set; }
         }
 
@@ -603,6 +642,7 @@ namespace TiaOpennessMcp.Tia
                     ex is NotSupportedException || ex is TargetInvocationException)
                 {
                     scan.Warnings.Add($"Could not scan {category}: {ex.Message}");
+                    scan.FailedCategories.Add(category);
                 }
             }
 
@@ -659,8 +699,8 @@ namespace TiaOpennessMcp.Tia
                     object? eventType = handler.GetType().GetProperty("EventType")?.GetValue(handler, null);
                     object? propertyName = handler.GetType().GetProperty("PropertyName")?.GetValue(handler, null);
                     object? script = handler.GetType().GetProperty("Script")?.GetValue(handler, null);
-                    string location = locationPrefix + ":" + (propertyName == null ? "" : propertyName + ".") + eventType;
-                    AddScriptSite(owner, location, script, script?.GetType().GetProperty("ScriptCode"), script);
+                    foreach (HmiEventScriptCodeSite site in GetEventScriptCodeSites(script, locationPrefix, propertyName, eventType))
+                        AddScriptSite(owner, site.Location, script, site.CodeProperty, script);
                 }
             }
 
@@ -742,11 +782,14 @@ namespace TiaOpennessMcp.Tia
                 foreach (HmiDiscreteAlarm alarm in hmi.DiscreteAlarms)
                 {
                     string owner = "DiscreteAlarm '" + alarm.Name + "'";
+                    RunCategory(owner, () =>
+                    {
                     AddReference("alarm", owner, "RaisedStateTag", alarm.RaisedStateTag, () => alarm.RaisedStateTag);
                     AddReference("alarm", owner, "AcknowledgmentControlTag", alarm.AcknowledgmentControlTag, () => alarm.AcknowledgmentControlTag);
                     AddReference("alarm", owner, "AcknowledgmentStateTag", alarm.AcknowledgmentStateTag, () => alarm.AcknowledgmentStateTag);
                     AddAddressReference("alarm", owner, "TriggerBitAddress", alarm.TriggerBitAddress, () => alarm.TriggerBitAddress);
                     AddAlarmParameterTags(scan, owner, () => alarm.AlarmParameterTags, AddReference);
+                    });
                 }
             });
             RunCategory("analog alarms", () =>
@@ -754,12 +797,15 @@ namespace TiaOpennessMcp.Tia
                 foreach (HmiAnalogAlarm alarm in hmi.AnalogAlarms)
                 {
                     string owner = "AnalogAlarm '" + alarm.Name + "'";
+                    RunCategory(owner, () =>
+                    {
                     AddReference("alarm", owner, "RaisedStateTag", alarm.RaisedStateTag, () => alarm.RaisedStateTag);
                     AddAddressReference("alarm", owner, "TriggerAddress", alarm.TriggerAddress, () => alarm.TriggerAddress);
                     // ConditionValue is Object in V21; only a plain string can name a tag here.
                     if (alarm.ConditionValue is string conditionTag)
                         AddReference("alarm", owner, "ConditionValue", conditionTag, () => alarm.ConditionValue as string);
                     AddAlarmParameterTags(scan, owner, () => alarm.AlarmParameterTags, AddReference);
+                    });
                 }
             });
             RunCategory("runtime settings", () =>
@@ -780,6 +826,8 @@ namespace TiaOpennessMcp.Tia
                         bool isSubject = string.Equals(tag.Name, tagName, StringComparison.Ordinal);
                         if (isSubject && skipOwnTag) continue;
                         string owner = "HmiTag '" + tag.Name + "'";
+                        RunCategory(owner, () =>
+                        {
                         AddReference("tag", owner, "ReadHandshakeTag", tag.ReadHandshakeTag, () => tag.ReadHandshakeTag);
                         AddReference("tag", owner, "WriteHandshakeTag", tag.WriteHandshakeTag, () => tag.WriteHandshakeTag);
                         AddReference("tag", owner, "BufferHandshakeTag", tag.BufferHandshakeTag, () => tag.BufferHandshakeTag);
@@ -792,6 +840,7 @@ namespace TiaOpennessMcp.Tia
                             HmiLoggingTag current = logging;
                             AddReference("logging_tag_trigger", owner + " LoggingTag '" + current.Name + "'", "TriggerTag", current.TriggerTag, () => current.TriggerTag);
                         }
+                        });
                     }
                 }
             });
@@ -871,6 +920,12 @@ namespace TiaOpennessMcp.Tia
         }
     }
 
+    public sealed class HmiEventScriptCodeSite
+    {
+        public string Location { get; set; } = string.Empty;
+        public PropertyInfo CodeProperty { get; set; } = null!;
+    }
+
     public sealed class HmiTagReference
     {
         public string Kind { get; set; } = string.Empty;
@@ -921,6 +976,8 @@ namespace TiaOpennessMcp.Tia
         public int? LoggingTagCount { get; set; }
         public int BlockingReferenceCount { get; set; }
         public int CrossReferenceCount { get; set; }
+        /// <summary>Scan categories or objects that could not be read; with on_referenced='fail' they block the delete.</summary>
+        public List<string> ScanFailures { get; set; } = new List<string>();
         public List<HmiTagReference> References { get; set; } = new List<HmiTagReference>();
         public List<HmiTagReference> CrossReferences { get; set; } = new List<HmiTagReference>();
         public List<HmiScriptTagOccurrence> ScriptOccurrences { get; set; } = new List<HmiScriptTagOccurrence>();
@@ -948,6 +1005,8 @@ namespace TiaOpennessMcp.Tia
         public string ScriptReferencesMode { get; set; } = "report";
         public int StaleReferenceCount { get; set; }
         public List<HmiTagReference> StructuredReferences { get; set; } = new List<HmiTagReference>();
+        /// <summary>Scan categories or objects that could not be read; references there are not listed.</summary>
+        public List<string> ScanFailures { get; set; } = new List<string>();
         public List<HmiTagReference> CrossReferences { get; set; } = new List<HmiTagReference>();
         public List<HmiScriptTagOccurrence> ScriptOccurrences { get; set; } = new List<HmiScriptTagOccurrence>();
         public List<string> LoggingTagsNamedAfterOldName { get; set; } = new List<string>();

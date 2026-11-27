@@ -552,11 +552,24 @@ class HmiJsonTests
             "unchanged Singlebit re-import is updated in place");
         Check(PlanMode(singlebit, Converter("Singlebit", Bitmask("SingleBit", 0, 1, "#00FF00"), Bitmask("SingleBit", 1, 1, "#0000FF")))
             == "UpdateBitmaskInPlace", "Singlebit colour change is updated in place");
-        object swapped = Invoke("PlanMappingTableUpdate", singlebit,
+        // Same masks per position: the in-place update and read-back are positional, so edited conditions that another
+        // entry already had are written per position (identity pairing), not refused as a reorder.
+        object swappedConditions = Invoke("PlanMappingTableUpdate", singlebit,
             Converter("Singlebit", Bitmask("SingleBit", 1, 1, "#E80000"), Bitmask("SingleBit", 0, 1, "#E2E5E8")));
+        Check(Get(swappedConditions, "Mode").ToString() == "UpdateBitmaskInPlace" && Json(Get(swappedConditions, "Pairing")) == "[0,1]",
+            "Singlebit conditions edited at the same positions are updated in place with the identity pairing");
+        object sharedMask = Converter("Bitmask", Bitmask("MultiBit", 4, 20, "#000001"), Bitmask("MultiBit", 16, 20, "#000002"));
+        object sharedEdited = Invoke("PlanMappingTableUpdate", sharedMask,
+            Converter("Bitmask", Bitmask("MultiBit", 16, 20, "#00000A"), Bitmask("MultiBit", 4, 20, "#00000B")));
+        Check(Get(sharedEdited, "Mode").ToString() == "UpdateBitmaskInPlace" && Json(Get(sharedEdited, "Pairing")) == "[0,1]",
+            "MultiBit entries with a shared mask and edited conditions are updated in place with the identity pairing");
+        object distinctMasks = Converter("Bitmask", Bitmask("MultiBit", 1, 1, "#000001"), Bitmask("MultiBit", 2, 2, "#000002"));
+        object swapped = Invoke("PlanMappingTableUpdate", distinctMasks,
+            Converter("Bitmask", Bitmask("MultiBit", 2, 2, "#000002"), Bitmask("MultiBit", 1, 1, "#000001")));
         // The read-back compares entries by position, so a reordered table is refused instead of failing verification.
-        Check(Get(swapped, "Mode").ToString() == "RefuseEntryOrder" && ((string)Get(swapped, "Reason")).Contains("order"),
-            "swapped Singlebit entries are refused with an entry-order reason");
+        Check(Get(swapped, "Mode").ToString() == "RefuseEntryOrder" && ((string)Get(swapped, "Reason")).Contains("order") &&
+            Json(Get(swapped, "Pairing")) == "[1,0]",
+            "reordered entries with different masks are refused with an entry-order reason");
         string orderRefusal = (string)Invoke("DescribeMappingTablePlanConflict", "Lamp_1", "BackColor", swapped, "replace");
         Check(orderRefusal != null && orderRefusal.Contains("Lamp_1.BackColor") && orderRefusal.Contains("TIA's entry order"),
             "entry-order refusal applies even with onConflict replace: " + orderRefusal);

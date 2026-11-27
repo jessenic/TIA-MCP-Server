@@ -963,6 +963,10 @@ internal static class HmiToolBehaviorTests
             "hmi_delete_tag requires only tag_name");
         Check(deleteTool.InputSchema.Properties["on_referenced"].Enum.SequenceEqual(new[] { "fail", "ignore" }),
             "hmi_delete_tag exposes on_referenced fail and ignore");
+        Check(deleteTool.Description.Contains("scan_incomplete") && deleteTool.Description.Contains("ScanFailures"),
+            "hmi_delete_tag documents that an incomplete reference scan refuses the delete");
+        Check(typeof(HmiTagDeleteResult).GetProperty("ScanFailures") != null && typeof(HmiTagRenameResult).GetProperty("ScanFailures") != null,
+            "delete and rename results expose the scan categories that could not be read");
         Check(renameTool.InputSchema.Required.SequenceEqual(new[] { "tag_name", "new_name", "on_conflict" }),
             "hmi_rename_tag requires tag_name, new_name and on_conflict");
         Check(renameTool.InputSchema.Properties["on_conflict"].Enum.SequenceEqual(new[] { "fail" }),
@@ -1140,6 +1144,48 @@ internal static class HmiToolBehaviorTests
             "SyntaxCheck is found through an explicitly implemented interface");
         Check(TiaManager.FindScriptSyntaxCheck(new object()) == null && TiaManager.FindScriptSyntaxCheck(null) == null,
             "a script object without SyntaxCheck (or none at all) is reported as not checkable");
+
+        // Event-handler scripts (IHmiScript) have a global definition area; it is its own scanned and replaceable site.
+        foreach (object script in new object[] { new PublicEventScript(), new ExplicitEventScript() })
+        {
+            List<HmiEventScriptCodeSite> sites = TiaManager.GetEventScriptCodeSites(script, "event", null, "Tapped");
+            HmiEventScriptCodeSite global = sites.SingleOrDefault(site => site.Location == "event_global_definitions:Tapped");
+            Check(sites.Count == 2 && sites.Any(site => site.Location == "event:Tapped") && global != null,
+                script.GetType().Name + ": event script exposes ScriptCode and GlobalDefinitionAreaScriptCode sites");
+            string globalCode = global.CodeProperty.GetValue(script, null) as string;
+            Check(HmiTagReferenceText.FindScriptOccurrences(globalCode, "Motor").Occurrences
+                    .Any(occurrence => occurrence.Replaceable && HmiTagReferenceText.IsBlockingKind(occurrence.Kind)),
+                script.GetType().Name + ": a tag literal only in the global definition area is a blocking, replaceable hit");
+            Check(global.CodeProperty.CanWrite && TiaManager.FindScriptSyntaxCheck(script) != null,
+                script.GetType().Name + ": the global definition area is writable and guarded by SyntaxCheck");
+        }
+        Check(TiaManager.GetEventScriptCodeSites(null, "event", null, "Tapped").Count == 0,
+            "a handler without a script has no code sites");
+    }
+
+    public interface IFakeEventScript
+    {
+        string ScriptCode { get; set; }
+        string GlobalDefinitionAreaScriptCode { get; set; }
+        object SyntaxCheck();
+    }
+
+    public sealed class PublicEventScript
+    {
+        private string _code = "HMIRuntime.Trace('x');";
+        private string _global = "const TAG = \"Motor\";";
+        public string ScriptCode { get { return _code; } set { _code = value; } }
+        public string GlobalDefinitionAreaScriptCode { get { return _global; } set { _global = value; } }
+        public object SyntaxCheck() { return null; }
+    }
+
+    public sealed class ExplicitEventScript : IFakeEventScript
+    {
+        private string _code = "HMIRuntime.Trace('x');";
+        private string _global = "const TAG = \"Motor\";";
+        string IFakeEventScript.ScriptCode { get { return _code; } set { _code = value; } }
+        string IFakeEventScript.GlobalDefinitionAreaScriptCode { get { return _global; } set { _global = value; } }
+        object IFakeEventScript.SyntaxCheck() { return null; }
     }
 
     public interface IFakeHmiScript
