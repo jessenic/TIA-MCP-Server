@@ -1636,12 +1636,20 @@ namespace TiaOpennessMcp.Tools
             // ----------------------------------------------------
 
             // 51. plcsim_list_instances
-            Register("plcsim_list_instances", "List all registered Siemens S7-PLCSIM Advanced instances with ID, name, operating state, CPU type, and IP.",
+            Register("plcsim_list_instances", "List all registered Siemens S7-PLCSIM Advanced instances with ID, name, operating state, CPU type, and IP. " +
+                "S7-PLCSIM Advanced V8.0+ only (S7-1500 / ET 200SP virtual controllers); standard S7-PLCSIM (V18-V21), and therefore S7-1200 simulation, has no public API and is not supported. " +
+                "Returns an object {runtimeAvailable, apiPath, apiVersion, runtimeManagerAvailable, runtimeVersion, instances[], standardPlcSimProcesses[], message, error}; " +
+                "message explains an empty list, and standardPlcSimProcesses reports a running standard S7-PLCSIM. isError is set when the PLCSIM Advanced runtime is not available.",
                 schema => { },
-                args => CallToolResult.Json(PlcSimManager.Instance.ListInstances()));
+                args =>
+                {
+                    var result = PlcSimRuntimeProbe.ListInstancesSafe();
+                    return CallToolResult.Json(result, isError: !result.RuntimeAvailable);
+                });
 
             // 52. plcsim_connect
-            Register("plcsim_connect", "Connect to a running Siemens S7-PLCSIM Advanced instance by name (default 'PLC_1').",
+            Register("plcsim_connect", "Connect to a running Siemens S7-PLCSIM Advanced instance by name (default 'PLC_1'). " +
+                "S7-PLCSIM Advanced V8.0+ only (S7-1500 / ET 200SP); standard S7-PLCSIM and S7-1200 simulation are not supported. A failure message explains why (missing API, runtime not running, standard S7-PLCSIM detected).",
                 schema =>
                 {
                     schema.Properties["instance_name"] = new ToolProperty
@@ -1653,7 +1661,7 @@ namespace TiaOpennessMcp.Tools
                 args =>
                 {
                     string instanceName = GetStringProp(args, "instance_name") ?? "PLC_1";
-                    var res = PlcSimManager.Instance.Connect(instanceName);
+                    var res = PlcSimRuntimeProbe.ConnectSafe(instanceName);
                     return CallToolResult.Json(res, isError: !res.Success);
                 });
 

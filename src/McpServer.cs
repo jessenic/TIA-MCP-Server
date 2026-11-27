@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 using System.Text.Json;
 using TiaOpennessMcp.Protocol;
 using TiaOpennessMcp.Tools;
@@ -30,18 +31,42 @@ namespace TiaOpennessMcp
             // S7CommPlus driver) would corrupt the protocol, so everything else goes to stderr.
             lock (OutputLock)
             {
-                if (_protocolOut == null)
+                if (!_consoleRedirected)
                 {
-                    _protocolOut = Console.Out;
+                    _consoleRedirected = true;
                     Console.SetOut(Console.Error);
                 }
             }
+
+            // MCP stdio is UTF-8. Console.ReadLine would decode with the console code page (OEM/ANSI),
+            // which turns non-ASCII arguments (ä, ö, °) into mojibake. Console.InputEncoding is not
+            // changed: it calls SetConsoleCP, which can throw or affect a parent console.
+            Run(CreateStdioReader(Console.OpenStandardInput()), CreateStdioWriter(Console.OpenStandardOutput()));
+        }
+
+        /// <summary>UTF-8 line reader for the stdio transport (a BOM, if any, selects its encoding).</summary>
+        public static TextReader CreateStdioReader(Stream input)
+        {
+            return new StreamReader(input, new UTF8Encoding(false), detectEncodingFromByteOrderMarks: true);
+        }
+
+        /// <summary>UTF-8 writer without BOM for the stdio transport.</summary>
+        public static TextWriter CreateStdioWriter(Stream output)
+        {
+            return new StreamWriter(output, new UTF8Encoding(false)) { AutoFlush = true, NewLine = "\n" };
+        }
+
+        /// <summary>Serves JSON-RPC messages, one per line, from input and writes responses to output until EOF.</summary>
+        public void Run(TextReader input, TextWriter output)
+        {
+            _protocolOut = output ?? throw new ArgumentNullException(nameof(output));
+            if (input == null) throw new ArgumentNullException(nameof(input));
 
             Console.Error.WriteLine("[McpServer] Siemens TIA Portal V21 Openness MCP Server started.");
             Console.Error.WriteLine("[McpServer] Listening on stdio for JSON-RPC messages...");
 
             string? line;
-            while ((line = Console.ReadLine()) != null)
+            while ((line = input.ReadLine()) != null)
             {
                 line = line.Trim();
                 if (string.IsNullOrEmpty(line))
@@ -204,6 +229,7 @@ namespace TiaOpennessMcp
         }
 
         private static readonly object OutputLock = new object();
-        private static System.IO.TextWriter? _protocolOut;
+        private static bool _consoleRedirected;
+        private System.IO.TextWriter? _protocolOut;
     }
 }

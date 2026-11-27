@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Threading;
 using Siemens.Simatic.Simulation.Runtime;
@@ -23,11 +24,17 @@ namespace TiaOpennessMcp.Tia
         public bool IsConnected => _instance != null;
         public string? ConnectedInstanceName => _connectedName;
 
-        public List<PlcSimInstanceSummary> ListInstances()
+        /// <summary>
+        /// Registered PLCSIM Advanced instances. A runtime failure is returned in Error instead of being
+        /// swallowed. Callers go through PlcSimRuntimeProbe.ListInstancesSafe, which also catches a
+        /// missing API assembly and fills the diagnosis.
+        /// </summary>
+        public PlcSimListResult ListInstances()
         {
-            var result = new List<PlcSimInstanceSummary>();
+            var result = new PlcSimListResult();
             try
             {
+                ReadRuntimeManagerState(result);
                 var infos = SimulationRuntimeManager.RegisteredInstanceInfo;
                 if (infos != null)
                 {
@@ -52,15 +59,35 @@ namespace TiaOpennessMcp.Tia
                         {
                             // If instance is not reachable
                         }
-                        result.Add(summary);
+                        result.Instances.Add(summary);
                     }
                 }
+                result.RuntimeAvailable = result.RuntimeManagerAvailable != false;
+                if (!result.RuntimeAvailable && result.Error == null)
+                    result.Error = "the S7-PLCSIM Advanced Runtime Manager is not available (is S7-PLCSIM Advanced running?)";
             }
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"[PlcSimManager] ListInstances error: {ex.Message}");
+                result.RuntimeAvailable = false;
+                result.Error = PlcSimRuntimeProbe.DescribeException(ex);
             }
             return result;
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void ReadRuntimeManagerState(PlcSimListResult result)
+        {
+            try
+            {
+                result.RuntimeManagerAvailable = SimulationRuntimeManager.IsRuntimeManagerAvailable;
+                result.RuntimeVersion = SimulationRuntimeManager.Version;
+            }
+            catch (MissingMemberException ex)
+            {
+                // A newer API without these members: report it, never fail the listing.
+                Console.Error.WriteLine($"[PlcSimManager] Runtime manager state not readable: {ex.Message}");
+            }
         }
 
         public PlcSimConnectResult Connect(string instanceName = "PLC_1")
@@ -93,7 +120,8 @@ namespace TiaOpennessMcp.Tia
                 {
                     Success = false,
                     InstanceName = instanceName,
-                    Message = $"Failed to connect to PLCSIM Advanced instance '{instanceName}': {ex.Message}"
+                    Message = $"Failed to connect to PLCSIM Advanced instance '{instanceName}': {PlcSimRuntimeProbe.DescribeException(ex)} " +
+                        PlcSimRuntimeProbe.BuildConnectHint(PlcSimRuntimeProbe.DetectStandardPlcSimProcesses())
                 };
             }
         }
@@ -112,7 +140,8 @@ namespace TiaOpennessMcp.Tia
                 var conn = Connect(_connectedName ?? "PLC_1");
                 if (!conn.Success || _instance == null)
                 {
-                    throw new InvalidOperationException("Not connected to S7-PLCSIM Advanced. Call 'plcsim_connect' first.");
+                    throw new InvalidOperationException("Not connected to S7-PLCSIM Advanced. Call 'plcsim_connect' first. " +
+                        $"Automatic connect to '{conn.InstanceName}' failed: {conn.Message}");
                 }
             }
         }
