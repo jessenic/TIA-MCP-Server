@@ -1,30 +1,30 @@
 {
   "name": "hmi_export_json",
-  "description": "Export a Unified HMI target as versioned JSON files. Omit output_directory to stage a remote-readable export and return a transfer_id.",
+  "description": "Export a Unified HMI target as a versioned JSON directory containing screens, tag tables, alarms, optional styles, and file hashes.",
   "parameters": {
-    "additionalProperties": false,
+    "type": "object",
     "properties": {
-      "compact": {
-        "description": "Omit item properties equal to their TIA-created type defaults (default: true).",
-        "type": "boolean"
-      },
-      "include_library": {
-        "description": "Package the complete project type library, including faceplates, dynamic SVG definitions and PLC type dependencies, in a hashed V21 .zal21 archive (default: true). Requires committed library versions.",
-        "type": "boolean"
-      },
       "output_directory": {
-        "description": "Optional local server directory. Omit for a staged export readable with hmi_read_export_file.",
-        "type": "string"
+        "type": "string",
+        "description": "Optional local server directory. Omit to create a remote-readable staged export and return its transfer_id."
+      },
+      "compact": {
+        "type": "boolean",
+        "description": "Omit item properties equal to their TIA-created type defaults (default: true)."
       },
       "script_files": {
-        "description": "Write event scripts into .js sidecar files instead of inline JSON strings (default: false).",
-        "type": "boolean"
+        "type": "boolean",
+        "description": "Write event scripts into .js sidecar files instead of inline JSON strings (default: false)."
+      },
+      "include_library": {
+        "type": "boolean",
+        "description": "Package the complete project type library, including faceplates, dynamic SVG definitions and PLC type dependencies, in a hashed V21 .zal21 archive (default: true). Requires committed library versions."
       },
       "target_name": {
-        "description": "Target HMI software/device selector (optional when only one target exists).",
-        "type": "string"
+        "type": "string",
+        "description": "Target HMI software/device selector (optional when only one target exists)."
       }
     },
-    "type": "object"
+    "additionalProperties": false
   }
 }

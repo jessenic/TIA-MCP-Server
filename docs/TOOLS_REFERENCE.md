@@ -426,7 +426,7 @@ The bundled Openness assemblies cover authoring APIs, not the complete WinCC Uni
   | `on_conflict` | string | No | `"fail"` | Only `"fail"` is supported. |
 - **Collision check:** the rename fails with status `collision`, and nothing changes, if any program block, PLC data type, system block or system data type in the PLC already has the new name (case-insensitive). Objects inside S7-1500 software units are not searched.
 - **Not found:** when `group_path` is given and the name is not in that folder, the message names the folders where it exists. If the name belongs to a UDT, the message points to `tia_rename_plc_type`.
-- **Result:** `{ Success, Operation, Status, PlcName, ObjectName, TargetPath, Partial, Message, Warnings }`. If TIA rejects the name and the read-back shows the old name unchanged, `Status` is `api_failure` with `Partial: false`.
+- **Result:** `{ Success, Operation, Status, PlcName, ObjectName, TargetPath, DataType, Value, Partial, Message, Warnings }`. `DataType` and `Value` are always `null` for a rename. If TIA rejects the name and the read-back shows the old name unchanged, `Status` is `api_failure` with `Partial: false`.
 - **Not verified against a live TIA Portal:** whether callers and instance DBs follow the rename, and the behaviour for know-how protected or library-linked blocks.
 
 ### `tia_rename_plc_type`
@@ -2270,7 +2270,8 @@ been run against a live TIA Portal.
 
 ### `tia_list_technology_objects`
 - **Parameters:** `plc_name` (optional, exact, case-sensitive).
-- Lists the folder including subfolders. **Response data:** `[{ Name, Type, Version, Number, GroupPath, IsConsistent, Error }]`.
+- Lists the folder including subfolders. **Response data:** `{ Success, Status, PlcName, Count, TechnologyObjects: [{ Name, Type, Version, Number, GroupPath, IsConsistent, Error }], Message }`.
+  The result is an error when `Success` is `false`.
   `Type` is the Openness system-library name, e.g. `PID_Temp`.
 
 ### `tia_get_technology_object_parameters`
@@ -2305,7 +2306,9 @@ been run against a live TIA Portal.
   order, and each is read back.
 - **Per-parameter status:** `updated`; `api_failure` (TIA rejected the write; it may still have changed state);
   `verification_failed` (written, but the read-back failed or differs, e.g. TIA recalculated the value); `not_written`
-  (not attempted).
+  (not attempted). When validation fails, the failing entry has `not_found` (unknown name or a case mismatch),
+  `not_readable` (the current value cannot be read) or `invalid_input` (the current value is null or the value cannot be
+  converted), and all other entries are `not_written`.
 - Not transactional: on a failure in the write phase `Partial` is `true`, later entries are `not_written`, earlier writes
   are not rolled back, and a warning says whether earlier parameters were written. Each entry lists `OldValue`,
   `RequestedValue`, `NewValue`, `ClrType` and `Status`.

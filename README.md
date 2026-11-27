@@ -908,7 +908,7 @@ This repository includes 3 turnkey agent skills located in `.agents/skills/`:
 ## Version History & Bug Fixes
 
 ### [v2.14.0] - 2026-11-27
-* #3: Non-ASCII text (ä, ö, å, °) is no longer corrupted. Stdio and HTTP requests are read as UTF-8, `tia_import_scl_block` writes its temporary source as UTF-8 with BOM, and the HMI text tools decode numeric references such as `&#196;`.
+* #3: Non-ASCII text (ä, ö, å, °) is no longer corrupted. Stdio requests are read as UTF-8, HTTP requests as UTF-8 unless `Content-Type` names another known charset, `tia_import_scl_block` writes its temporary source as UTF-8 with BOM, and the HMI text tools decode numeric references such as `&#196;`.
 * #4: Added `hmi_delete_tag`: delete one HMI tag after a best-effort reference scan; a referenced tag, or one whose scan was incomplete, is kept by default.
 * #5: `hmi_import_json` accepts flags enums such as `WindowFlags` as names separated by `,` or `|`, or `None`.
 * #6: Re-importing unchanged Singlebit/Bitmask dynamizations updates the mapping tables in place; a changed condition type or bit needs `onConflict: "replace"`, reordered entries are refused, and the dry run reports both. `hmi_set_tag_dynamization` runs in one transaction.
@@ -917,8 +917,8 @@ This repository includes 3 turnkey agent skills located in `.agents/skills/`:
 * #9: Script read-back ignores line endings and trailing whitespace (`hmi_import_json`, `hmi_set_event_script`, `hmi_create_navigation_button`).
 * #10: Added `hmi_rename_tag`: rename one HMI tag in place, read back the references found before, and optionally replace exact string literals in scripts.
 * #11: Added `tia_delete_plc_type`, `tia_rename_plc_type` and `tia_rename_block`.
-* #12: `tia_import_scl_block` has a `backup` parameter; an inconsistent existing block is compiled once before the backup, and the import stops without changes if it stays inconsistent.
-* #13: `tia_import_block`, `tia_import_scl_block` and `tia_import_plc_type` accept a server-local `file_path` instead of inline text; `.scl` files must be UTF-8.
+* #12: `tia_import_scl_block` has a `backup` parameter; an inconsistent existing block is compiled once before the backup; if it stays inconsistent, the import stops without replacing the block, and the error says whether that compile ran.
+* #13: `tia_import_block`, `tia_import_scl_block` and `tia_import_plc_type` accept a server-local `file_path` instead of inline text; a file without a BOM must be UTF-8, and a file with a BOM is read by its BOM.
 * #14: Added `tia_set_block_attribute` for OB `CyclicTime`, `PhaseOffset` and `PriorityNumber`; `tia_import_block` warns about OB cycle times that look like milliseconds, and `tia_get_block_attributes` returns the OB cycle attributes.
 * #15: `hmi_update_screen_item` also sets `Enabled`, `OutputFormat`, text alignment, a screen window's `Screen`, `Text` and `Font`.
 * #16: `tia_get_block_code` returns the source text TIA Portal generates for SCL, STL and DB blocks and for UDTs (`format`, `include_xml`, `with_dependencies`); `ExtractedScl` is deprecated.

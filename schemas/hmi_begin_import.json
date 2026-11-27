@@ -1,9 +1,9 @@
 {
   "name": "hmi_begin_import",
-  "description": "Create a temporary HMI JSON import transfer.",
+  "description": "Create a temporary HMI JSON import transfer. Upload manifest.json and every referenced file with hmi_upload_import_file.",
   "parameters": {
-    "additionalProperties": false,
+    "type": "object",
     "properties": {},
-    "type": "object"
+    "additionalProperties": false
   }
 }
