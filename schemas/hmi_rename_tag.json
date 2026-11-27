@@ -1,6 +1,6 @@
 {
   "name": "hmi_rename_tag",
-  "description": "Rename one Unified HMI tag in place with TIA\u0027s own rename (the tag is never deleted and recreated), including tags in grouped tag tables. Before renaming, a best-effort scan lists structured references (alarms, other tags, dynamizations, button parts, script trigger tags) and script text occurrences; after renaming, each structured reference is read back and reported with Updated=true or false. Structured references are never rewritten by this tool. script_references=\u0027replace\u0027 also rewrites script string literals that are exactly the old name (\u0022Old\u0022 or \u0027Old\u0027); other occurrences are only reported. The PLC tag is not renamed. Run with dry_run=true first.",
+  "description": "Rename one Unified HMI tag in place with TIA\u0027s own rename (the tag is never deleted and recreated), including tags in grouped tag tables. Before renaming, a best-effort scan lists structured references (alarms, other tags, runtime settings, dynamizations, button parts, script trigger tags) and script text occurrences; after renaming, each structured reference is read back and reported with Updated=true or false. TIA cross-references are listed in CrossReferences but not read back. Structured references are never rewritten by this tool. script_references=\u0027replace\u0027 also rewrites script string literals that are exactly the old name (\u0022Old\u0022 or \u0027Old\u0027), only in scripts that have a syntax check; other occurrences are only reported. The PLC tag is not renamed. Run with dry_run=true first.",
   "parameters": {
     "type": "object",
     "properties": {
@@ -29,7 +29,7 @@
       },
       "script_references": {
         "type": "string",
-        "description": "\u0027report\u0027 (default) only lists script occurrences of the old name; \u0027replace\u0027 also rewrites string literals that are exactly the old name and verifies each script by read-back.",
+        "description": "\u0027report\u0027 (default) only lists script occurrences of the old name; \u0027replace\u0027 also rewrites string literals that are exactly the old name and verifies each script by read-back and by a syntax check that must not report more errors than before.",
         "enum": [
           "report",
           "replace"

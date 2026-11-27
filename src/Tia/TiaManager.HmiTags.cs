@@ -12,6 +12,7 @@ using Siemens.Engineering.HmiUnified;
 using Siemens.Engineering.HmiUnified.HmiAlarm;
 using Siemens.Engineering.HmiUnified.HmiTags;
 using Siemens.Engineering.HmiUnified.LoggingTags;
+using Siemens.Engineering.HmiUnified.RuntimeSettings;
 using Siemens.Engineering.HmiUnified.UI;
 using Siemens.Engineering.HmiUnified.UI.Base;
 using Siemens.Engineering.HmiUnified.UI.Dynamization;
@@ -47,9 +48,17 @@ namespace TiaOpennessMcp.Tia
         {
             "Global script modules (HmiSoftware.Scripts): V21 Openness exposes no script code for them.",
             "Faceplate, custom widget and custom web control interface bindings.",
-            "Runtime settings (for example exclusive-operation control and status tags).",
+            "Runtime settings other than the exclusive-operation control and status tags.",
+            "Analog alarm ConditionValue when it is not a plain string (for example a limit object).",
+            "Screen items nested in groups or faceplate containers, if V21 does not list them in HmiScreen.ScreenItems (only HmiScreen.ScreenItems is walked; not checked live).",
+            "Plant object tags (HmiSoftware.PlantObjectTags).",
             "Scheduler tasks, reports, recipes and user-management settings.",
             "Other HMI devices, library types, and HMI JSON exports saved outside the project."
+        };
+
+        private static readonly string[] HmiTagRenameNotChecked =
+        {
+            "The name-collision check does not look at plant object tags (HmiSoftware.PlantObjectTags); TIA may still reject the name."
         };
 
         public HmiTagDeleteResult DeleteHmiTag(
@@ -84,10 +93,10 @@ namespace TiaOpennessMcp.Tia
                 HmiTagUsageScan preview = ScanHmiTagUsage(hmi, location.Tag, tagName, skipOwnTag: true);
                 ApplyScan(result, preview);
                 result.Success = true;
-                result.Status = "preview";
-                result.Message = result.BlockingReferenceCount == 0
+                result.Status = "dry_run";
+                result.Message = !IsReferenced(result)
                     ? "Dry run: the tag can be deleted; no blocking references were found by the best-effort scan. Nothing was changed."
-                    : $"Dry run: {result.BlockingReferenceCount} blocking reference(s) found. With on_referenced='fail' the delete would be refused. Nothing was changed.";
+                    : $"Dry run: {DescribeReferences(result)} found. With on_referenced='fail' the delete would be refused. Nothing was changed.";
                 return result;
             }
 
@@ -103,11 +112,11 @@ namespace TiaOpennessMcp.Tia
 
                     HmiTagUsageScan scan = ScanHmiTagUsage(hmi, location.Tag, tagName, skipOwnTag: true);
                     ApplyScan(result, scan);
-                    if (result.BlockingReferenceCount > 0 && onReferenced == "fail")
+                    if (IsReferenced(result) && onReferenced == "fail")
                     {
                         result.Success = false;
                         result.Status = "referenced";
-                        result.Message = $"HMI tag '{tagName}' is still referenced ({result.BlockingReferenceCount} blocking reference(s)); nothing was deleted. " +
+                        result.Message = $"HMI tag '{tagName}' is still referenced ({DescribeReferences(result)}); nothing was deleted. " +
                             "Remove the references first, or pass on_referenced='ignore' to delete anyway.";
                         return result;
                     }
@@ -130,8 +139,8 @@ namespace TiaOpennessMcp.Tia
                 result.Success = true;
                 result.Status = "deleted";
                 result.Message = "HMI tag deleted and verified by exact-name read-back.";
-                if (result.BlockingReferenceCount > 0)
-                    result.Warnings.Add($"{result.BlockingReferenceCount} reference(s) to '{tagName}' now point to a missing tag; hmi_compile will report them.");
+                if (IsReferenced(result))
+                    result.Warnings.Add($"References to '{tagName}' ({DescribeReferences(result)}) now point to a missing tag; hmi_compile will report them.");
                 return result;
             }
             catch (Exception ex) when (mutationStarted && IsHmiTagMutationFailure(ex))
@@ -173,7 +182,7 @@ namespace TiaOpennessMcp.Tia
                 TargetName = hmi.Name,
                 DryRun = dryRun,
                 ScriptReferencesMode = scriptReferences,
-                NotScanned = HmiTagScanNotCovered.ToList()
+                NotScanned = HmiTagScanNotCovered.Concat(HmiTagRenameNotChecked).ToList()
             };
 
             HmiTagLocation? location = ResolveHmiTagForMutation(hmi, tagName, tableName, out string? failureStatus, out string? failureMessage);
@@ -306,8 +315,20 @@ namespace TiaOpennessMcp.Tia
                 .Where(logging => string.Equals(logging.Name, result.OldName, StringComparison.Ordinal))
                 .Select(logging => logging.Name)
                 .ToList();
-            if (result.LoggingTagsNamedAfterOldName.Count > 0)
-                result.Warnings.Add("Logging tags named after the old tag name keep that name; hmi_assign_logging_tags looks logging tags up by tag name.");
+            const string loggingWarning = "Logging tags named after the old tag name keep that name; hmi_assign_logging_tags looks logging tags up by tag name.";
+            if (result.LoggingTagsNamedAfterOldName.Count > 0 && !result.Warnings.Contains(loggingWarning))
+                result.Warnings.Add(loggingWarning);
+        }
+
+        private static bool IsReferenced(HmiTagDeleteResult result) =>
+            result.BlockingReferenceCount > 0 || result.CrossReferenceCount > 0;
+
+        private static string DescribeReferences(HmiTagDeleteResult result)
+        {
+            string text = $"{result.BlockingReferenceCount} blocking reference(s) from the scan";
+            if (result.CrossReferenceCount > 0)
+                text += $" and {result.CrossReferenceCount} TIA cross-reference 'used by' location(s), which may repeat scan hits or be the tag's own logging relations";
+            return text;
         }
 
         private static string? NullIfBlank(string? value) => string.IsNullOrEmpty(value) ? null : value;
@@ -315,26 +336,31 @@ namespace TiaOpennessMcp.Tia
         private static void ApplyScan(HmiTagDeleteResult result, HmiTagUsageScan scan)
         {
             result.References = scan.References;
+            result.CrossReferences = scan.CrossReferences;
             result.ScriptOccurrences = scan.ScriptOccurrences;
             result.CrossReferenceServiceAvailable = scan.CrossReferenceServiceAvailable;
             result.Warnings.AddRange(scan.Warnings);
             result.BlockingReferenceCount = scan.References.Count +
                 scan.ScriptOccurrences.Count(occurrence => HmiTagReferenceText.IsBlockingKind(occurrence.Kind));
+            result.CrossReferenceCount = scan.CrossReferences.Count;
             result.Warnings.Add("The reference scan is best-effort; see NotScanned for the places it does not read.");
+            if (scan.CrossReferences.Count > 0)
+                result.Warnings.Add("CrossReferences lists TIA 'used by' locations. They are counted separately from References, may repeat the same binding, " +
+                    "and may include the tag's own logging relations (not checked live). They also block the delete with on_referenced='fail'.");
         }
 
         private static void ApplyScan(HmiTagRenameResult result, HmiTagUsageScan scan, string newName)
         {
             result.StructuredReferences = scan.References;
             foreach (HmiTagReference reference in scan.References)
-            {
-                if (reference.Kind != "cross_reference")
-                    reference.ExpectedAfter = HmiTagReferenceText.RewriteTagReference(reference.Value, result.OldName, newName);
-            }
+                reference.ExpectedAfter = HmiTagReferenceText.RewriteTagReference(reference.Value, result.OldName, newName);
+            result.CrossReferences = scan.CrossReferences;
             result.ScriptOccurrences = scan.ScriptOccurrences;
             result.CrossReferenceServiceAvailable = scan.CrossReferenceServiceAvailable;
             result.Warnings.AddRange(scan.Warnings);
             result.Warnings.Add("The reference scan is best-effort; see NotScanned for the places it does not read.");
+            if (scan.CrossReferences.Count > 0)
+                result.Warnings.Add("CrossReferences lists TIA 'used by' locations found before the rename; they are not read back after it.");
         }
 
         private static void ReadBackStructuredReferences(HmiTagRenameResult result, HmiTagUsageScan scan, string oldName, string newName)
@@ -347,9 +373,11 @@ namespace TiaOpennessMcp.Tia
                 {
                     after = reference.ReadBack();
                 }
-                catch (Exception ex) when (ex is EngineeringException || ex is COMException || ex is InvalidOperationException)
+                catch (Exception ex) when (ex is EngineeringException || ex is COMException || ex is InvalidOperationException ||
+                    ex is TargetInvocationException || ex is NotSupportedException)
                 {
-                    result.Warnings.Add($"Could not read back {reference.Owner} {reference.Property}: {ex.Message}");
+                    string message = ex is TargetInvocationException && ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+                    result.Warnings.Add($"Could not read back {reference.Owner} {reference.Property}: {message}");
                     continue;
                 }
                 reference.ValueAfter = after;
@@ -370,18 +398,23 @@ namespace TiaOpennessMcp.Tia
                     result.Warnings.Add($"Script at {site.Owner} {site.Location} is not writable through the V21 Openness API; it was not changed.");
                     continue;
                 }
+                if (!site.CanSyntaxCheck)
+                {
+                    result.Warnings.Add($"Script at {site.Owner} {site.Location} has no SyntaxCheck in the V21 Openness API; it was not changed.");
+                    continue;
+                }
 
                 string current = site.Read() ?? string.Empty;
                 string updated = HmiTagReferenceText.ReplaceExactLiterals(current, oldName, newName, out int replaced);
                 if (replaced == 0) continue;
 
-                int errorsBefore = GetScriptDiagnostics(site.ScriptObject, "Errors").Count;
+                int errorsBefore = GetScriptSyntaxErrors(site.ScriptObject).Count;
                 site.Write(updated);
                 string? readBack = site.Read();
                 if (!string.Equals(readBack, updated, StringComparison.Ordinal))
                     throw new HmiStructureVerificationException(
                         $"Script at {site.Owner} {site.Location} could not be verified by read-back after replacing '{oldName}'.");
-                List<string> errorsAfter = GetScriptDiagnostics(site.ScriptObject, "Errors");
+                List<string> errorsAfter = GetScriptSyntaxErrors(site.ScriptObject);
                 if (errorsAfter.Count > errorsBefore)
                     throw new HmiStructureVerificationException(
                         $"Replacing '{oldName}' in the script at {site.Owner} {site.Location} added syntax errors: {string.Join("; ", errorsAfter)}");
@@ -389,6 +422,33 @@ namespace TiaOpennessMcp.Tia
                 foreach (HmiScriptTagOccurrence occurrence in planned)
                     occurrence.Replaced = true;
             }
+        }
+
+        // SyntaxCheck is public on ScriptDynamization and declared on IHmiScript (event handler scripts),
+        // so look on the concrete type first and then on its interfaces (explicit implementations).
+        public static MethodInfo? FindScriptSyntaxCheck(object? script)
+        {
+            if (script == null) return null;
+            Type type = script.GetType();
+            return type.GetMethod("SyntaxCheck", BindingFlags.Instance | BindingFlags.Public, null, Type.EmptyTypes, null)
+                ?? type.GetInterfaces()
+                    .Select(contract => contract.GetMethod("SyntaxCheck", Type.EmptyTypes))
+                    .FirstOrDefault(method => method != null);
+        }
+
+        private static List<string> GetScriptSyntaxErrors(object? script)
+        {
+            MethodInfo? syntaxCheck = FindScriptSyntaxCheck(script);
+            if (syntaxCheck == null)
+                throw new HmiStructureVerificationException("The script object exposes no SyntaxCheck; the replacement cannot be checked.");
+            object? diagnostics = syntaxCheck.Invoke(script, null);
+            object? values = diagnostics?.GetType().GetProperty("Errors")?.GetValue(diagnostics, null);
+            if (!(values is IEnumerable enumerable))
+                return new List<string>();
+            return enumerable.Cast<object?>()
+                .Where(value => value != null)
+                .Select(value => value!.ToString()!)
+                .ToList();
         }
 
         private sealed class HmiTagLocation
@@ -482,6 +542,7 @@ namespace TiaOpennessMcp.Tia
         private sealed class HmiTagUsageScan
         {
             public List<HmiTagReference> References { get; } = new List<HmiTagReference>();
+            public List<HmiTagReference> CrossReferences { get; } = new List<HmiTagReference>();
             public List<HmiScriptTagOccurrence> ScriptOccurrences { get; } = new List<HmiScriptTagOccurrence>();
             public List<HmiScriptSite> ScriptSites { get; } = new List<HmiScriptSite>();
             public List<string> Warnings { get; } = new List<string>();
@@ -496,6 +557,7 @@ namespace TiaOpennessMcp.Tia
             public Func<string?> Read { get; set; } = () => null;
             public Action<string>? Write { get; set; }
             public object? ScriptObject { get; set; }
+            public bool CanSyntaxCheck { get; set; }
         }
 
         // Read-only, best-effort scan of the places in one HMI software that can name a tag.
@@ -512,6 +574,18 @@ namespace TiaOpennessMcp.Tia
             void AddReference(string kind, string owner, string property, string? value, Func<string?> readBack)
             {
                 if (!HmiTagReferenceText.IsTagReference(value, tagName, isOtherTagName)) return;
+                AddMatchedReference(kind, owner, property, value, readBack);
+            }
+
+            // Alarm trigger addresses: the V21 format is not documented, so also accept 'Tag:bit'.
+            void AddAddressReference(string kind, string owner, string property, string? value, Func<string?> readBack)
+            {
+                if (!HmiTagReferenceText.IsTagAddressReference(value, tagName, isOtherTagName)) return;
+                AddMatchedReference(kind, owner, property, value, readBack);
+            }
+
+            void AddMatchedReference(string kind, string owner, string property, string? value, Func<string?> readBack)
+            {
                 scan.References.Add(new HmiTagReference
                 {
                     Kind = kind,
@@ -543,6 +617,8 @@ namespace TiaOpennessMcp.Tia
 
                 string key = owner + "|" + location;
                 bool writable = codeProperty.CanWrite && codeProperty.SetMethod?.IsPublic == true;
+                // Replacement is only allowed where the before/after SyntaxCheck guard can actually run.
+                bool canSyntaxCheck = FindScriptSyntaxCheck(scriptObject) != null;
                 scan.ScriptSites.Add(new HmiScriptSite
                 {
                     Key = key,
@@ -550,7 +626,8 @@ namespace TiaOpennessMcp.Tia
                     Location = location,
                     Read = read,
                     Write = writable ? value => codeProperty.SetValue(codeOwner, value, null) : (Action<string>?)null,
-                    ScriptObject = scriptObject
+                    ScriptObject = scriptObject,
+                    CanSyntaxCheck = canSyntaxCheck
                 });
                 foreach (HmiScriptTextOccurrence occurrence in lexed.Occurrences)
                 {
@@ -563,8 +640,12 @@ namespace TiaOpennessMcp.Tia
                         Column = occurrence.Column,
                         Kind = occurrence.Kind,
                         Snippet = occurrence.Snippet,
-                        Replaceable = occurrence.Replaceable && !lexed.Uncertain && writable,
-                        Note = lexed.Uncertain ? lexed.UncertainReason : (!writable && occurrence.Replaceable ? "Script code is not writable through the API." : null)
+                        Replaceable = occurrence.Replaceable && !lexed.Uncertain && writable && canSyntaxCheck,
+                        Note = lexed.Uncertain ? lexed.UncertainReason
+                            : !occurrence.Replaceable ? null
+                            : !writable ? "Script code is not writable through the API."
+                            : !canSyntaxCheck ? "The script object exposes no SyntaxCheck, so the replacement could not be checked; not replaceable."
+                            : null
                     });
                 }
             }
@@ -619,9 +700,10 @@ namespace TiaOpennessMcp.Tia
                             {
                                 scan.Warnings.Add($"Script trigger tags of {owner} {property} have an unsupported shape ({triggerTags.GetType().Name}) and were not scanned.");
                             }
-                            AddScriptSite(owner, "dynamization:" + property, null,
+                            // ScriptDynamization.SyntaxCheck (V21) checks the dynamization script, so it guards both code sites.
+                            AddScriptSite(owner, "dynamization:" + property, script,
                                 script.GetType().GetProperty("ScriptCode"), script);
-                            AddScriptSite(owner, "dynamization_global_definitions:" + property, null,
+                            AddScriptSite(owner, "dynamization_global_definitions:" + property, script,
                                 script.GetType().GetProperty("GlobalDefinitionAreaScriptCode"), script);
                         }
                     }
@@ -663,6 +745,7 @@ namespace TiaOpennessMcp.Tia
                     AddReference("alarm", owner, "RaisedStateTag", alarm.RaisedStateTag, () => alarm.RaisedStateTag);
                     AddReference("alarm", owner, "AcknowledgmentControlTag", alarm.AcknowledgmentControlTag, () => alarm.AcknowledgmentControlTag);
                     AddReference("alarm", owner, "AcknowledgmentStateTag", alarm.AcknowledgmentStateTag, () => alarm.AcknowledgmentStateTag);
+                    AddAddressReference("alarm", owner, "TriggerBitAddress", alarm.TriggerBitAddress, () => alarm.TriggerBitAddress);
                     AddAlarmParameterTags(scan, owner, () => alarm.AlarmParameterTags, AddReference);
                 }
             });
@@ -672,8 +755,21 @@ namespace TiaOpennessMcp.Tia
                 {
                     string owner = "AnalogAlarm '" + alarm.Name + "'";
                     AddReference("alarm", owner, "RaisedStateTag", alarm.RaisedStateTag, () => alarm.RaisedStateTag);
+                    AddAddressReference("alarm", owner, "TriggerAddress", alarm.TriggerAddress, () => alarm.TriggerAddress);
+                    // ConditionValue is Object in V21; only a plain string can name a tag here.
+                    if (alarm.ConditionValue is string conditionTag)
+                        AddReference("alarm", owner, "ConditionValue", conditionTag, () => alarm.ConditionValue as string);
                     AddAlarmParameterTags(scan, owner, () => alarm.AlarmParameterTags, AddReference);
                 }
+            });
+            RunCategory("runtime settings", () =>
+            {
+                HmiExclusiveOperationSettings? exclusive = hmi.RuntimeSettings?.HmiExclusiveOperationSettings;
+                if (exclusive == null) return;
+                AddReference("runtime_settings", "RuntimeSettings", "ExclusiveOperationControlTag",
+                    exclusive.ExclusiveOperationControlTag, () => exclusive.ExclusiveOperationControlTag);
+                AddReference("runtime_settings", "RuntimeSettings", "ExclusiveOperationStatusTag",
+                    exclusive.ExclusiveOperationStatusTag, () => exclusive.ExclusiveOperationStatusTag);
             });
             RunCategory("HMI tags", () =>
             {
@@ -729,7 +825,7 @@ namespace TiaOpennessMcp.Tia
                         {
                             // Only "used by" relations are references to this tag; "uses" covers e.g. its PLC tag.
                             if (location.ReferenceType != ReferenceType.UsedBy) continue;
-                            scan.References.Add(new HmiTagReference
+                            scan.CrossReferences.Add(new HmiTagReference
                             {
                                 Kind = "cross_reference",
                                 Owner = string.IsNullOrEmpty(reference.Path) ? reference.Name : reference.Path,
@@ -824,7 +920,9 @@ namespace TiaOpennessMcp.Tia
         public int? MemberCount { get; set; }
         public int? LoggingTagCount { get; set; }
         public int BlockingReferenceCount { get; set; }
+        public int CrossReferenceCount { get; set; }
         public List<HmiTagReference> References { get; set; } = new List<HmiTagReference>();
+        public List<HmiTagReference> CrossReferences { get; set; } = new List<HmiTagReference>();
         public List<HmiScriptTagOccurrence> ScriptOccurrences { get; set; } = new List<HmiScriptTagOccurrence>();
         public bool? CrossReferenceServiceAvailable { get; set; }
         public List<string> NotScanned { get; set; } = new List<string>();
@@ -850,6 +948,7 @@ namespace TiaOpennessMcp.Tia
         public string ScriptReferencesMode { get; set; } = "report";
         public int StaleReferenceCount { get; set; }
         public List<HmiTagReference> StructuredReferences { get; set; } = new List<HmiTagReference>();
+        public List<HmiTagReference> CrossReferences { get; set; } = new List<HmiTagReference>();
         public List<HmiScriptTagOccurrence> ScriptOccurrences { get; set; } = new List<HmiScriptTagOccurrence>();
         public List<string> LoggingTagsNamedAfterOldName { get; set; } = new List<string>();
         public bool? CrossReferenceServiceAvailable { get; set; }
@@ -914,6 +1013,15 @@ namespace TiaOpennessMcp.Tia
                     return false;
             }
             return true;
+        }
+
+        // Like IsTagReference, but also accepts 'Tag:bit' (a possible alarm trigger address form).
+        public static bool IsTagAddressReference(string? reference, string tagName, Func<string, bool>? isOtherTagName)
+        {
+            if (IsTagReference(reference, tagName, isOtherTagName)) return true;
+            if (string.IsNullOrEmpty(reference) || string.IsNullOrEmpty(tagName)) return false;
+            return reference!.Length > tagName.Length && reference.StartsWith(tagName, StringComparison.Ordinal) &&
+                reference[tagName.Length] == ':';
         }
 
         public static string RewriteTagReference(string reference, string oldName, string newName)

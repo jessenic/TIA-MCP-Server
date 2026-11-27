@@ -27,8 +27,9 @@ namespace TiaOpennessMcp.Tools
 
             Register("hmi_delete_tag",
                 "Delete one Unified HMI tag by exact name, including tags in tag tables inside tag-table groups. " +
-                "Before deleting, a best-effort scan looks for references in alarms, other tags (handshake, limit and logging trigger tags), screen and item dynamizations, button parts and scripts, and TIA cross-references when available. " +
-                "By default (on_referenced='fail') a referenced tag is not deleted and the references are returned. dry_run=true only reports. " +
+                "Before deleting, a best-effort scan looks for references in alarms (state, acknowledgment, parameter and trigger tags), other tags (handshake, limit and logging trigger tags), the exclusive-operation runtime settings, screen and item dynamizations, button parts and scripts; " +
+                "TIA cross-references ('used by') are listed separately in CrossReferences when available. " +
+                "By default (on_referenced='fail') a tag with scan hits or cross-references is not deleted and the references are returned. dry_run=true only reports (status 'dry_run'). " +
                 "Members of structured tags, system tags and whole tag tables cannot be deleted with this tool.",
                 schema =>
                 {
@@ -62,8 +63,9 @@ namespace TiaOpennessMcp.Tools
 
             Register("hmi_rename_tag",
                 "Rename one Unified HMI tag in place with TIA's own rename (the tag is never deleted and recreated), including tags in grouped tag tables. " +
-                "Before renaming, a best-effort scan lists structured references (alarms, other tags, dynamizations, button parts, script trigger tags) and script text occurrences; after renaming, each structured reference is read back and reported with Updated=true or false. " +
-                "Structured references are never rewritten by this tool. script_references='replace' also rewrites script string literals that are exactly the old name (\"Old\" or 'Old'); other occurrences are only reported. " +
+                "Before renaming, a best-effort scan lists structured references (alarms, other tags, runtime settings, dynamizations, button parts, script trigger tags) and script text occurrences; after renaming, each structured reference is read back and reported with Updated=true or false. " +
+                "TIA cross-references are listed in CrossReferences but not read back. " +
+                "Structured references are never rewritten by this tool. script_references='replace' also rewrites script string literals that are exactly the old name (\"Old\" or 'Old'), only in scripts that have a syntax check; other occurrences are only reported. " +
                 "The PLC tag is not renamed. Run with dry_run=true first.",
                 schema =>
                 {
@@ -77,7 +79,7 @@ namespace TiaOpennessMcp.Tools
                         Type = "string",
                         Enum = new List<string> { "report", "replace" },
                         Default = "report",
-                        Description = "'report' (default) only lists script occurrences of the old name; 'replace' also rewrites string literals that are exactly the old name and verifies each script by read-back."
+                        Description = "'report' (default) only lists script occurrences of the old name; 'replace' also rewrites string literals that are exactly the old name and verifies each script by read-back and by a syntax check that must not report more errors than before."
                     };
                     schema.Properties["dry_run"] = new ToolProperty { Type = "boolean", Default = false, Description = "Only report what the rename would touch; change nothing (default: false)." };
                     schema.Required = new List<string> { "tag_name", "new_name", "on_conflict" };

@@ -489,9 +489,14 @@ internal static class HmiToolBehaviorTests
 
         tagFake.NextDeleteStatus = "referenced";
         CallToolResult referencedResult = registry.Execute("hmi_delete_tag", Arguments("{\"tag_name\":\"Motor_Speed\"}"));
-        Check(referencedResult.IsError && FirstText(referencedResult).Contains("\"referenced\"") &&
-            FirstText(referencedResult).Contains("tag_dynamization") && !FirstText(referencedResult).Contains("ReadBack"),
-            "a referenced delete is an error result that lists the references");
+        string referencedJson = FirstText(referencedResult);
+        Check(referencedResult.IsError && referencedJson.Contains("\"referenced\"") &&
+            referencedJson.Contains("tag_dynamization") && referencedJson.Contains("cross_reference") &&
+            referencedJson.Contains("CrossReferenceCount"),
+            "a referenced delete is an error result that lists the references and cross-references separately");
+        Check(!referencedJson.Contains("ReadBack") && !referencedJson.Contains("LeakedReadBackValue") &&
+            !referencedJson.Contains("SiteKey") && !referencedJson.Contains("LeakedSiteKeyValue"),
+            "the internal ReadBack delegate and SiteKey are not serialized");
         tagFake.NextDeleteStatus = "deleted";
 
         int calls = tagFake.CallCount;
@@ -559,6 +564,17 @@ internal static class HmiToolBehaviorTests
         }
         HmiTagReferenceText.ValidateNewTagName("Motor_Speed 2");
         Check(true, "new tag name accepts underscores and spaces");
+
+        Check(HmiTagReferenceText.IsTagAddressReference("Motor:3", "Motor", noOtherTags) &&
+            HmiTagReferenceText.IsTagAddressReference("Motor.x3", "Motor", noOtherTags) &&
+            HmiTagReferenceText.IsTagAddressReference("Motor", "Motor", noOtherTags),
+            "alarm trigger addresses match the tag, a member, or 'Tag:bit'");
+        Check(!HmiTagReferenceText.IsTagAddressReference("Motor2:3", "Motor", noOtherTags) &&
+            !HmiTagReferenceText.IsTagAddressReference("motor:3", "Motor", noOtherTags) &&
+            !HmiTagReferenceText.IsTagReference("Motor:3", "Motor", noOtherTags),
+            "'Tag:bit' is accepted only for trigger addresses and only for the exact tag name");
+        Check(HmiTagReferenceText.RewriteTagReference("Motor:3", "Motor", "Pump") == "Pump:3",
+            "a 'Tag:bit' address keeps its bit suffix when the expected value is rewritten");
     }
 
     private static void TestHmiTagScriptLexer()
@@ -623,6 +639,29 @@ internal static class HmiToolBehaviorTests
             "rename rejects an unknown script_references value before project access");
         Throws<ArgumentException>(() => manager.RenameHmiTag("Motor", "Motor", null, null, "fail", "report", false),
             "rename rejects an unchanged name before project access");
+
+        // The replace guard needs SyntaxCheck: public (ScriptDynamization) or on an interface (IHmiScript).
+        Check(TiaManager.FindScriptSyntaxCheck(new PublicSyntaxCheckScript()) != null,
+            "SyntaxCheck is found on a script object with a public method");
+        Check(TiaManager.FindScriptSyntaxCheck(new ExplicitSyntaxCheckScript()) != null,
+            "SyntaxCheck is found through an explicitly implemented interface");
+        Check(TiaManager.FindScriptSyntaxCheck(new object()) == null && TiaManager.FindScriptSyntaxCheck(null) == null,
+            "a script object without SyntaxCheck (or none at all) is reported as not checkable");
+    }
+
+    public interface IFakeHmiScript
+    {
+        object SyntaxCheck();
+    }
+
+    public sealed class PublicSyntaxCheckScript
+    {
+        public object SyntaxCheck() { return null; }
+    }
+
+    public sealed class ExplicitSyntaxCheckScript : IFakeHmiScript
+    {
+        object IFakeHmiScript.SyntaxCheck() { return null; }
     }
 
     private static CallToolResult ExecuteQuietly(ToolRegistry registry, string tool, string json)
@@ -674,14 +713,30 @@ internal static class HmiToolBehaviorTests
             };
             if (NextDeleteStatus == "referenced")
             {
-                result.References.Add(new HmiTagReference
+                var reference = new HmiTagReference
                 {
                     Kind = "tag_dynamization",
                     Owner = "Screen 'Main' item 'io_Speed'",
                     Property = "ProcessValue",
                     Value = tagName
-                });
-                result.BlockingReferenceCount = 1;
+                };
+                // Set the internal members the way TiaManager does, so the test sees whether they leak into JSON.
+                typeof(HmiTagReference).GetProperty("ReadBack", BindingFlags.Instance | BindingFlags.NonPublic)
+                    .SetValue(reference, (Func<string>)(() => "LeakedReadBackValue"));
+                result.References.Add(reference);
+                var occurrence = new HmiScriptTagOccurrence
+                {
+                    Owner = "Screen 'Main'",
+                    Location = "event:Loaded",
+                    Kind = HmiTagReferenceText.ExactLiteral,
+                    Snippet = "Tags('" + tagName + "')"
+                };
+                typeof(HmiScriptTagOccurrence).GetProperty("SiteKey", BindingFlags.Instance | BindingFlags.NonPublic)
+                    .SetValue(occurrence, "LeakedSiteKeyValue");
+                result.ScriptOccurrences.Add(occurrence);
+                result.CrossReferences.Add(new HmiTagReference { Kind = "cross_reference", Owner = "HMI_RT/Main", Value = tagName });
+                result.BlockingReferenceCount = 2;
+                result.CrossReferenceCount = 1;
             }
             return result;
         }
