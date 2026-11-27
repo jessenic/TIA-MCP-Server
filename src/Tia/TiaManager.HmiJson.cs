@@ -592,8 +592,9 @@ namespace TiaOpennessMcp.Tia
             ValidateHmiRequirements(hmi, plan.Manifest.Require);
 
             if (dryRun)
-                return CreateImportResult(plan, hmi.Name, true, pruneItems, null);
+                return CreateImportResult(plan, hmi.Name, true, pruneItems, null, CheckHmiImportZOrder(hmi, plan, true));
 
+            List<string> zOrderWarnings;
             using (ExclusiveAccess access = _tiaPortal!.ExclusiveAccess("Import Unified HMI JSON"))
             using (Transaction transaction = access.Transaction(_project!, "Import Unified HMI JSON"))
             {
@@ -605,13 +606,14 @@ namespace TiaOpennessMcp.Tia
                 ApplyHmiImportPlan(hmi, plan, pruneItems, defaults);
                 VerifyHmiImportPlan(hmi, plan);
                 VerifyHmiPatch(hmi, plan.Manifest.Verify);
+                zOrderWarnings = CheckHmiImportZOrder(hmi, plan, false);
                 transaction.CommitOnDispose();
             }
 
             HmiTargetInfo target = ListHmiTargets().Single(t =>
                 string.Equals(t.SoftwareName, hmi.Name, StringComparison.OrdinalIgnoreCase));
             CompilationReport compilation = CompileHmi(target.DeviceName);
-            var result = CreateImportResult(plan, hmi.Name, false, pruneItems, compilation);
+            var result = CreateImportResult(plan, hmi.Name, false, pruneItems, compilation, zOrderWarnings);
             if (compilation.ErrorCount > 0)
                 throw new InvalidOperationException(
                     $"HMI JSON import was applied in memory but compilation reported {compilation.ErrorCount} error(s). " +
@@ -631,17 +633,24 @@ namespace TiaOpennessMcp.Tia
             if (!string.Equals(patch.Format, "tia-mcp-hmi-patch/1", StringComparison.Ordinal))
                 throw new InvalidDataException($"Unsupported HMI patch format '{patch.Format}'.");
             ValidatePatchRequirements(hmi, patch.Require);
+            ValidatePatchRequiredItems(hmi, patch.Require);
             ValidatePatchOperations(hmi, patch.Operations);
             List<string> languages = GetHmiLanguages(hmi);
+            List<string> warnings = CollectUnknownPatchFields(patch);
 
             if (dryRun)
-                return new Dictionary<string, object>
+            {
+                var dryRunResult = new Dictionary<string, object>
                 {
                     ["targetName"] = hmi.Name,
                     ["dryRun"] = true,
                     ["operationCount"] = patch.Operations.Count,
                     ["operations"] = patch.Operations.Select(DescribePatchOperation).ToList()
                 };
+                if (warnings.Count > 0)
+                    dryRunResult["warnings"] = warnings;
+                return dryRunResult;
+            }
 
             using (ExclusiveAccess access = _tiaPortal!.ExclusiveAccess("Apply Unified HMI JSON patch"))
             using (Transaction transaction = access.Transaction(_project!, "Apply Unified HMI JSON patch"))
@@ -662,7 +671,7 @@ namespace TiaOpennessMcp.Tia
                     "The project has not been saved. Compile diagnostics: " +
                     JsonSerializer.Serialize(compilation.Messages, HmiJsonOptions));
 
-            return new Dictionary<string, object>
+            var result = new Dictionary<string, object>
             {
                 ["targetName"] = hmi.Name,
                 ["dryRun"] = false,
@@ -670,6 +679,9 @@ namespace TiaOpennessMcp.Tia
                 ["operations"] = patch.Operations.Select(DescribePatchOperation).ToList(),
                 ["compilation"] = compilation
             };
+            if (warnings.Count > 0)
+                result["warnings"] = warnings;
+            return result;
         }
 
         private static HmiJsonScreen CreateScreenDocument(
@@ -779,6 +791,7 @@ namespace TiaOpennessMcp.Tia
             bool compact = false,
             string? screenPath = null)
         {
+            var texts = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
             var document = new HmiJsonItem
             {
                 Name = item.Name,
@@ -787,7 +800,8 @@ namespace TiaOpennessMcp.Tia
                 Compact = item is HmiCustomWidgetContainer ? false : (bool?)null,
                 Interface = CreateInterfaceDocument(item),
                 Props = new Dictionary<string, JsonElement>(StringComparer.Ordinal),
-                Text = new Dictionary<string, JsonElement>(StringComparer.Ordinal),
+                // Export and the compact defaults snapshot always set text, dynamizations and events.
+                Text = texts,
                 Dynamizations = new List<HmiJsonDynamization>(),
                 Events = new List<HmiJsonEvent>()
             };
@@ -803,7 +817,7 @@ namespace TiaOpennessMcp.Tia
 
                 if (IsMultilingualText(property.PropertyType))
                 {
-                    document.Text[property.Name] = SerializeMultilingualText(value, languages);
+                    texts[property.Name] = SerializeMultilingualText(value, languages);
                     continue;
                 }
 
@@ -832,7 +846,8 @@ namespace TiaOpennessMcp.Tia
             if (compact && defaults != null && defaults.TryGetValue(GetItemIdentityKey(document), out HmiJsonItem? defaultItem))
             {
                 RemoveDefaultValues(document.Props, defaultItem.Props);
-                RemoveDefaultValues(document.Text, defaultItem.Text);
+                if (defaultItem.Text != null)
+                    RemoveDefaultValues(texts, defaultItem.Text);
             }
             return document;
         }
@@ -880,6 +895,7 @@ namespace TiaOpennessMcp.Tia
             return defaults;
         }
 
+        // Type key only: Text, Dynamizations and Events stay null and must not be read from this object.
         private static HmiJsonItem CreateItemIdentity(HmiScreenItemBase item)
         {
             return new HmiJsonItem
@@ -948,6 +964,53 @@ namespace TiaOpennessMcp.Tia
             }
         }
 
+        /// <summary>
+        /// Normalizes script text for read-back comparison only: CRLF and CR become LF, trailing spaces and tabs
+        /// are removed from each line, a leading BOM and trailing line breaks are dropped. Indentation and all other
+        /// content are kept. Scripts are always written exactly as supplied.
+        /// </summary>
+        private static string NormalizeScriptForComparison(string? code)
+        {
+            if (code == null) return "";
+            string text = code.Length > 0 && code[0] == '\uFEFF' ? code.Substring(1) : code;
+            text = text.Replace("\r\n", "\n").Replace('\r', '\n');
+            string[] lines = text.Split('\n');
+            for (int i = 0; i < lines.Length; i++)
+                lines[i] = lines[i].TrimEnd(' ', '\t');
+            return string.Join("\n", lines).TrimEnd('\n');
+        }
+
+        /// <summary>True when two scripts differ only in line endings or trailing whitespace.</summary>
+        private static bool AreScriptsEquivalent(string? expected, string? actual)
+        {
+            return string.Equals(NormalizeScriptForComparison(expected), NormalizeScriptForComparison(actual),
+                StringComparison.Ordinal);
+        }
+
+        /// <summary>
+        /// Describes the first difference between two scripts after normalization, or null when they are equivalent.
+        /// </summary>
+        private static string? DescribeScriptDifference(string? expected, string? actual)
+        {
+            if (AreScriptsEquivalent(expected, actual)) return null;
+            string[] expectedLines = NormalizeScriptForComparison(expected).Split('\n');
+            string[] actualLines = NormalizeScriptForComparison(actual).Split('\n');
+            int count = Math.Min(expectedLines.Length, actualLines.Length);
+            for (int i = 0; i < count; i++)
+            {
+                if (!string.Equals(expectedLines[i], actualLines[i], StringComparison.Ordinal))
+                    return $"first difference at line {i + 1}: expected \"{ShortenScriptLine(expectedLines[i])}\", " +
+                        $"read back \"{ShortenScriptLine(actualLines[i])}\"";
+            }
+            return $"expected {expectedLines.Length} line(s), read back {actualLines.Length} line(s)";
+        }
+
+        private static string ShortenScriptLine(string line)
+        {
+            string escaped = line.Replace("\\", "\\\\").Replace("\t", "\\t").Replace("\"", "\\\"");
+            return escaped.Length <= 80 ? escaped : escaped.Substring(0, 77) + "...";
+        }
+
         private static void WriteScriptSidecars(
             string root,
             int screenIndex,
@@ -958,6 +1021,7 @@ namespace TiaOpennessMcp.Tia
             for (int itemIndex = 0; itemIndex < screen.Items.Count; itemIndex++)
             {
                 HmiJsonItem item = screen.Items[itemIndex];
+                if (item.Events == null) continue;
                 for (int eventIndex = 0; eventIndex < item.Events.Count; eventIndex++)
                 {
                     HmiJsonEvent itemEvent = item.Events[eventIndex];
@@ -1183,6 +1247,7 @@ namespace TiaOpennessMcp.Tia
                 throw new InvalidDataException($"Unsupported HMI JSON format '{manifest.Format}'.");
             if (manifest.ScreenFiles.Count > 2000)
                 throw new InvalidDataException("The manifest contains too many screen files.");
+            ResolveZOrderMode(manifest.ZOrder, null, "manifest.json");
 
             var plan = new HmiJsonImportPlan
             {
@@ -1201,7 +1266,8 @@ namespace TiaOpennessMcp.Tia
                         throw new InvalidDataException($"Screen identity in '{file.Path}' does not match the manifest.");
                     if (screen.Items.Count > 10000)
                         throw new InvalidDataException($"Screen '{screen.Name}' contains too many items.");
-                    foreach (HmiJsonEvent itemEvent in screen.Items.SelectMany(i => i.Events))
+                    ResolveZOrderMode(manifest.ZOrder, screen.ZOrder, file.Path);
+                    foreach (HmiJsonEvent itemEvent in screen.Items.SelectMany(i => i.Events ?? Enumerable.Empty<HmiJsonEvent>()))
                     {
                         if (itemEvent.ScriptFile == null || string.IsNullOrWhiteSpace(itemEvent.ScriptFile))
                             continue;
@@ -1359,6 +1425,7 @@ namespace TiaOpennessMcp.Tia
                     throw new InvalidDataException($"Screen '{screenDocument.Name}' must include nonzero Width and Height properties.");
                 ValidateProperties(typeof(HmiScreen), screenDocument.Props);
                 ValidateTexts(typeof(HmiScreen), screenDocument.Text);
+                var partialItems = new List<string>();
                 foreach (HmiJsonItem itemDocument in screenDocument.Items)
                 {
                     Type itemType = ResolveHmiScreenItemType(itemDocument.Type);
@@ -1369,10 +1436,11 @@ namespace TiaOpennessMcp.Tia
                         FindHmiScreen(hmi, screenDocument.Name, screenDocument.Group)?.ScreenItems.Find(itemDocument.Name) == null)
                         throw new InvalidDataException(
                             $"Custom widget '{screenDocument.Name}/{itemDocument.Name}' must already exist: V21 does not expose its creation type in the public API.");
-                    if (itemDocument.Props.Count > 256 || itemDocument.Text.Count > 64)
+                    if (itemDocument.Props.Count > 256 || (itemDocument.Text?.Count ?? 0) > 64)
                         throw new InvalidDataException($"Item '{screenDocument.Name}/{itemDocument.Name}' has too many properties.");
                     ValidateProperties(itemType, itemDocument.Props);
-                    ValidateTexts(itemType, itemDocument.Text);
+                    if (itemDocument.Text != null)
+                        ValidateTexts(itemType, itemDocument.Text);
                     if (itemDocument.Interface != null && FindOptionalProperty(itemType, "Interface") == null)
                         throw new InvalidDataException($"Item type '{itemType.Name}' does not expose a container interface.");
                     ValidateInterfaceDocument(itemDocument.Interface);
@@ -1388,14 +1456,26 @@ namespace TiaOpennessMcp.Tia
                     foreach (var itemProperty in itemDocument.Props)
                         effectiveProperties[itemProperty.Key] = itemProperty.Value;
                     ValidateProperties(itemType, effectiveProperties);
-                    foreach (HmiJsonDynamization dynamization in itemDocument.Dynamizations)
+                    if (itemDocument.Dynamizations != null)
                     {
-                        ValidateDynamizationDocument(itemType, dynamization, suppliedTags);
+                        foreach (HmiJsonDynamization dynamization in itemDocument.Dynamizations)
+                        {
+                            ValidateDynamizationDocument(itemType, dynamization, suppliedTags);
+                        }
+                        EnsureUnique(itemDocument.Dynamizations.Select(d => d.Property),
+                            $"dynamization on '{screenDocument.Name}/{itemDocument.Name}'");
                     }
-                    EnsureUnique(itemDocument.Dynamizations.Select(d => d.Property),
-                        $"dynamization on '{screenDocument.Name}/{itemDocument.Name}'");
-                    ValidateEvents(itemType, itemDocument.Events);
+                    if (itemDocument.Events != null)
+                        ValidateEvents(itemType, itemDocument.Events);
+                    string[] unchanged = GetUnchangedItemSections(itemDocument);
+                    if (unchanged.Length > 0)
+                        partialItems.Add($"{itemDocument.Name} ({string.Join(", ", unchanged)})");
                 }
+                if (partialItems.Count > 0)
+                    plan.Warnings.Add(
+                        $"Screen '{screenDocument.Name}': {partialItems.Count} item(s) omit sections that are left unchanged " +
+                        "on existing items: " + string.Join("; ", partialItems.Take(20)) +
+                        (partialItems.Count > 20 ? "; ..." : "") + ".");
             }
         }
 
@@ -1451,6 +1531,8 @@ namespace TiaOpennessMcp.Tia
                 effectiveType == typeof(decimal) ? value.ValueKind == JsonValueKind.Number : false;
             if (!valid)
                 throw new InvalidDataException($"Value for property '{propertyName}' has the wrong JSON type.");
+            if (effectiveType.IsEnum)
+                ParseEnumValue(effectiveType, value.GetString()!, propertyName);
         }
 
         private static void ValidateTexts(Type itemType, Dictionary<string, JsonElement> texts)
@@ -1596,14 +1678,32 @@ namespace TiaOpennessMcp.Tia
                 defaults.TryGetValue(GetItemIdentityKey(itemDocument), out HmiJsonItem? defaultItem))
             {
                 ApplyObjectProperties(item, defaultItem.Props);
-                ApplyTexts(item, defaultItem.Text, plan.Manifest.Languages);
+                // A missing text key leaves the texts unchanged, so the compact text reset is skipped too.
+                if (itemDocument.Text != null && defaultItem.Text != null)
+                    ApplyTexts(item, defaultItem.Text, plan.Manifest.Languages);
             }
             var mergedProperties = ResolveStyleProperties(plan.Styles, itemDocument);
             ApplyObjectProperties(item, mergedProperties);
-            ApplyTexts(item, itemDocument.Text, plan.Manifest.Languages);
+            if (itemDocument.Text != null)
+                ApplyTexts(item, itemDocument.Text, plan.Manifest.Languages);
             ApplyInterfaceDocument(item, itemDocument.Interface);
-            ApplyDynamizations(hmi, item, itemDocument.Dynamizations);
-            ApplyItemEvents(item, itemDocument.Events);
+            if (itemDocument.Dynamizations != null)
+                ApplyDynamizations(hmi, item, itemDocument.Dynamizations);
+            if (itemDocument.Events != null)
+                ApplyItemEvents(item, itemDocument.Events);
+        }
+
+        /// <summary>
+        /// Names the item sections that are missing (or null) in the import document. Those sections are not
+        /// applied, so the existing texts, dynamizations or events of the item stay as they are.
+        /// </summary>
+        private static string[] GetUnchangedItemSections(HmiJsonItem itemDocument)
+        {
+            var sections = new List<string>();
+            if (itemDocument.Text == null) sections.Add("text");
+            if (itemDocument.Dynamizations == null) sections.Add("dynamizations");
+            if (itemDocument.Events == null) sections.Add("events");
+            return sections.ToArray();
         }
 
         private static Dictionary<string, JsonElement> ResolveStyleProperties(
@@ -1802,6 +1902,8 @@ namespace TiaOpennessMcp.Tia
 
         private static object ParseEnumValue(Type enumType, string value, string context)
         {
+            if (enumType.IsDefined(typeof(FlagsAttribute), false))
+                return ParseFlagsEnumValue(enumType, value, context);
             try
             {
                 object parsed = Enum.Parse(enumType, value, true);
@@ -1813,6 +1915,29 @@ namespace TiaOpennessMcp.Tia
             {
                 throw new InvalidDataException($"'{value}' is not a valid {enumType.Name} value for '{context}'.", error);
             }
+        }
+
+        /// <summary>
+        /// Parses a [Flags] enum from member names separated by ',' or '|' (for example the exported
+        /// "ShowCaption, CanClose" or "None"). Numbers are rejected so that only named flags are written.
+        /// </summary>
+        private static object ParseFlagsEnumValue(Type enumType, string? value, string context)
+        {
+            string[] names = Enum.GetNames(enumType);
+            string error = $"'{value}' is not a valid {enumType.Name} value for '{context}'. " +
+                $"Use one name or several names separated by ',' or '|' from: {string.Join(", ", names)}.";
+            if (value == null || value.Trim().Length == 0)
+                throw new InvalidDataException(error);
+            long combined = 0;
+            foreach (string token in value.Split(',', '|'))
+            {
+                string trimmed = token.Trim();
+                string? name = names.FirstOrDefault(n => string.Equals(n, trimmed, StringComparison.OrdinalIgnoreCase));
+                if (trimmed.Length == 0 || name == null)
+                    throw new InvalidDataException(error);
+                combined |= Convert.ToInt64(Enum.Parse(enumType, name), CultureInfo.InvariantCulture);
+            }
+            return Enum.ToObject(enumType, combined);
         }
 
         private static Color ParseJsonColor(string text, string propertyName)
@@ -2276,7 +2401,125 @@ namespace TiaOpennessMcp.Tia
                 throw new InvalidDataException("Singlebit condition type requires SingleBit mapping entries.");
         }
 
-        private static void ApplyValueConverter(ValueConverter converter, HmiJsonValueConverter document)
+        private enum MappingTableUpdateMode
+        {
+            RebuildEntries,
+            UpdateBitmaskInPlace,
+            ReplaceDynamization
+        }
+
+        private sealed class MappingTableUpdatePlan
+        {
+            public MappingTableUpdateMode Mode { get; set; }
+            public int[]? Pairing { get; set; }
+            public string Reason { get; set; } = "";
+        }
+
+        /// <summary>
+        /// Decides how an existing mapping table is brought to the desired document. Bitmask and Singlebit entries
+        /// cannot be deleted through Openness, so an existing bitmask table is only updated in place (same condition
+        /// type, bit dynamization type, entry count and relevant masks). Anything else needs the dynamization to be
+        /// recreated, which the caller allows only with onConflict 'replace'.
+        /// </summary>
+        private static MappingTableUpdatePlan PlanMappingTableUpdate(
+            HmiJsonValueConverter existing,
+            HmiJsonValueConverter desired)
+        {
+            if (!existing.Entries.Any(entry => entry.Type == "Bitmask"))
+                return new MappingTableUpdatePlan { Mode = MappingTableUpdateMode.RebuildEntries };
+            var replace = new MappingTableUpdatePlan { Mode = MappingTableUpdateMode.ReplaceDynamization };
+            if (desired.Entries.Count == 0 || desired.Entries.Any(entry => entry.Type != "Bitmask"))
+            {
+                replace.Reason = $"the existing {existing.ConditionType} mapping table has bitmask entries that " +
+                    $"cannot be changed to a {desired.ConditionType} table with {desired.Entries.Count} non-bitmask entries in place";
+                return replace;
+            }
+            object existingCondition = ParseEnumValue(typeof(ConditionType), existing.ConditionType, "mapping condition type");
+            object desiredCondition = ParseEnumValue(typeof(ConditionType), desired.ConditionType, "mapping condition type");
+            if (!Equals(existingCondition, desiredCondition))
+            {
+                replace.Reason = $"the mapping condition type changes from {existingCondition} to {desiredCondition}";
+                return replace;
+            }
+            BitDynamizationType existingBits = ParseBitDynamizationType(existing.Entries[0].BitDynamizationType);
+            BitDynamizationType desiredBits = ParseBitDynamizationType(desired.Entries[0].BitDynamizationType);
+            if (existingBits != desiredBits)
+            {
+                replace.Reason = $"the bit dynamization type changes from {existingBits} to {desiredBits}";
+                return replace;
+            }
+            int[]? pairing = PairBitmaskEntries(existing.Entries, desired.Entries);
+            if (pairing == null)
+            {
+                replace.Reason = $"the bitmask entries change (existing relevant masks " +
+                    $"[{string.Join(", ", existing.Entries.Select(e => e.Relevant))}], requested " +
+                    $"[{string.Join(", ", desired.Entries.Select(e => e.Relevant))}]); the relevant mask (bit) is " +
+                    "read-only in Openness, so a recreated table only works when TIA generates the requested bit";
+                return replace;
+            }
+            return new MappingTableUpdatePlan { Mode = MappingTableUpdateMode.UpdateBitmaskInPlace, Pairing = pairing };
+        }
+
+        /// <summary>
+        /// Pairs each desired bitmask entry with an existing entry: first by equal relevant mask and condition,
+        /// then by equal relevant mask only, preferring the same position. Returns null when no full pairing exists.
+        /// </summary>
+        private static int[]? PairBitmaskEntries(List<HmiJsonMappingEntry> existing, List<HmiJsonMappingEntry> desired)
+        {
+            if (existing.Count != desired.Count) return null;
+            var used = new bool[existing.Count];
+            var pairing = Enumerable.Repeat(-1, desired.Count).ToArray();
+            for (int pass = 0; pass < 2; pass++)
+            {
+                for (int i = 0; i < desired.Count; i++)
+                {
+                    if (pairing[i] >= 0) continue;
+                    foreach (int j in new[] { i }.Concat(Enumerable.Range(0, existing.Count)))
+                    {
+                        if (j >= existing.Count || used[j]) continue;
+                        if (!existing[j].Relevant.HasValue || existing[j].Relevant != desired[i].Relevant) continue;
+                        if (pass == 0 && ReadBitmaskCondition(existing[j]) != ReadBitmaskCondition(desired[i])) continue;
+                        used[j] = true;
+                        pairing[i] = j;
+                        break;
+                    }
+                }
+            }
+            return pairing.All(index => index >= 0) ? pairing : null;
+        }
+
+        private static MappingTableUpdatePlan PlanExistingMappingTable(ValueConverter converter, HmiJsonValueConverter desired)
+        {
+            HmiJsonValueConverter existing;
+            try
+            {
+                existing = CreateValueConverterDocument(converter);
+            }
+            catch (InvalidDataException error)
+            {
+                // The existing table cannot be described; bitmask entries still must not be deleted.
+                return converter.MappingTable.Entries.OfType<MappingTableEntryBitmask>().Any()
+                    ? new MappingTableUpdatePlan
+                    {
+                        Mode = MappingTableUpdateMode.ReplaceDynamization,
+                        Reason = "the existing bitmask mapping table cannot be read (" + error.Message + ")"
+                    }
+                    : new MappingTableUpdatePlan { Mode = MappingTableUpdateMode.RebuildEntries };
+            }
+            return PlanMappingTableUpdate(existing, desired);
+        }
+
+        private static string FormatMappingTableConflict(string itemName, string property, string reason)
+        {
+            return $"Refusing to replace the mapping table of '{itemName}.{property}': {reason}. " +
+                "Set onConflict to 'replace' on this dynamization to delete and recreate only the dynamization " +
+                "(the screen item is kept), or keep the exported mapping table.";
+        }
+
+        private static void ApplyValueConverter(
+            ValueConverter converter,
+            HmiJsonValueConverter document,
+            MappingTableUpdatePlan? plan = null)
         {
             if (converter.Formula != document.Formula)
             {
@@ -2285,8 +2528,18 @@ namespace TiaOpennessMcp.Tia
             }
             converter.IsFormulaSelected = document.IsFormulaSelected;
             var table = converter.MappingTable;
-            foreach (MappingTableEntryBase entry in table.Entries.ToList())
-                entry.Delete();
+            if (plan?.Mode == MappingTableUpdateMode.UpdateBitmaskInPlace)
+            {
+                UpdateBitmaskEntriesInPlace(table, document, plan.Pairing!);
+                return;
+            }
+            if (plan?.Mode == MappingTableUpdateMode.ReplaceDynamization)
+                throw new InvalidOperationException("A mapping table that needs replacement cannot be updated in place.");
+            if (table.Entries.OfType<MappingTableEntryBitmask>().Any())
+                throw new InvalidOperationException(
+                    "Bitmask mapping entries cannot be deleted through Openness; recreate the dynamization instead.");
+            while (table.Entries.Count > 0)
+                table.Entries[0].Delete();
             table.ConditionType = (ConditionType)ParseEnumValue(typeof(ConditionType),
                 document.ConditionType, "mapping condition type");
             if (document.Entries.Count > 0 && document.Entries[0].Type == "Bitmask")
@@ -2309,11 +2562,16 @@ namespace TiaOpennessMcp.Tia
                     BitDynamizationType entryBitDynamizationType =
                         ParseBitDynamizationType(entry.BitDynamizationType);
                     if (entryBitDynamizationType != bitDynamizationType ||
-                        bitmask.BitDynamizationType != entryBitDynamizationType ||
-                        bitmask.Relevant != ReadRelevantMask(entry))
+                        bitmask.BitDynamizationType != entryBitDynamizationType)
                         throw new InvalidDataException(
-                            $"TIA generated a bitmask entry with a different type or relevant mask at index {i}.");
-                    bitmask.Condition = condition;
+                            $"TIA generated a bitmask entry with a different type at index {i}.");
+                    if (bitmask.Condition != condition)
+                        bitmask.Condition = condition;
+                    if (bitmask.Relevant != ReadRelevantMask(entry))
+                        throw new InvalidDataException(
+                            $"TIA generated a bitmask entry with relevant mask {bitmask.Relevant} at index {i}, but the JSON " +
+                            $"requires {ReadRelevantMask(entry)}. The relevant mask (bit) is read-only in Openness; " +
+                            "change the bit in TIA Portal.");
                     ApplyMappingEntryValues(bitmask, entry);
                 }
                 return;
@@ -2338,6 +2596,31 @@ namespace TiaOpennessMcp.Tia
                     throw new InvalidDataException($"Unsupported mapping entry type '{entry.Type}'.");
                 ApplyMappingEntryValues(actual, entry);
             }
+        }
+
+        private static void UpdateBitmaskEntriesInPlace(MappingTable table, HmiJsonValueConverter document, int[] pairing)
+        {
+            ConditionType conditionBefore = table.ConditionType;
+            List<MappingTableEntryBitmask> entries = table.Entries.OfType<MappingTableEntryBitmask>().ToList();
+            int countBefore = table.Entries.Count;
+            if (entries.Count != countBefore || pairing.Length != document.Entries.Count ||
+                pairing.Any(index => index < 0 || index >= entries.Count))
+                throw new InvalidOperationException("The existing bitmask mapping table changed while it was being updated.");
+            for (int i = 0; i < document.Entries.Count; i++)
+            {
+                HmiJsonMappingEntry entry = document.Entries[i];
+                MappingTableEntryBitmask bitmask = entries[pairing[i]];
+                ulong condition = ReadBitmaskCondition(entry);
+                if (bitmask.Condition != condition)
+                    bitmask.Condition = condition;
+                ApplyMappingEntryValues(bitmask, entry);
+            }
+            if (table.Entries.Count != countBefore || table.ConditionType != conditionBefore)
+                throw new InvalidOperationException("TIA changed the bitmask mapping table layout during an in-place update.");
+            for (int i = 0; i < document.Entries.Count; i++)
+                if (entries[pairing[i]].Relevant != ReadRelevantMask(document.Entries[i]))
+                    throw new InvalidOperationException(
+                        $"TIA changed the relevant mask of bitmask entry {pairing[i]} during an in-place update.");
         }
 
         private static string ReadSimpleCondition(HmiJsonMappingEntry entry)
@@ -2415,6 +2698,23 @@ namespace TiaOpennessMcp.Tia
                     existing.Delete();
                     existing = null;
                 }
+                MappingTableUpdatePlan? tablePlan = null;
+                ValueConverter? existingConverter = (existing as TagDynamization)?.ValueConverter ??
+                    (existing as ExpressionDynamization)?.ValueConverter;
+                if (existingConverter != null && document.ValueConverter != null)
+                {
+                    tablePlan = PlanExistingMappingTable(existingConverter, document.ValueConverter);
+                    if (tablePlan.Mode == MappingTableUpdateMode.ReplaceDynamization)
+                    {
+                        if (!string.Equals(document.OnConflict, "replace", StringComparison.OrdinalIgnoreCase))
+                            throw new InvalidOperationException(
+                                FormatMappingTableConflict(item.Name, document.Property, tablePlan.Reason));
+                        // Only the dynamization is recreated; the screen item stays in place.
+                        existing!.Delete();
+                        existing = null;
+                        tablePlan = null;
+                    }
+                }
                 if (document.Type == "ResourceList")
                 {
                     var dynamization = existing as ResourceListDynamization ??
@@ -2461,7 +2761,7 @@ namespace TiaOpennessMcp.Tia
                     converter = tagDynamization.ValueConverter;
                 }
                 if (document.ValueConverter != null)
-                    ApplyValueConverter(converter, document.ValueConverter);
+                    ApplyValueConverter(converter, document.ValueConverter, tablePlan);
                 if (!expression)
                 {
                     var tagDynamization = (TagDynamization)item.Dynamizations.Find(document.Property);
@@ -2490,32 +2790,36 @@ namespace TiaOpennessMcp.Tia
                     if (item is HmiContainerBase container && container.ContainedType != itemDocument.ContainedType)
                         throw new InvalidOperationException($"Container '{screen.Name}/{itemDocument.Name}' failed contained type verification.");
                     VerifyObjectProperties(item, ResolveStyleProperties(plan.Styles, itemDocument));
-                    VerifyTexts(item, itemDocument.Text, plan.Manifest.Languages);
+                    if (itemDocument.Text != null)
+                        VerifyTexts(item, itemDocument.Text, plan.Manifest.Languages);
                     if (itemDocument.Interface != null)
                         VerifyInterfaceProperties(CreateInterfaceDocument(item) ??
                             throw new InvalidOperationException($"Item '{item.Name}' is missing its interface."),
                             itemDocument.Interface, item.Name);
-                    foreach (HmiJsonDynamization dynamization in itemDocument.Dynamizations)
+                    if (itemDocument.Dynamizations != null)
                     {
-                        var actual = item.Dynamizations.Find(dynamization.Property);
-                        var actualDocument = actual == null ? null : CreateDynamizationDocument(actual);
-                        if (actualDocument != null)
-                            actualDocument.OnConflict = dynamization.OnConflict;
-                        if (actualDocument != null && dynamization.ValueConverter == null)
-                            actualDocument.ValueConverter = null;
-                        if (actualDocument == null || !AreJsonValuesEqual(
-                            JsonSerializer.SerializeToElement(actualDocument, HmiJsonOptions),
-                            JsonSerializer.SerializeToElement(dynamization, HmiJsonOptions)))
-                            throw new InvalidOperationException(
-                                $"Dynamization '{screen.Name}/{item.Name}/{dynamization.Property}' failed read-back verification.");
+                        foreach (HmiJsonDynamization dynamization in itemDocument.Dynamizations)
+                        {
+                            var actual = item.Dynamizations.Find(dynamization.Property);
+                            var actualDocument = actual == null ? null : CreateDynamizationDocument(actual);
+                            if (actualDocument != null)
+                                actualDocument.OnConflict = dynamization.OnConflict;
+                            if (actualDocument != null && dynamization.ValueConverter == null)
+                                actualDocument.ValueConverter = null;
+                            if (actualDocument?.Script != null && dynamization.Script != null)
+                                VerifyScriptDynamizationCode(actualDocument.Script, dynamization.Script,
+                                    $"{screen.Name}/{item.Name}/{dynamization.Property}");
+                            if (actualDocument == null || !AreJsonValuesEqual(
+                                JsonSerializer.SerializeToElement(actualDocument, HmiJsonOptions),
+                                JsonSerializer.SerializeToElement(dynamization, HmiJsonOptions)))
+                                throw new InvalidOperationException(
+                                    $"Dynamization '{screen.Name}/{item.Name}/{dynamization.Property}' failed read-back verification.");
+                        }
+                        if (item.Dynamizations.Count != itemDocument.Dynamizations.Count)
+                            throw new InvalidOperationException($"Dynamizations on '{screen.Name}/{item.Name}' failed read-back verification.");
                     }
-                    if (item.Dynamizations.Count != itemDocument.Dynamizations.Count)
-                        throw new InvalidOperationException($"Dynamizations on '{screen.Name}/{item.Name}' failed read-back verification.");
-                    var actualEvents = ReadItemEvents(item);
-                    if (actualEvents.Count != itemDocument.Events.Count ||
-                        itemDocument.Events.Any(expected => !actualEvents.Any(actual =>
-                            actual.Type == expected.Type && actual.Script == expected.Script)))
-                        throw new InvalidOperationException($"Events on '{screen.Name}/{item.Name}' failed read-back verification.");
+                    if (itemDocument.Events != null)
+                        VerifyItemEvents(ReadItemEvents(item), itemDocument.Events, $"{screen.Name}/{item.Name}");
                 }
             }
             foreach (HmiJsonTag expected in plan.Tags)
@@ -2559,6 +2863,51 @@ namespace TiaOpennessMcp.Tia
             }
         }
 
+        /// <summary>
+        /// Checks event read-back: the same event types (case-insensitive) and equivalent scripts
+        /// (line endings and trailing whitespace ignored).
+        /// </summary>
+        private static void VerifyItemEvents(List<HmiJsonEvent> actualEvents, List<HmiJsonEvent> expectedEvents, string itemPath)
+        {
+            if (actualEvents.Count != expectedEvents.Count)
+                throw new InvalidOperationException(
+                    $"Events on '{itemPath}' failed read-back verification: expected " +
+                    $"[{string.Join(", ", expectedEvents.Select(e => e.Type))}], read back " +
+                    $"[{string.Join(", ", actualEvents.Select(e => e.Type))}].");
+            foreach (HmiJsonEvent expected in expectedEvents)
+            {
+                HmiJsonEvent? actual = actualEvents.FirstOrDefault(e =>
+                    string.Equals(e.Type, expected.Type, StringComparison.OrdinalIgnoreCase));
+                if (actual == null)
+                    throw new InvalidOperationException($"Event '{expected.Type}' on '{itemPath}' was not found after import.");
+                string? difference = DescribeScriptDifference(expected.Script, actual.Script);
+                if (difference != null)
+                    throw new InvalidOperationException(
+                        $"Event '{expected.Type}' on '{itemPath}' failed read-back verification: {difference}.");
+            }
+        }
+
+        /// <summary>
+        /// Compares script dynamization code with the script comparison rules and, when equivalent, copies the
+        /// expected text into the read-back document so that the remaining fields are compared exactly.
+        /// </summary>
+        private static void VerifyScriptDynamizationCode(
+            HmiJsonScriptDynamization actual,
+            HmiJsonScriptDynamization expected,
+            string path)
+        {
+            string? difference = DescribeScriptDifference(expected.Code, actual.Code);
+            if (difference != null)
+                throw new InvalidOperationException(
+                    $"Script dynamization '{path}' failed read-back verification of its code: {difference}.");
+            difference = DescribeScriptDifference(expected.GlobalDefinitionCode, actual.GlobalDefinitionCode);
+            if (difference != null)
+                throw new InvalidOperationException(
+                    $"Script dynamization '{path}' failed read-back verification of its global definition code: {difference}.");
+            actual.Code = expected.Code;
+            actual.GlobalDefinitionCode = expected.GlobalDefinitionCode;
+        }
+
         private static bool HasItemEvents(HmiScreenItemBase item)
         {
             if (ReadItemEvents(item).Count > 0)
@@ -2573,10 +2922,37 @@ namespace TiaOpennessMcp.Tia
             {
                 PropertyInfo property = FindProperty(target.GetType(), expected.Key);
                 object? value = property.GetValue(target, null);
-                if (value == null || !AreJsonValuesEqual(SerializePropertyValue(value), expected.Value))
+                if (value != null && IsPartType(value.GetType()) && expected.Value.ValueKind == JsonValueKind.Object)
+                {
+                    // Parts are verified per given key so that enum values inside parts compare by value.
+                    VerifyObjectProperties(value, expected.Value.EnumerateObject()
+                        .ToDictionary(p => p.Name, p => p.Value, StringComparer.Ordinal));
+                    continue;
+                }
+                if (value == null || !IsPropertyValueEqual(value, expected.Value, property.Name))
                     throw new InvalidOperationException(
                         $"Property '{target.GetType().Name}.{property.Name}' failed read-back verification.");
             }
+        }
+
+        /// <summary>
+        /// Compares a read-back property value with its JSON value. Enum values compare by value, so
+        /// "CanClose|ShowCaption" equals the canonical "ShowCaption, CanClose" that TIA reads back.
+        /// </summary>
+        private static bool IsPropertyValueEqual(object actual, JsonElement expected, string propertyName)
+        {
+            if (actual.GetType().IsEnum && expected.ValueKind == JsonValueKind.String)
+            {
+                try
+                {
+                    return Equals(actual, ParseEnumValue(actual.GetType(), expected.GetString()!, propertyName));
+                }
+                catch (InvalidDataException)
+                {
+                    return false;
+                }
+            }
+            return AreJsonValuesEqual(SerializePropertyValue(actual), expected);
         }
 
         private static void VerifyTexts(
@@ -2656,6 +3032,7 @@ namespace TiaOpennessMcp.Tia
         {
             if (operations.Count > 10000)
                 throw new InvalidDataException("An HMI patch may contain at most 10,000 operations.");
+            var deletedItems = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (HmiJsonPatchOperation operation in operations)
             {
                 HmiScreen? screen = FindHmiScreen(hmi, operation.Screen, operation.Group);
@@ -2664,6 +3041,10 @@ namespace TiaOpennessMcp.Tia
                 HmiScreenItemBase? item = screen.ScreenItems.Find(operation.Item);
                 if (item == null)
                     throw new InvalidOperationException($"Patch item '{operation.Screen}/{operation.Item}' does not exist.");
+                string itemKey = (operation.Group ?? "") + "/" + screen.Name + "/" + item.Name;
+                if (deletedItems.Contains(itemKey))
+                    throw new InvalidDataException(
+                        $"Patch operation '{operation.Op}' on '{operation.Screen}/{operation.Item}' follows a delete of the same item.");
                 if (!string.IsNullOrWhiteSpace(operation.RequireType) &&
                     !string.Equals(operation.RequireType, item.GetType().Name, StringComparison.Ordinal))
                     throw new InvalidOperationException($"Patch precondition type failed for '{operation.Screen}/{operation.Item}'.");
@@ -2678,19 +3059,26 @@ namespace TiaOpennessMcp.Tia
                     case "bind":
                         if (string.IsNullOrWhiteSpace(operation.Property) || string.IsNullOrWhiteSpace(operation.Tag))
                             throw new InvalidDataException("Patch 'bind' operations require property and tag.");
-                        if (FindReferencedTag(hmi, operation.Tag!) == null)
+                        ValidatePatchBindDocument(item.GetType(), operation.Property!, operation.OnConflict);
+                        if (FindReferencedTag(hmi, operation.Tag!) == null && !hmi.SystemTags.Any(t => t.Name == operation.Tag))
                             throw new InvalidOperationException($"Patch references missing HMI tag '{operation.Tag}'.");
                         DynamizationBase? existing = item.Dynamizations.Find(operation.Property);
                         if (existing != null && !(existing is TagDynamization) &&
                             !string.Equals(operation.OnConflict, "replace", StringComparison.OrdinalIgnoreCase))
                             throw new InvalidOperationException(
                                 $"Refusing to overwrite non-tag dynamization on '{item.Name}.{operation.Property}'.");
+                        string? expectTagFailure = CheckBindExpectTag(operation.ExpectTag,
+                            existing == null ? null : existing.GetType().Name, (existing as TagDynamization)?.Tag);
+                        if (expectTagFailure != null)
+                            throw new InvalidOperationException(
+                                $"Patch bind precondition failed for '{operation.Screen}/{item.Name}.{operation.Property}': {expectTagFailure}");
                         break;
                     case "delete":
                         if (operation.RequireNoDynamizations && item.Dynamizations.Any())
                             throw new InvalidOperationException($"Delete precondition failed: '{item.Name}' has dynamizations.");
                         if (operation.RequireNoEvents && HasItemEvents(item))
                             throw new InvalidOperationException($"Delete precondition failed: '{item.Name}' has event handlers.");
+                        deletedItems.Add(itemKey);
                         break;
                     default:
                         throw new InvalidDataException($"Unsupported patch operation '{operation.Op}'.");
@@ -2759,13 +3147,22 @@ namespace TiaOpennessMcp.Tia
                     }
                     break;
                 case "bind":
+                    DynamizationBase? current = item.Dynamizations.Find(operation.Property!);
+                    string? expectTagFailure = CheckBindExpectTag(operation.ExpectTag,
+                        current == null ? null : current.GetType().Name, (current as TagDynamization)?.Tag);
+                    if (expectTagFailure != null)
+                        throw new InvalidOperationException(
+                            $"Patch bind precondition failed for '{operation.Screen}/{item.Name}.{operation.Property}': {expectTagFailure}");
+                    var currentTag = current as TagDynamization;
+                    // The server never touches the value converter or mapping table on bind (ValueConverter is null).
                     var binding = new HmiJsonDynamization
                     {
                         Type = "Tag",
                         Property = operation.Property!,
                         Tag = operation.Tag!,
-                        ReadOnly = operation.ReadOnly,
-                        UseIndirectAddressing = operation.UseIndirectAddressing,
+                        ReadOnly = ResolveBindFlag(operation.ReadOnly, currentTag?.ReadOnly),
+                        UseIndirectAddressing = ResolveBindFlag(operation.UseIndirectAddressing,
+                            currentTag?.UseIndirectAddressing),
                         OnConflict = operation.OnConflict
                     };
                     ApplyDynamizations(hmi, item, new List<HmiJsonDynamization> { binding }, reconcile: false);
@@ -2778,7 +3175,7 @@ namespace TiaOpennessMcp.Tia
 
         private static object DescribePatchOperation(HmiJsonPatchOperation operation)
         {
-            return new Dictionary<string, object?>
+            var description = new Dictionary<string, object?>
             {
                 ["op"] = operation.Op,
                 ["screen"] = operation.Screen,
@@ -2788,6 +3185,104 @@ namespace TiaOpennessMcp.Tia
                 ["tag"] = operation.Tag,
                 ["requireType"] = operation.RequireType
             };
+            if (operation.Op == "bind")
+            {
+                description["expectTag"] = operation.ExpectTag;
+                description["readOnly"] = operation.ReadOnly?.ToString().ToLowerInvariant() ?? "keep";
+                description["useIndirectAddressing"] = operation.UseIndirectAddressing?.ToString().ToLowerInvariant() ?? "keep";
+                description["onConflict"] = operation.OnConflict ?? "fail";
+            }
+            return description;
+        }
+
+        /// <summary>bind: an omitted readOnly or useIndirectAddressing keeps the existing value (false when new).</summary>
+        private static bool ResolveBindFlag(bool? requested, bool? existing)
+        {
+            return requested ?? existing ?? false;
+        }
+
+        /// <summary>
+        /// bind: checks the optional expectTag guard against the existing dynamization. Returns null when the guard
+        /// passes or is not set, otherwise the reason it failed.
+        /// </summary>
+        private static string? CheckBindExpectTag(string? expectTag, string? existingTypeName, string? existingTag)
+        {
+            if (expectTag == null)
+                return null;
+            if (existingTypeName == null)
+                return $"expectTag '{expectTag}' was given but the property has no dynamization.";
+            if (existingTypeName != nameof(TagDynamization))
+                return $"expectTag '{expectTag}' was given but the property has a {existingTypeName}.";
+            if (!string.Equals(existingTag, expectTag, StringComparison.Ordinal))
+                return $"expectTag '{expectTag}' does not match the current tag '{existingTag}'.";
+            return null;
+        }
+
+        /// <summary>bind: the property must be a dynamizable item property and onConflict must be fail or replace.</summary>
+        private static void ValidatePatchBindDocument(Type itemType, string property, string? onConflict)
+        {
+            if (property.Contains("."))
+                throw new InvalidDataException($"Patch 'bind' property '{property}' must be a top-level item property.");
+            Type propertyType = FindProperty(itemType, property).PropertyType;
+            if (!IsSupportedValue(propertyType) && !IsMultilingualText(propertyType))
+                throw new InvalidDataException($"Patch 'bind' property '{property}' cannot be dynamized on '{itemType.Name}'.");
+            if (onConflict != null && !string.Equals(onConflict, "fail", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(onConflict, "replace", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException($"Unsupported onConflict '{onConflict}' in patch 'bind'. Use 'fail' or 'replace'.");
+        }
+
+        /// <summary>
+        /// Patch only, before any change: every item listed under require.screens[].items must exist (and match its type).
+        /// The after-apply re-check does not look at items, so a patch may require an item and then delete it.
+        /// </summary>
+        private static void ValidatePatchRequiredItems(HmiSoftware hmi, HmiJsonRequirements? requirements)
+        {
+            if (requirements == null) return;
+            foreach (HmiJsonScreenRequirement requiredScreen in requirements.Screens)
+            {
+                HmiScreen? screen = FindHmiScreen(hmi, requiredScreen.Name, requiredScreen.Group);
+                if (screen == null) continue;
+                foreach (HmiJsonItemRequirement requiredItem in requiredScreen.Items)
+                {
+                    HmiScreenItemBase? item = screen.ScreenItems.Find(requiredItem.Name);
+                    if (item == null)
+                        throw new InvalidOperationException(
+                            $"Required item '{requiredScreen.Name}/{requiredItem.Name}' does not exist.");
+                    if (requiredItem.Type != null && !string.Equals(item.GetType().Name, requiredItem.Type, StringComparison.Ordinal))
+                        throw new InvalidOperationException(
+                            $"Required item '{requiredScreen.Name}/{requiredItem.Name}' is '{item.GetType().Name}', not '{requiredItem.Type}'.");
+                }
+            }
+        }
+
+        /// <summary>Lists fields in a patch file that the patch format does not know; they are ignored.</summary>
+        private static List<string> CollectUnknownPatchFields(HmiJsonPatch patch)
+        {
+            var warnings = new List<string>();
+            void Add(string path, Dictionary<string, JsonElement>? fields)
+            {
+                if (fields != null && fields.Count > 0)
+                    warnings.Add($"Unknown field(s) ignored at {path}: {string.Join(", ", fields.Keys)}.");
+            }
+            void AddRequirements(string path, HmiJsonRequirements? requirements)
+            {
+                if (requirements == null) return;
+                Add(path, requirements.UnknownFields);
+                for (int i = 0; i < requirements.Screens.Count; i++)
+                {
+                    Add($"{path}.screens[{i}]", requirements.Screens[i].UnknownFields);
+                    for (int j = 0; j < requirements.Screens[i].Items.Count; j++)
+                        Add($"{path}.screens[{i}].items[{j}]", requirements.Screens[i].Items[j].UnknownFields);
+                }
+                for (int i = 0; i < requirements.Tags.Count; i++)
+                    Add($"{path}.tags[{i}]", requirements.Tags[i].UnknownFields);
+            }
+            Add("(root)", patch.UnknownFields);
+            AddRequirements("require", patch.Require);
+            AddRequirements("verify", patch.Verify);
+            for (int i = 0; i < patch.Operations.Count; i++)
+                Add($"operations[{i}]", patch.Operations[i].UnknownFields);
+            return warnings;
         }
 
         private static Dictionary<string, object> CreateImportResult(
@@ -2795,7 +3290,8 @@ namespace TiaOpennessMcp.Tia
             string targetName,
             bool dryRun,
             bool pruneItems,
-            CompilationReport? compilation)
+            CompilationReport? compilation,
+            List<string>? zOrderWarnings = null)
         {
             var result = new Dictionary<string, object>
             {
@@ -2812,9 +3308,93 @@ namespace TiaOpennessMcp.Tia
             };
             if (plan.Warnings.Count > 0)
                 result["warnings"] = plan.Warnings;
+            if (zOrderWarnings != null && zOrderWarnings.Count > 0)
+                result["zOrderWarnings"] = zOrderWarnings;
             if (compilation != null)
                 result["compilation"] = compilation;
             return result;
+        }
+
+        /// <summary>
+        /// Resolves the zOrder option of a screen: the screen value overrides the manifest value; the default is 'keep'.
+        /// </summary>
+        private static string ResolveZOrderMode(string? manifestValue, string? screenValue, string context)
+        {
+            string? value = screenValue ?? manifestValue;
+            if (value == null) return "keep";
+            if (string.Equals(value, "keep", StringComparison.OrdinalIgnoreCase)) return "keep";
+            if (string.Equals(value, "require", StringComparison.OrdinalIgnoreCase)) return "require";
+            throw new InvalidDataException($"Unsupported zOrder '{value}' in '{context}'. Use 'keep' or 'require'.");
+        }
+
+        /// <summary>
+        /// Returns the items whose order in TIA differs from the file order (items not on the longest common
+        /// ordered run), considering only names present in both lists. An empty list means the order matches.
+        /// </summary>
+        private static List<string> FindZOrderDifferences(IList<string> fileOrder, IList<string> actualOrder)
+        {
+            var filePosition = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            for (int i = 0; i < fileOrder.Count; i++)
+                if (!filePosition.ContainsKey(fileOrder[i]))
+                    filePosition[fileOrder[i]] = i;
+            var names = actualOrder.Where(filePosition.ContainsKey).ToList();
+            var positions = names.Select(name => filePosition[name]).ToList();
+            // Longest increasing subsequence of file positions in the actual order (patience sorting).
+            var tails = new List<int>();
+            var tailIndex = new List<int>();
+            var previous = new int[positions.Count];
+            for (int i = 0; i < positions.Count; i++)
+            {
+                int low = 0, high = tails.Count;
+                while (low < high)
+                {
+                    int middle = (low + high) / 2;
+                    if (tails[middle] < positions[i]) low = middle + 1; else high = middle;
+                }
+                previous[i] = low > 0 ? tailIndex[low - 1] : -1;
+                if (low == tails.Count) { tails.Add(positions[i]); tailIndex.Add(i); }
+                else { tails[low] = positions[i]; tailIndex[low] = i; }
+            }
+            var inOrder = new HashSet<int>();
+            for (int i = tailIndex.Count > 0 ? tailIndex[tailIndex.Count - 1] : -1; i >= 0; i = previous[i])
+                inOrder.Add(i);
+            return Enumerable.Range(0, names.Count).Where(i => !inOrder.Contains(i)).Select(i => names[i]).ToList();
+        }
+
+        private static string DescribeZOrderDifference(string screenName, IList<string> outOfOrder, bool dryRun)
+        {
+            string items = string.Join(", ", outOfOrder.Take(20).Select(name => "'" + name + "'")) +
+                (outOfOrder.Count > 20 ? ", ..." : "");
+            return dryRun
+                ? $"Screen '{screenName}': {outOfOrder.Count} existing item(s) are not in file order ({items}). " +
+                  "Import does not reorder existing items (V21 Openness has no reorder API); use Arrange in the TIA editor."
+                : $"Screen '{screenName}': after import {outOfOrder.Count} item(s) are not in file order ({items}). " +
+                  "Import does not reorder existing items and TIA decides where new items are placed " +
+                  "(V21 Openness has no reorder API); use Arrange in the TIA editor.";
+        }
+
+        /// <summary>
+        /// Compares the screen item order in TIA with the file order. zOrder 'keep' returns warnings;
+        /// 'require' throws, so a real import rolls back. A dry run checks existing items only.
+        /// </summary>
+        private static List<string> CheckHmiImportZOrder(HmiSoftware hmi, HmiJsonImportPlan plan, bool dryRun)
+        {
+            var warnings = new List<string>();
+            foreach (HmiJsonScreen screenDocument in plan.Screens)
+            {
+                HmiScreen? screen = FindHmiScreen(hmi, screenDocument.Name, screenDocument.Group);
+                if (screen == null) continue;
+                List<string> outOfOrder = FindZOrderDifferences(
+                    screenDocument.Items.Select(i => i.Name).ToList(),
+                    screen.ScreenItems.Select(i => i.Name).ToList());
+                if (outOfOrder.Count == 0) continue;
+                string message = DescribeZOrderDifference(screenDocument.Name, outOfOrder, dryRun);
+                if (ResolveZOrderMode(plan.Manifest.ZOrder, screenDocument.ZOrder, screenDocument.Name) == "require")
+                    throw new InvalidOperationException(message + " zOrder is 'require', so the import " +
+                        (dryRun ? "would fail." : "was rolled back."));
+                warnings.Add(message);
+            }
+            return warnings;
         }
 
         private static PropertyInfo FindProperty(Type type, string name)
@@ -2981,6 +3561,8 @@ namespace TiaOpennessMcp.Tia
             public string? LibraryFile { get; set; }
             public List<HmiJsonLibraryType> LibraryTypes { get; set; } = new List<HmiJsonLibraryType>();
             public bool Compact { get; set; } = true;
+            /// <summary>Import only: 'keep' (default, warn when the item order differs) or 'require' (fail).</summary>
+            public string? ZOrder { get; set; }
             public SortedDictionary<string, string> FileHashes { get; set; } =
                 new SortedDictionary<string, string>(StringComparer.Ordinal);
             public HmiJsonRequirements? Require { get; set; }
@@ -3014,6 +3596,8 @@ namespace TiaOpennessMcp.Tia
             public Dictionary<string, JsonElement> Text { get; set; } =
                 new Dictionary<string, JsonElement>(StringComparer.Ordinal);
             public List<HmiJsonItem> Items { get; set; } = new List<HmiJsonItem>();
+            /// <summary>Import only: overrides the manifest zOrder option for this screen.</summary>
+            public string? ZOrder { get; set; }
         }
 
         private sealed class HmiJsonItem
@@ -3026,10 +3610,11 @@ namespace TiaOpennessMcp.Tia
             public string? Style { get; set; }
             public Dictionary<string, JsonElement> Props { get; set; } =
                 new Dictionary<string, JsonElement>(StringComparer.Ordinal);
-            public Dictionary<string, JsonElement> Text { get; set; } =
-                new Dictionary<string, JsonElement>(StringComparer.Ordinal);
-            public List<HmiJsonDynamization> Dynamizations { get; set; } = new List<HmiJsonDynamization>();
-            public List<HmiJsonEvent> Events { get; set; } = new List<HmiJsonEvent>();
+            // Import: a missing or null text, dynamizations or events key leaves that section of the existing item
+            // unchanged; an empty list removes all dynamizations or events. Export always writes all three.
+            public Dictionary<string, JsonElement>? Text { get; set; }
+            public List<HmiJsonDynamization>? Dynamizations { get; set; }
+            public List<HmiJsonEvent>? Events { get; set; }
         }
 
         private sealed class HmiJsonTagFile
@@ -3158,12 +3743,16 @@ namespace TiaOpennessMcp.Tia
             public HmiJsonRequirements? Require { get; set; }
             public HmiJsonRequirements? Verify { get; set; }
             public List<HmiJsonPatchOperation> Operations { get; set; } = new List<HmiJsonPatchOperation>();
+            [JsonExtensionData]
+            public Dictionary<string, JsonElement>? UnknownFields { get; set; }
         }
 
         private sealed class HmiJsonRequirements
         {
             public List<HmiJsonScreenRequirement> Screens { get; set; } = new List<HmiJsonScreenRequirement>();
             public List<HmiJsonTagRequirement> Tags { get; set; } = new List<HmiJsonTagRequirement>();
+            [JsonExtensionData]
+            public Dictionary<string, JsonElement>? UnknownFields { get; set; }
         }
 
         private sealed class HmiJsonScreenRequirement
@@ -3174,18 +3763,24 @@ namespace TiaOpennessMcp.Tia
             public uint? Width { get; set; }
             public uint? Height { get; set; }
             public List<HmiJsonItemRequirement> Items { get; set; } = new List<HmiJsonItemRequirement>();
+            [JsonExtensionData]
+            public Dictionary<string, JsonElement>? UnknownFields { get; set; }
         }
 
         private sealed class HmiJsonTagRequirement
         {
             public string Name { get; set; } = "";
             public string? PlcTag { get; set; }
+            [JsonExtensionData]
+            public Dictionary<string, JsonElement>? UnknownFields { get; set; }
         }
 
         private sealed class HmiJsonItemRequirement
         {
             public string Name { get; set; } = "";
             public string? Type { get; set; }
+            [JsonExtensionData]
+            public Dictionary<string, JsonElement>? UnknownFields { get; set; }
         }
 
         private sealed class HmiJsonScreenLocation
@@ -3203,12 +3798,18 @@ namespace TiaOpennessMcp.Tia
             public string? Property { get; set; }
             public JsonElement Value { get; set; }
             public string? Tag { get; set; }
-            public bool ReadOnly { get; set; }
-            public bool UseIndirectAddressing { get; set; }
+            /// <summary>bind: the existing dynamization must be a tag dynamization bound to this tag.</summary>
+            public string? ExpectTag { get; set; }
+            /// <summary>bind: null keeps the value of an existing tag dynamization (false for a new one).</summary>
+            public bool? ReadOnly { get; set; }
+            /// <summary>bind: null keeps the value of an existing tag dynamization (false for a new one).</summary>
+            public bool? UseIndirectAddressing { get; set; }
             public string? OnConflict { get; set; } = "fail";
             public string? RequireType { get; set; }
             public bool RequireNoDynamizations { get; set; }
             public bool RequireNoEvents { get; set; }
+            [JsonExtensionData]
+            public Dictionary<string, JsonElement>? UnknownFields { get; set; }
         }
     }
 }

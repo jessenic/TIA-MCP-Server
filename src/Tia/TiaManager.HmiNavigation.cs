@@ -148,7 +148,7 @@ namespace TiaOpennessMcp.Tia
 
                     HmiButtonEventHandler? readBackHandler = readBackButton.EventHandlers.Find(HmiButtonEventType.Tapped);
                     if (readBackHandler == null ||
-                        !string.Equals(readBackHandler.Script.ScriptCode, script, StringComparison.Ordinal))
+                        !AreScriptsEquivalent(script, readBackHandler.Script.ScriptCode))
                     {
                         failureStatus = "verification_failed";
                         throw new InvalidOperationException($"Navigation action for button '{itemName}' did not match on read-back.");

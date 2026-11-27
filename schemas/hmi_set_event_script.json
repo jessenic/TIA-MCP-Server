@@ -1,6 +1,6 @@
 {
   "name": "hmi_set_event_script",
-  "description": "Create or update one supported screen or item event script in place and verify the script read-back.",
+  "description": "Create or update one supported screen or item event script in place and verify the script read-back (line endings and trailing whitespace are ignored in the comparison).",
   "parameters": {
     "type": "object",
     "properties": {
