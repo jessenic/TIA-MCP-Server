@@ -346,7 +346,7 @@ try {
         tia_get_compile_state = @()
         tia_get_block_code = @('block_name')
         tia_get_block_attributes = @('block_name')
-        tia_import_block = @('xml_content')
+        tia_import_block = @()
         tia_compile = @()
     }
     foreach ($toolName in $plcMetaContracts.Keys) {

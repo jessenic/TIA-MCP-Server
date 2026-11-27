@@ -370,6 +370,7 @@ internal static class HmiToolBehaviorTests
             ((JsonElement)InvokeManagerHelperResult("NormalizeExpectedText", JsonValue("{\"html\":\"<body><p>X</p></body>\"}"))).GetString() == "X" &&
             ((JsonElement)InvokeManagerHelperResult("NormalizeExpectedText", JsonValue("{\"en-US\":\"A\",\"fi-FI\":\"A\"}"))).GetString() == "A",
             "import text read-back normalizes expected strings, raw html, and equal language maps");
+    }
 
     private static void TestHmiCompileTool(ToolRegistry registry, FakeHmiToolOperations fake)
     {
