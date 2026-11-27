@@ -573,18 +573,23 @@ namespace TiaOpennessMcp.Tools
                     return CallToolResult.Json(_hmiToolOperations.Value.GetHmiScreenItem(screen, item, target));
                 });
 
-            Register("hmi_update_screen_item", "Update allowlisted screen-item properties in place and verify the resulting item state.",
+            Register("hmi_update_screen_item", "Update allowlisted screen-item properties in place (the item is never deleted or recreated) and verify each value by reading it back. Supports position, size, colors, Visible, Enabled, IO-field OutputFormat, text alignment, screen-window Screen, Text (keeps the existing paragraph style), and Font as a nested object or dotted Font.<property> paths. A property that also has a dynamization is still updated and reported under 'warnings'; the dynamization is not changed.",
                 schema =>
                 {
                     schema.Properties["screen_name"] = new ToolProperty { Type = "string", Description = "Name of the screen containing the item." };
                     schema.Properties["item_name"] = new ToolProperty { Type = "string", Description = "Name of the item to update." };
+                    var fontWeights = new List<string> { "Light", "Normal", "SemiBold", "Bold" };
+                    var fontNames = new List<string> { "Arial", "TimesNewRoman", "SimSun", "SiemensSans" };
+                    var horizontalAlignments = new List<string> { "Left", "Center", "Right", "Stretch" };
+                    var verticalAlignments = new List<string> { "Top", "Center", "Bottom", "Stretch" };
                     schema.Properties["item_properties"] = new ToolProperty
                     {
                         Type = "object",
-                        Description = "Non-empty object of supported property/value pairs. Allowed names: Visible, Left, Top, Width, Height, CenterX, CenterY, Radius, BackColor, ForeColor, BorderColor, BorderWidth.",
+                        Description = "Non-empty object of supported property/value pairs; names are case-insensitive. Allowed: Visible, Enabled, Left, Top, Width, Height, CenterX, CenterY, Radius, BackColor, ForeColor, BorderColor, BorderWidth, OutputFormat, HorizontalTextAlignment, VerticalTextAlignment, Screen, Text, Font {Size, Weight, Italic, Underline, StrikeOut, Name, Bold} and dotted Font.<property> paths (for example \"Font.Size\": 14). Each property may be given only once. A property the item type does not have fails before any change.",
                         Properties = new Dictionary<string, ToolProperty>
                         {
                             ["Visible"] = new ToolProperty { Type = "boolean", Description = "Whether the item is visible." },
+                            ["Enabled"] = new ToolProperty { Type = "boolean", Description = "Whether the item can be operated in runtime." },
                             ["Left"] = new ToolProperty { Type = "integer", Description = "Horizontal position." },
                             ["Top"] = new ToolProperty { Type = "integer", Description = "Vertical position." },
                             ["Width"] = new ToolProperty { Type = "integer", Description = "Item width." },
@@ -592,10 +597,47 @@ namespace TiaOpennessMcp.Tools
                             ["CenterX"] = new ToolProperty { Type = "integer", Description = "Circle center X coordinate." },
                             ["CenterY"] = new ToolProperty { Type = "integer", Description = "Circle center Y coordinate." },
                             ["Radius"] = new ToolProperty { Type = "integer", Description = "Circle radius." },
-                            ["BackColor"] = new ToolProperty { Type = "string", Description = "Background color (#RRGGBB, #AARRGGBB, or supported TIA color name)." },
-                            ["ForeColor"] = new ToolProperty { Type = "string", Description = "Foreground/text color (#RRGGBB, #AARRGGBB, or supported TIA color name)." },
-                            ["BorderColor"] = new ToolProperty { Type = "string", Description = "Border color (#RRGGBB, #AARRGGBB, or supported TIA color name)." },
-                            ["BorderWidth"] = new ToolProperty { Type = "integer", Description = "Border width." }
+                            ["BackColor"] = new ToolProperty { Type = "string", Description = "Background color as #RRGGBB or #AARRGGBB." },
+                            ["ForeColor"] = new ToolProperty { Type = "string", Description = "Foreground/text color as #RRGGBB or #AARRGGBB." },
+                            ["BorderColor"] = new ToolProperty { Type = "string", Description = "Border color as #RRGGBB or #AARRGGBB." },
+                            ["BorderWidth"] = new ToolProperty { Type = "integer", Description = "Border width." },
+                            ["OutputFormat"] = new ToolProperty { Type = "string", Description = "IO field output format, e.g. '{F1} °C'. Plain Unicode text, not HTML; do not use HTML entities." },
+                            ["HorizontalTextAlignment"] = new ToolProperty { Type = "string", Enum = horizontalAlignments, Description = "Horizontal text alignment." },
+                            ["VerticalTextAlignment"] = new ToolProperty { Type = "string", Enum = verticalAlignments, Description = "Vertical text alignment." },
+                            ["Screen"] = new ToolProperty { Type = "string", Description = "Screen windows only: exact name of an existing screen in the same HMI to show in the window." },
+                            ["Text"] = new ToolProperty
+                            {
+                                Type = null,
+                                AnyOf = new List<ToolProperty>
+                                {
+                                    new ToolProperty { Type = "string", Description = "Plain Unicode text (ä, ö, å, °) for every active language; do not use HTML entities. Only the paragraph text is replaced; the existing <body>/<p> attributes such as style are kept." },
+                                    new ToolProperty { Type = "object", Description = "{\"html\": \"<body><p>...</p></body>\"} raw markup for every language, or a language map such as {\"en-US\": \"Start\", \"fi-FI\": \"Käynnistä\"} that covers every active language (values are plain text or {\"html\": ...})." }
+                                },
+                                Description = "Item text (buttons, texts, text boxes): a plain string or an object, see the alternatives."
+                            },
+                            ["Font"] = new ToolProperty
+                            {
+                                Type = "object",
+                                Description = "Font part, updated in place; give only the properties to change.",
+                                Properties = new Dictionary<string, ToolProperty>
+                                {
+                                    ["Size"] = new ToolProperty { Type = "number", Description = "Font size (DIU)." },
+                                    ["Weight"] = new ToolProperty { Type = "string", Enum = fontWeights, Description = "Font weight." },
+                                    ["Bold"] = new ToolProperty { Type = "boolean", Description = "Convenience for Weight: true = Bold, false = Normal. Do not combine with Weight." },
+                                    ["Italic"] = new ToolProperty { Type = "boolean", Description = "Italic text." },
+                                    ["Underline"] = new ToolProperty { Type = "boolean", Description = "Underlined text." },
+                                    ["StrikeOut"] = new ToolProperty { Type = "boolean", Description = "Struck-out text." },
+                                    ["Name"] = new ToolProperty { Type = "string", Enum = fontNames, Description = "Font family." }
+                                },
+                                AdditionalProperties = false
+                            },
+                            ["Font.Size"] = new ToolProperty { Type = "number", Description = "Dotted alias of Font.Size." },
+                            ["Font.Weight"] = new ToolProperty { Type = "string", Enum = fontWeights, Description = "Dotted alias of Font.Weight." },
+                            ["Font.Bold"] = new ToolProperty { Type = "boolean", Description = "Dotted alias of Font.Bold (true = Bold, false = Normal)." },
+                            ["Font.Italic"] = new ToolProperty { Type = "boolean", Description = "Dotted alias of Font.Italic." },
+                            ["Font.Underline"] = new ToolProperty { Type = "boolean", Description = "Dotted alias of Font.Underline." },
+                            ["Font.StrikeOut"] = new ToolProperty { Type = "boolean", Description = "Dotted alias of Font.StrikeOut." },
+                            ["Font.Name"] = new ToolProperty { Type = "string", Enum = fontNames, Description = "Dotted alias of Font.Name." }
                         },
                         AdditionalProperties = false
                     };
@@ -861,7 +903,7 @@ namespace TiaOpennessMcp.Tools
                 {
                     schema.Properties["screen_name"] = new ToolProperty { Type = "string", Description = "Screen name." };
                     schema.Properties["name"] = new ToolProperty { Type = "string", Description = "Item name." };
-                    schema.Properties["text"] = new ToolProperty { Type = "string", Description = "Display text." };
+                    schema.Properties["text"] = new ToolProperty { Type = "string", Description = "Display text. Plain Unicode text (ä, ö, å, °); the server wraps and escapes it as HTML, so do not use HTML entities." };
                     schema.Properties["left"] = new ToolProperty { Type = "integer", Description = "X position." };
                     schema.Properties["top"] = new ToolProperty { Type = "integer", Description = "Y position." };
                     schema.Properties["width"] = new ToolProperty { Type = "integer", Description = "Width." };
@@ -900,7 +942,7 @@ namespace TiaOpennessMcp.Tools
                 {
                     schema.Properties["screen_name"] = new ToolProperty { Type = "string", Description = "Screen name." };
                     schema.Properties["name"] = new ToolProperty { Type = "string", Description = "Button item name." };
-                    schema.Properties["text"] = new ToolProperty { Type = "string", Description = "Button caption." };
+                    schema.Properties["text"] = new ToolProperty { Type = "string", Description = "Button caption. Plain Unicode text (ä, ö, å, °); the server wraps and escapes it as HTML, so do not use HTML entities." };
                     schema.Properties["left"] = new ToolProperty { Type = "integer", Description = "X position." };
                     schema.Properties["top"] = new ToolProperty { Type = "integer", Description = "Y position." };
                     schema.Properties["width"] = new ToolProperty { Type = "integer", Description = "Width." };
@@ -937,8 +979,8 @@ namespace TiaOpennessMcp.Tools
                 {
                     schema.Properties["screen_name"] = new ToolProperty { Type = "string", Description = "Screen name." };
                     schema.Properties["name"] = new ToolProperty { Type = "string", Description = "Toggle switch item name." };
-                    schema.Properties["off_text"] = new ToolProperty { Type = "string", Description = "Caption shown in the normal state." };
-                    schema.Properties["on_text"] = new ToolProperty { Type = "string", Description = "Caption shown in the alternate state." };
+                    schema.Properties["off_text"] = new ToolProperty { Type = "string", Description = "Caption shown in the normal state. Plain Unicode text (ä, ö, å, °); the server wraps and escapes it as HTML, so do not use HTML entities." };
+                    schema.Properties["on_text"] = new ToolProperty { Type = "string", Description = "Caption shown in the alternate state. Plain Unicode text (ä, ö, å, °); the server wraps and escapes it as HTML, so do not use HTML entities." };
                     schema.Properties["left"] = new ToolProperty { Type = "integer", Description = "X position." };
                     schema.Properties["top"] = new ToolProperty { Type = "integer", Description = "Y position." };
                     schema.Properties["width"] = new ToolProperty { Type = "integer", Description = "Width." };
@@ -1018,7 +1060,7 @@ namespace TiaOpennessMcp.Tools
                     schema.Properties["height"] = new ToolProperty { Type = "integer", Description = "Height." };
                     schema.Properties["mode"] = new ToolProperty { Type = "string", Description = "'Output' or 'InputOutput' (default: Output)." };
                     schema.Properties["process_tag"] = new ToolProperty { Type = "string", Description = "HMI tag to bind to ProcessValue." };
-                    schema.Properties["output_format"] = new ToolProperty { Type = "string", Description = "Output format, e.g. '{F1} °C' for one decimal and a unit (optional; omit to keep the current format)." };
+                    schema.Properties["output_format"] = new ToolProperty { Type = "string", Description = "Output format, e.g. '{F1} °C' for one decimal and a unit (optional; omit to keep the current format). Plain Unicode text, not HTML; do not use HTML entities (numeric references such as &#176; are decoded)." };
                     schema.Properties["target_name"] = new ToolProperty { Type = "string", Description = "Target HMI software name (optional)." };
                     schema.Required = new List<string> { "screen_name", "name", "left", "top", "width", "height" };
                 },
@@ -1351,7 +1393,7 @@ namespace TiaOpennessMcp.Tools
                     schema.Properties["raised_state_tag"] = new ToolProperty { Type = "string", Description = "Existing HMI tag that raises the alarm." };
                     schema.Properties["raised_state_tag_bit_number"] = new ToolProperty { Type = "integer", Description = "Bit number in the trigger tag (default: 0)." };
                     schema.Properties["trigger_mode"] = new ToolProperty { Type = "string", Description = "Discrete alarm trigger mode (default: OnRisingEdge)." };
-                    schema.Properties["text"] = new ToolProperty { Type = "string", Description = "Alarm event text." };
+                    schema.Properties["text"] = new ToolProperty { Type = "string", Description = "Alarm event text. Plain Unicode text (ä, ö, å, °); the server wraps and escapes it as HTML, so do not use HTML entities." };
                     schema.Properties["acknowledgment_control_tag"] = new ToolProperty { Type = "string", Description = "Optional existing HMI tag used to control acknowledgment." };
                     schema.Properties["target_name"] = new ToolProperty { Type = "string", Description = "Target HMI software name (optional)." };
                     schema.Required = new List<string> { "alarm_name", "alarm_class", "raised_state_tag", "text" };
@@ -2235,7 +2277,7 @@ namespace TiaOpennessMcp.Tools
                     schema.Properties["target_name"] = new ToolProperty { Type = "string", Description = "Exact HMI software name from hmi_list_targets." };
                     schema.Properties["screen_name"] = new ToolProperty { Type = "string", Description = "Exact unique source screen name." };
                     schema.Properties["item_name"] = new ToolProperty { Type = "string", Description = "New button item name; collisions fail without replacement." };
-                    schema.Properties["text"] = new ToolProperty { Type = "string", Description = "Plain-text button caption." };
+                    schema.Properties["text"] = new ToolProperty { Type = "string", Description = "Plain-text button caption. Plain Unicode text (ä, ö, å, °); the server wraps and escapes it as HTML, so do not use HTML entities." };
                     schema.Properties["destination_screen"] = new ToolProperty { Type = "string", Description = "Exact unique destination screen name in the selected HMI software." };
                     schema.Properties["left"] = new ToolProperty { Type = "integer", Description = "Horizontal pixel position." };
                     schema.Properties["top"] = new ToolProperty { Type = "integer", Description = "Vertical pixel position." };

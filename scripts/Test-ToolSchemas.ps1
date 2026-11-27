@@ -227,10 +227,24 @@ try {
     }
 
     $updateSchema = Get-Content -LiteralPath (Join-Path $outputDirectory 'hmi_update_screen_item.json') -Raw | ConvertFrom-Json
-    foreach ($propertyName in @('Visible', 'Top', 'Left', 'Width', 'Height')) {
+    foreach ($propertyName in @('Visible', 'Top', 'Left', 'Width', 'Height', 'Enabled', 'OutputFormat',
+            'HorizontalTextAlignment', 'VerticalTextAlignment', 'Screen', 'Text', 'Font', 'Font.Size', 'Font.Weight')) {
         if ($null -eq $updateSchema.parameters.properties.item_properties.properties.$propertyName) {
             throw "hmi_update_screen_item must expose '$propertyName' in its property allowlist."
         }
+    }
+    $fontSchema = $updateSchema.parameters.properties.item_properties.properties.Font
+    if ($null -eq $fontSchema.properties.Size -or $null -eq $fontSchema.properties.Weight -or
+        $fontSchema.additionalProperties -ne $false) {
+        throw 'hmi_update_screen_item Font must expose Size and Weight and reject other properties.'
+    }
+    $verticalAlignment = @($updateSchema.parameters.properties.item_properties.properties.VerticalTextAlignment.enum)
+    if ($verticalAlignment -notcontains 'Center' -or $verticalAlignment -contains 'Middle') {
+        throw 'hmi_update_screen_item VerticalTextAlignment must use the V21 HmiVerticalAlignment names.'
+    }
+    $textAlternatives = @($updateSchema.parameters.properties.item_properties.properties.Text.anyOf | ForEach-Object { $_.type })
+    if (($textAlternatives -join ',') -ne 'string,object') {
+        throw 'hmi_update_screen_item Text must accept a string or an object.'
     }
     if ($updateSchema.parameters.properties.item_properties.additionalProperties -ne $false) {
         throw 'hmi_update_screen_item.item_properties must reject properties outside its allowlist.'

@@ -1,1 +1,71 @@
-{"name":"hmi_add_label","description":"Add or update a label / text box on a screen with text, position, font size, bold, alignment, and colors.","parameters":{"additionalProperties":false,"properties":{"align":{"description":"Horizontal alignment ('Left', 'Center', 'Right').","type":"string"},"back_color":{"description":"Background color ('transparent', '#000000', etc.).","type":"string"},"font_size":{"description":"Font size in pt (default: 11).","type":"number"},"fore_color":{"description":"Text color ('#FFFFFF', 'white', etc.).","type":"string"},"height":{"description":"Height.","type":"integer"},"is_bold":{"description":"Bold text.","type":"boolean"},"left":{"description":"X position.","type":"integer"},"name":{"description":"Item name.","type":"string"},"screen_name":{"description":"Screen name.","type":"string"},"target_name":{"description":"Target HMI software name (optional).","type":"string"},"text":{"description":"Display text.","type":"string"},"top":{"description":"Y position.","type":"integer"},"width":{"description":"Width.","type":"integer"}},"required":["screen_name","name","text","left","top","width","height"],"type":"object"}}
+{
+  "name": "hmi_add_label",
+  "description": "Add or update a label / text box on a screen with text, position, font size, bold, alignment, and colors.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "screen_name": {
+        "type": "string",
+        "description": "Screen name."
+      },
+      "name": {
+        "type": "string",
+        "description": "Item name."
+      },
+      "text": {
+        "type": "string",
+        "description": "Display text. Plain Unicode text (\u00E4, \u00F6, \u00E5, \u00B0); the server wraps and escapes it as HTML, so do not use HTML entities."
+      },
+      "left": {
+        "type": "integer",
+        "description": "X position."
+      },
+      "top": {
+        "type": "integer",
+        "description": "Y position."
+      },
+      "width": {
+        "type": "integer",
+        "description": "Width."
+      },
+      "height": {
+        "type": "integer",
+        "description": "Height."
+      },
+      "font_size": {
+        "type": "number",
+        "description": "Font size in pt (default: 11)."
+      },
+      "is_bold": {
+        "type": "boolean",
+        "description": "Bold text."
+      },
+      "align": {
+        "type": "string",
+        "description": "Horizontal alignment (\u0027Left\u0027, \u0027Center\u0027, \u0027Right\u0027)."
+      },
+      "fore_color": {
+        "type": "string",
+        "description": "Text color (\u0027#FFFFFF\u0027, \u0027white\u0027, etc.)."
+      },
+      "back_color": {
+        "type": "string",
+        "description": "Background color (\u0027transparent\u0027, \u0027#000000\u0027, etc.)."
+      },
+      "target_name": {
+        "type": "string",
+        "description": "Target HMI software name (optional)."
+      }
+    },
+    "required": [
+      "screen_name",
+      "name",
+      "text",
+      "left",
+      "top",
+      "width",
+      "height"
+    ],
+    "additionalProperties": false
+  }
+}

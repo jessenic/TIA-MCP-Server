@@ -1,6 +1,6 @@
 {
   "name": "hmi_update_screen_item",
-  "description": "Update allowlisted screen-item properties in place and verify the resulting item state.",
+  "description": "Update allowlisted screen-item properties in place (the item is never deleted or recreated) and verify each value by reading it back. Supports position, size, colors, Visible, Enabled, IO-field OutputFormat, text alignment, screen-window Screen, Text (keeps the existing paragraph style), and Font as a nested object or dotted Font.\u003Cproperty\u003E paths. A property that also has a dynamization is still updated and reported under \u0027warnings\u0027; the dynamization is not changed.",
   "parameters": {
     "type": "object",
     "properties": {
@@ -14,11 +14,15 @@
       },
       "item_properties": {
         "type": "object",
-        "description": "Non-empty object of supported property/value pairs. Allowed names: Visible, Left, Top, Width, Height, CenterX, CenterY, Radius, BackColor, ForeColor, BorderColor, BorderWidth.",
+        "description": "Non-empty object of supported property/value pairs; names are case-insensitive. Allowed: Visible, Enabled, Left, Top, Width, Height, CenterX, CenterY, Radius, BackColor, ForeColor, BorderColor, BorderWidth, OutputFormat, HorizontalTextAlignment, VerticalTextAlignment, Screen, Text, Font {Size, Weight, Italic, Underline, StrikeOut, Name, Bold} and dotted Font.\u003Cproperty\u003E paths (for example \u0022Font.Size\u0022: 14). Each property may be given only once. A property the item type does not have fails before any change.",
         "properties": {
           "Visible": {
             "type": "boolean",
             "description": "Whether the item is visible."
+          },
+          "Enabled": {
+            "type": "boolean",
+            "description": "Whether the item can be operated in runtime."
           },
           "Left": {
             "type": "integer",
@@ -50,19 +54,147 @@
           },
           "BackColor": {
             "type": "string",
-            "description": "Background color (#RRGGBB, #AARRGGBB, or supported TIA color name)."
+            "description": "Background color as #RRGGBB or #AARRGGBB."
           },
           "ForeColor": {
             "type": "string",
-            "description": "Foreground/text color (#RRGGBB, #AARRGGBB, or supported TIA color name)."
+            "description": "Foreground/text color as #RRGGBB or #AARRGGBB."
           },
           "BorderColor": {
             "type": "string",
-            "description": "Border color (#RRGGBB, #AARRGGBB, or supported TIA color name)."
+            "description": "Border color as #RRGGBB or #AARRGGBB."
           },
           "BorderWidth": {
             "type": "integer",
             "description": "Border width."
+          },
+          "OutputFormat": {
+            "type": "string",
+            "description": "IO field output format, e.g. \u0027{F1} \u00B0C\u0027. Plain Unicode text, not HTML; do not use HTML entities."
+          },
+          "HorizontalTextAlignment": {
+            "type": "string",
+            "description": "Horizontal text alignment.",
+            "enum": [
+              "Left",
+              "Center",
+              "Right",
+              "Stretch"
+            ]
+          },
+          "VerticalTextAlignment": {
+            "type": "string",
+            "description": "Vertical text alignment.",
+            "enum": [
+              "Top",
+              "Center",
+              "Bottom",
+              "Stretch"
+            ]
+          },
+          "Screen": {
+            "type": "string",
+            "description": "Screen windows only: exact name of an existing screen in the same HMI to show in the window."
+          },
+          "Text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "description": "Plain Unicode text (\u00E4, \u00F6, \u00E5, \u00B0) for every active language; do not use HTML entities. Only the paragraph text is replaced; the existing \u003Cbody\u003E/\u003Cp\u003E attributes such as style are kept."
+              },
+              {
+                "type": "object",
+                "description": "{\u0022html\u0022: \u0022\u003Cbody\u003E\u003Cp\u003E...\u003C/p\u003E\u003C/body\u003E\u0022} raw markup for every language, or a language map such as {\u0022en-US\u0022: \u0022Start\u0022, \u0022fi-FI\u0022: \u0022K\u00E4ynnist\u00E4\u0022} that covers every active language (values are plain text or {\u0022html\u0022: ...})."
+              }
+            ],
+            "description": "Item text (buttons, texts, text boxes): a plain string or an object, see the alternatives."
+          },
+          "Font": {
+            "type": "object",
+            "description": "Font part, updated in place; give only the properties to change.",
+            "properties": {
+              "Size": {
+                "type": "number",
+                "description": "Font size (DIU)."
+              },
+              "Weight": {
+                "type": "string",
+                "description": "Font weight.",
+                "enum": [
+                  "Light",
+                  "Normal",
+                  "SemiBold",
+                  "Bold"
+                ]
+              },
+              "Bold": {
+                "type": "boolean",
+                "description": "Convenience for Weight: true = Bold, false = Normal. Do not combine with Weight."
+              },
+              "Italic": {
+                "type": "boolean",
+                "description": "Italic text."
+              },
+              "Underline": {
+                "type": "boolean",
+                "description": "Underlined text."
+              },
+              "StrikeOut": {
+                "type": "boolean",
+                "description": "Struck-out text."
+              },
+              "Name": {
+                "type": "string",
+                "description": "Font family.",
+                "enum": [
+                  "Arial",
+                  "TimesNewRoman",
+                  "SimSun",
+                  "SiemensSans"
+                ]
+              }
+            },
+            "additionalProperties": false
+          },
+          "Font.Size": {
+            "type": "number",
+            "description": "Dotted alias of Font.Size."
+          },
+          "Font.Weight": {
+            "type": "string",
+            "description": "Dotted alias of Font.Weight.",
+            "enum": [
+              "Light",
+              "Normal",
+              "SemiBold",
+              "Bold"
+            ]
+          },
+          "Font.Bold": {
+            "type": "boolean",
+            "description": "Dotted alias of Font.Bold (true = Bold, false = Normal)."
+          },
+          "Font.Italic": {
+            "type": "boolean",
+            "description": "Dotted alias of Font.Italic."
+          },
+          "Font.Underline": {
+            "type": "boolean",
+            "description": "Dotted alias of Font.Underline."
+          },
+          "Font.StrikeOut": {
+            "type": "boolean",
+            "description": "Dotted alias of Font.StrikeOut."
+          },
+          "Font.Name": {
+            "type": "string",
+            "description": "Dotted alias of Font.Name.",
+            "enum": [
+              "Arial",
+              "TimesNewRoman",
+              "SimSun",
+              "SiemensSans"
+            ]
           }
         },
         "additionalProperties": false
