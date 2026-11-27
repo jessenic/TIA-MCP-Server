@@ -64,7 +64,7 @@ namespace TiaOpennessMcp.Tia
                 {
                     string parameterName;
                     try { parameterName = parameter.Name; }
-                    catch (EngineeringException ex)
+                    catch (Exception ex) when (ex is EngineeringException || ex is COMException)
                     {
                         parameters.Add(new TechnologyObjectParameterInfo { Name = "", Error = $"{ex.GetType().Name}: {ex.Message}" });
                         continue;
@@ -79,7 +79,7 @@ namespace TiaOpennessMcp.Tia
                         entry.Value = TechnologyObjectRules.FormatValue(value);
                         entry.ClrType = value?.GetType().Name;
                     }
-                    catch (EngineeringException ex)
+                    catch (Exception ex) when (ex is EngineeringException || ex is COMException)
                     {
                         entry.Error = $"{ex.GetType().Name}: {ex.Message}";
                     }
@@ -180,7 +180,7 @@ namespace TiaOpennessMcp.Tia
         {
             const string operation = "set_technology_object_parameters";
             var result = new TechnologyObjectParameterSetResult { Operation = operation, PlcName = plcName ?? "", ObjectName = name ?? "" };
-            int writesStarted = 0;
+            bool writesStarted = false;
             try
             {
                 ValidatePlcMutationName(name!, nameof(name));
@@ -216,10 +216,19 @@ namespace TiaOpennessMcp.Tia
                         return result.Fail("not_found",
                             $"Parameter '{request.Key}' was not found on '{technologyObject.Name}'. Nothing was written. Use tia_get_technology_object_parameters to list the names.");
                     }
+                    // Find may match case-insensitively; names are exact, so a case mismatch is rejected.
+                    string foundName = parameter.Name;
+                    if (!string.Equals(foundName, request.Key, StringComparison.Ordinal))
+                    {
+                        entry.Status = "not_found";
+                        entry.Message = $"Parameter names are case-sensitive. Did you mean: {foundName}?";
+                        return result.Fail("not_found",
+                            $"Parameter '{request.Key}' differs in case from '{foundName}' on '{technologyObject.Name}'. Nothing was written.");
+                    }
 
                     object? current;
                     try { current = parameter.Value; }
-                    catch (EngineeringException ex)
+                    catch (Exception ex) when (ex is EngineeringException || ex is COMException)
                     {
                         entry.Status = "not_readable";
                         entry.Message = $"{ex.GetType().Name}: {ex.Message}";
@@ -243,57 +252,39 @@ namespace TiaOpennessMcp.Tia
                     planned.Add((parameter, entry, converted!));
                 }
 
-                foreach (var (parameter, entry, converted) in planned)
+                // Every write and read-back failure is caught per entry inside ExecuteParameterWrites.
+                writesStarted = true;
+                var writes = planned.Select(item =>
                 {
-                    writesStarted++;
-                    try
-                    {
-                        parameter.Value = converted;
-                    }
-                    catch (EngineeringException ex)
-                    {
-                        entry.Status = "api_failure";
-                        entry.Message = $"{ex.GetType().Name}: {ex.Message}";
-                        return result.Fail("api_failure", writesStarted > 1
-                            ? $"Writing '{entry.Name}' failed; earlier parameters in the list were written and are not rolled back."
-                            : $"Writing '{entry.Name}' failed; TIA may have rejected the value or the parameter is read-only.", partial: true);
-                    }
-
-                    object? readBack = technologyObject.Parameters.Find(entry.Name)?.Value;
-                    entry.NewValue = TechnologyObjectRules.FormatValue(readBack);
-                    if (!TechnologyObjectRules.ValuesEqual(converted, readBack))
-                    {
-                        entry.Status = "verification_failed";
-                        entry.Message = "The value read back after writing differs from the requested value (TIA may have rejected or recalculated it).";
-                        return result.Fail("verification_failed",
-                            $"Read-back of '{entry.Name}' does not match the written value; later parameters were not written.", partial: true);
-                    }
-                    entry.Status = "updated";
-                }
-
-                result.Success = true;
-                result.Status = "updated";
-                result.Message = $"{planned.Count} parameter(s) written and verified by read-back.";
-                result.Warnings.Add("The writes are not transactional; save and reopen is a separate persisted-state verification.");
-                return result;
+                    var parameter = item.Parameter;
+                    string parameterName = item.Entry.Name;
+                    return new TechnologyObjectPlannedWrite(
+                        item.Entry,
+                        item.Converted,
+                        value => parameter.Value = value,
+                        () => technologyObject.Parameters.Find(parameterName)?.Value);
+                }).ToList();
+                return TechnologyObjectRules.ExecuteParameterWrites(result, writes);
             }
             catch (PlcMutationRejectedException ex)
             {
-                return result.Fail(ex.Status, ex.Message, partial: writesStarted > 0);
+                return result.Fail(ex.Status, ex.Message, partial: writesStarted);
             }
             catch (EngineeringException ex)
             {
-                return result.Fail("api_failure", $"{ex.GetType().Name}: {ex.Message}", partial: writesStarted > 0);
+                return result.Fail("api_failure", $"{ex.GetType().Name}: {ex.Message}", partial: writesStarted);
             }
             catch (COMException ex)
             {
-                return result.Fail("api_failure", $"{ex.GetType().Name}: {ex.Message}", partial: writesStarted > 0);
+                return result.Fail("api_failure", $"{ex.GetType().Name}: {ex.Message}", partial: writesStarted);
             }
         }
 
         private static List<(TechnologicalInstanceDB TechnologyObject, string GroupPath)> CollectTechnologyObjects(PlcSoftware plc)
         {
             var result = new List<(TechnologicalInstanceDB, string)>();
+            if (plc.TechnologicalObjectGroup == null)
+                return result;
             void Walk(TechnologicalInstanceDBGroup group, string path)
             {
                 foreach (TechnologicalInstanceDB technologyObject in group.TechnologicalObjects)
@@ -332,7 +323,7 @@ namespace TiaOpennessMcp.Tia
                 info.Number = technologyObject.Number;
                 info.IsConsistent = technologyObject.IsConsistent;
             }
-            catch (EngineeringException ex)
+            catch (Exception ex) when (ex is EngineeringException || ex is COMException)
             {
                 info.Error = $"{ex.GetType().Name}: {ex.Message}";
             }
@@ -349,7 +340,16 @@ namespace TiaOpennessMcp.Tia
 
             PlcBlock? block = FindBlockByNameIgnoreCase(plc.BlockGroup, name);
             if (block == null)
+            {
+                // Program resources (system blocks such as the PID_Temp FB itself) are in SystemBlockGroups.
+                foreach (PlcSystemBlockGroup systemGroup in plc.BlockGroup.SystemBlockGroups)
+                {
+                    PlcBlock? systemBlock = FindSystemBlockByNameIgnoreCase(systemGroup, name);
+                    if (systemBlock != null)
+                        return $"System block '{systemBlock.Name}' (program resources) already uses this name; blocks and technology objects share one name space. Choose another name, e.g. '{systemBlock.Name}_1'. Nothing was created or changed.";
+                }
                 return null;
+            }
 
             if (block is InstanceDB instanceDb)
             {
@@ -377,6 +377,36 @@ namespace TiaOpennessMcp.Tia
                     return found;
             }
             return null;
+        }
+
+        private static PlcBlock? FindSystemBlockByNameIgnoreCase(PlcSystemBlockGroup group, string name)
+        {
+            foreach (PlcBlock block in group.Blocks)
+                if (string.Equals(block.Name, name, StringComparison.OrdinalIgnoreCase))
+                    return block;
+            foreach (PlcSystemBlockGroup sub in group.Groups)
+            {
+                var found = FindSystemBlockByNameIgnoreCase(sub, name);
+                if (found != null)
+                    return found;
+            }
+            return null;
+        }
+
+        // Used by tia_import_scl_block: a block may not take a technology object's name. Returns the existing
+        // technology object's name (case-insensitive match), or null when there is none or it cannot be read.
+        private static string? FindTechnologyObjectNameForBlockImport(PlcSoftware plc, string name)
+        {
+            try
+            {
+                return CollectTechnologyObjects(plc)
+                    .Select(item => item.TechnologyObject.Name)
+                    .FirstOrDefault(existing => string.Equals(existing, name, StringComparison.OrdinalIgnoreCase));
+            }
+            catch (Exception ex) when (ex is EngineeringException || ex is COMException)
+            {
+                return null;
+            }
         }
     }
 
@@ -434,9 +464,10 @@ namespace TiaOpennessMcp.Tia
             return actual != null && requested.Major == actual.Major && requested.Minor == actual.Minor;
         }
 
+        // Case-insensitive: whether TechnologicalParameterComposition.Find ignores case is not documented.
         public static List<string> FindDuplicateNames(IEnumerable<string> names)
         {
-            return names.GroupBy(name => name, StringComparer.Ordinal)
+            return names.GroupBy(name => name, StringComparer.OrdinalIgnoreCase)
                 .Where(group => group.Count() > 1)
                 .Select(group => group.Key)
                 .ToList();
@@ -475,6 +506,72 @@ namespace TiaOpennessMcp.Tia
             if (expected.Equals(actual))
                 return true;
             return string.Equals(FormatValue(expected), FormatValue(actual), StringComparison.Ordinal);
+        }
+
+        // Writes the validated entries in order and verifies each by read-back; stops at the first failure.
+        // Entry status: updated, api_failure (setter threw; the value may or may not be in TIA), verification_failed
+        // (setter returned but read-back threw or differs), not_written (never attempted). No rollback.
+        public static TechnologyObjectParameterSetResult ExecuteParameterWrites(
+            TechnologyObjectParameterSetResult result,
+            IReadOnlyList<TechnologyObjectPlannedWrite> writes)
+        {
+            for (int index = 0; index < writes.Count; index++)
+            {
+                var write = writes[index];
+                var entry = write.Entry;
+                string earlier = index > 0
+                    ? "Earlier parameters in the list were written and are not rolled back"
+                    : "No earlier parameter was written";
+                try
+                {
+                    write.Write(write.Converted);
+                }
+                catch (Exception ex)
+                {
+                    entry.Status = "api_failure";
+                    entry.Message = $"{ex.GetType().Name}: {ex.Message}";
+                    return result.Fail("api_failure", index > 0
+                            ? $"Writing '{entry.Name}' failed; earlier parameters in the list were written and are not rolled back."
+                            : $"Writing '{entry.Name}' failed; TIA may have rejected the value or the parameter is read-only.",
+                        partial: true,
+                        partialWarning: $"{earlier}. The failed write of '{entry.Name}' may still have changed project state; inspect it with tia_get_technology_object_parameters.");
+                }
+
+                // From here on the setter has returned, so the value may be in TIA.
+                entry.Status = "written_unverified";
+                object? readBack;
+                try
+                {
+                    readBack = write.ReadBack();
+                }
+                catch (Exception ex)
+                {
+                    entry.Status = "verification_failed";
+                    entry.Message = $"The value was written, but reading it back failed: {ex.GetType().Name}: {ex.Message}";
+                    return result.Fail("verification_failed",
+                        $"'{entry.Name}' was written but could not be read back; later parameters were not written.",
+                        partial: true,
+                        partialWarning: $"{earlier}. '{entry.Name}' was written and not verified; inspect it with tia_get_technology_object_parameters.");
+                }
+
+                entry.NewValue = FormatValue(readBack);
+                if (!ValuesEqual(write.Converted, readBack))
+                {
+                    entry.Status = "verification_failed";
+                    entry.Message = "The value read back after writing differs from the requested value (TIA may have rejected or recalculated it).";
+                    return result.Fail("verification_failed",
+                        $"Read-back of '{entry.Name}' does not match the written value; later parameters were not written.",
+                        partial: true,
+                        partialWarning: $"{earlier}. '{entry.Name}' now reads back as '{entry.NewValue}'; inspect it with tia_get_technology_object_parameters.");
+                }
+                entry.Status = "updated";
+            }
+
+            result.Success = true;
+            result.Status = "updated";
+            result.Message = $"{writes.Count} parameter(s) written and verified by read-back.";
+            result.Warnings.Add("The writes are not transactional; save and reopen is a separate persisted-state verification.");
+            return result;
         }
 
         // Converts invariant-culture text to the CLR type of the parameter's current value.
@@ -550,6 +647,23 @@ namespace TiaOpennessMcp.Tia
         }
     }
 
+    // One validated parameter write; Write and ReadBack wrap the Openness parameter (fakes in offline tests).
+    public sealed class TechnologyObjectPlannedWrite
+    {
+        public TechnologyObjectPlannedWrite(TechnologyObjectParameterWrite entry, object converted, Action<object> write, Func<object?> readBack)
+        {
+            Entry = entry;
+            Converted = converted;
+            Write = write;
+            ReadBack = readBack;
+        }
+
+        public TechnologyObjectParameterWrite Entry { get; }
+        public object Converted { get; }
+        public Action<object> Write { get; }
+        public Func<object?> ReadBack { get; }
+    }
+
     public class TechnologyObjectInfo
     {
         public string Name { get; set; } = "";
@@ -617,7 +731,8 @@ namespace TiaOpennessMcp.Tia
         public List<TechnologyObjectParameterWrite> Parameters { get; set; } = new List<TechnologyObjectParameterWrite>();
         public List<string> Warnings { get; set; } = new List<string>();
 
-        internal TechnologyObjectParameterSetResult Fail(string status, string message, bool partial = false)
+        // partialWarning replaces the default warning when partial is true and the default would be wrong.
+        public TechnologyObjectParameterSetResult Fail(string status, string message, bool partial = false, string? partialWarning = null)
         {
             Success = false;
             Status = status;
@@ -626,7 +741,7 @@ namespace TiaOpennessMcp.Tia
             foreach (var entry in Parameters.Where(entry => entry.Status == "pending"))
                 entry.Status = "not_written";
             if (partial)
-                Warnings.Add("Some parameters were written before the failure and are not rolled back; inspect them with tia_get_technology_object_parameters.");
+                Warnings.Add(partialWarning ?? "Some parameters may have been written before the failure and are not rolled back; inspect them with tia_get_technology_object_parameters.");
             return this;
         }
     }

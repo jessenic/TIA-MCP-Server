@@ -72,7 +72,7 @@ namespace TiaOpennessMcp.Tools
 
             Register("tia_set_technology_object_parameters",
                 "Write existing parameters of one technology object in place by their 'Name in Openness', e.g. Config.InputPerOn or Config.ActivateCooling for PID_Temp. " +
-                "Every value is converted to the CLR type of the parameter's current value (Boolean true/false, integers and floating point in invariant culture). " +
+                "Every value is a string that is converted to the CLR type of the parameter's current value (Boolean true/false, integers and floating point in invariant culture). " +
                 "All names and values are validated before anything is written; then they are written in order and each is verified by read-back. " +
                 "Not transactional: if a later write fails, earlier writes stay and the result has Partial=true. Read the names first with tia_get_technology_object_parameters.",
                 schema =>
@@ -88,7 +88,7 @@ namespace TiaOpennessMcp.Tools
                             Properties = new Dictionary<string, ToolProperty>
                             {
                                 ["name"] = new ToolProperty { Type = "string", Description = "Exact parameter 'Name in Openness', e.g. 'Config.InputPerOn'." },
-                                ["value"] = new ToolProperty { Type = "string", Description = "New value as invariant text, e.g. 'true', '5', '0.5'." }
+                                ["value"] = new ToolProperty { Type = "string", Description = "New value as an invariant-culture JSON string, e.g. true, 5 or 0.5 sent as a string." }
                             },
                             Required = new List<string> { "name", "value" },
                             AdditionalProperties = false

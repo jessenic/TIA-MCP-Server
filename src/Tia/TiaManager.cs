@@ -601,6 +601,13 @@ namespace TiaOpennessMcp.Tia
 
             var (blockName, blockKind) = GetSclBlockDeclaration(sclCode);
             var plc = FindPlc(plcName);
+            string? technologyObjectName = FindTechnologyObjectNameForBlockImport(plc, blockName);
+            if (technologyObjectName != null)
+            {
+                throw new InvalidOperationException(
+                    $"'{blockName}' is the name of technology object '{technologyObjectName}' in PLC '{plc.Name}'; blocks and technology objects share one name space. " +
+                    "Refusing to import; nothing was changed. Rename the SCL block, or use tia_set_technology_object_parameters to change the technology object.");
+            }
             List<BlockLocation> matches = FindBlockLocations(plc.BlockGroup, blockName);
             if (matches.Count > 1)
             {

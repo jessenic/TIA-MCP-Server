@@ -23,6 +23,11 @@ internal static class TechnologyObjectTests
         Run("duplicate parameter names are found", Duplicates);
         Run("similar parameter names for not_found", Suggestions);
         Run("tool arguments: parameters array parsing", ParameterArguments);
+        Run("writes: all verified gives updated", WritesAllVerified);
+        Run("writes: first setter throws", WritesFirstSetterThrows);
+        Run("writes: later setter throws a COMException", WritesLaterSetterThrows);
+        Run("writes: read-back throws after a successful write", WritesReadBackThrows);
+        Run("writes: read-back mismatch stops later writes", WritesReadBackMismatch);
         Console.WriteLine($"\n{_passed} passed, {_failed} failed");
         return _failed == 0 ? 0 : 1;
     }
@@ -172,7 +177,8 @@ internal static class TechnologyObjectTests
     {
         Equal(0, TechnologyObjectRules.FindDuplicateNames(new[] { "Config.InputPerOn", "Config.ActivateCooling" }).Count, "no duplicates");
         var duplicates = TechnologyObjectRules.FindDuplicateNames(new[] { "A", "B", "A", "a", "B", "A" });
-        Equal("A,B", string.Join(",", duplicates), "ordinal duplicates");
+        Equal("A,B", string.Join(",", duplicates), "case-insensitive duplicates");
+        Equal(1, TechnologyObjectRules.FindDuplicateNames(new[] { "Config.InputPerOn", "config.inputperon" }).Count, "names differing only in case");
     }
 
     private static void Suggestions()
@@ -213,5 +219,99 @@ internal static class TechnologyObjectTests
             try { ParseArgs(bad); } catch (ArgumentException) { threw = true; }
             True(threw, "rejected: " + bad);
         }
+    }
+
+    private sealed class FakeParameter
+    {
+        public object? Value;
+        public Exception? WriteError;
+        public Exception? ReadError;
+        public Func<object, object?>? Recalculate;
+        public int Writes;
+    }
+
+    private static (TechnologyObjectParameterSetResult Result, List<TechnologyObjectPlannedWrite> Writes) Plan(params (string Name, object Value, FakeParameter Fake)[] items)
+    {
+        var result = new TechnologyObjectParameterSetResult();
+        var writes = new List<TechnologyObjectPlannedWrite>();
+        foreach (var (name, value, fake) in items)
+        {
+            var entry = new TechnologyObjectParameterWrite { Name = name, RequestedValue = TechnologyObjectRules.FormatValue(value), Status = "pending" };
+            result.Parameters.Add(entry);
+            writes.Add(new TechnologyObjectPlannedWrite(entry, value,
+                v => { fake.Writes++; if (fake.WriteError != null) throw fake.WriteError; fake.Value = fake.Recalculate != null ? fake.Recalculate(v) : v; },
+                () => { if (fake.ReadError != null) throw fake.ReadError; return fake.Value; }));
+        }
+        return (result, writes);
+    }
+
+    private static string Statuses(TechnologyObjectParameterSetResult result) => string.Join(",", result.Parameters.Select(p => p.Status));
+
+    private static void WritesAllVerified()
+    {
+        var a = new FakeParameter { Value = false };
+        var b = new FakeParameter { Value = 1.0f };
+        var (result, writes) = Plan(("A", true, a), ("B", 2.5f, b));
+        TechnologyObjectRules.ExecuteParameterWrites(result, writes);
+        True(result.Success, "success");
+        Equal("updated", result.Status, "status");
+        Equal(false, result.Partial, "not partial");
+        Equal("updated,updated", Statuses(result), "entries");
+        Equal("2.5", result.Parameters[1].NewValue, "read-back value");
+    }
+
+    private static void WritesFirstSetterThrows()
+    {
+        var a = new FakeParameter { Value = false, WriteError = new InvalidOperationException("read-only") };
+        var b = new FakeParameter { Value = false };
+        var (result, writes) = Plan(("A", true, a), ("B", true, b));
+        TechnologyObjectRules.ExecuteParameterWrites(result, writes);
+        True(!result.Success, "failed");
+        Equal("api_failure", result.Status, "status");
+        Equal(true, result.Partial, "partial: the failed write may have changed state");
+        Equal("api_failure,not_written", Statuses(result), "entries");
+        Equal(0, b.Writes, "later entry never written");
+        Equal(1, result.Warnings.Count, "one warning");
+        True(result.Warnings[0].StartsWith("No earlier parameter was written", StringComparison.Ordinal), "warning does not claim earlier writes: " + result.Warnings[0]);
+    }
+
+    private static void WritesLaterSetterThrows()
+    {
+        var a = new FakeParameter { Value = false };
+        var b = new FakeParameter { Value = 0, WriteError = new System.Runtime.InteropServices.COMException("RPC failed") };
+        var c = new FakeParameter { Value = 0 };
+        var (result, writes) = Plan(("A", true, a), ("B", 5, b), ("C", 6, c));
+        TechnologyObjectRules.ExecuteParameterWrites(result, writes);
+        Equal("api_failure", result.Status, "status");
+        Equal("updated,api_failure,not_written", Statuses(result), "entries");
+        True(result.Parameters[1].Message!.Contains("COMException"), "COM error on the entry");
+        True(result.Warnings[0].StartsWith("Earlier parameters in the list were written", StringComparison.Ordinal), "warning names earlier writes");
+        True(result.Message.Contains("earlier parameters"), "message names earlier writes");
+    }
+
+    private static void WritesReadBackThrows()
+    {
+        var a = new FakeParameter { Value = false, ReadError = new System.Runtime.InteropServices.COMException("gone") };
+        var b = new FakeParameter { Value = false };
+        var (result, writes) = Plan(("A", true, a), ("B", true, b));
+        TechnologyObjectRules.ExecuteParameterWrites(result, writes);
+        Equal("verification_failed", result.Status, "status");
+        Equal(true, result.Partial, "partial");
+        Equal("verification_failed,not_written", Statuses(result), "written entry is not reported as not_written");
+        Equal(true, a.Value, "value reached the fake");
+        True(result.Parameters[0].Message!.Contains("was written"), "entry says it was written");
+    }
+
+    private static void WritesReadBackMismatch()
+    {
+        var a = new FakeParameter { Value = 0.0, Recalculate = v => 1.0 };
+        var b = new FakeParameter { Value = 0.0 };
+        var (result, writes) = Plan(("A", 2.0, a), ("B", 3.0, b));
+        TechnologyObjectRules.ExecuteParameterWrites(result, writes);
+        Equal("verification_failed", result.Status, "status");
+        Equal("verification_failed,not_written", Statuses(result), "entries");
+        Equal("1", result.Parameters[0].NewValue, "recalculated value reported");
+        Equal(0, b.Writes, "later entry never written");
+        True(result.Warnings[0].Contains("now reads back as '1'"), "warning: " + result.Warnings[0]);
     }
 }
