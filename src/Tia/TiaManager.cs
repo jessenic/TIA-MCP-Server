@@ -561,8 +561,11 @@ namespace TiaOpennessMcp.Tia
             return null;
         }
 
-        public string ImportBlock(string? plcName, string xmlContent, bool overwrite = true, string? targetFolder = null)
+        public string ImportBlock(string? plcName, string? xmlContent, bool overwrite = true, string? targetFolder = null, string? sourceFilePath = null)
         {
+            if (sourceFilePath == null && string.IsNullOrWhiteSpace(xmlContent))
+                throw new ArgumentException("Provide exactly one of xml_content or file_path.");
+
             var plc = FindPlc(plcName);
             PlcBlockGroup targetGroup = plc.BlockGroup;
 
@@ -574,14 +577,17 @@ namespace TiaOpennessMcp.Tia
             string tempFile = Path.Combine(Path.GetTempPath(), $"tia_import_{Guid.NewGuid():N}.xml");
             try
             {
-                File.WriteAllText(tempFile, xmlContent);
+                // A file_path source is handed to Openness directly, so its own XML encoding declaration applies.
+                if (sourceFilePath == null)
+                    File.WriteAllText(tempFile, xmlContent);
                 var options = overwrite ? ImportOptions.Override : ImportOptions.None;
-                IList<PlcBlock> importedBlocks = targetGroup.Blocks.Import(new FileInfo(tempFile), options);
+                IList<PlcBlock> importedBlocks = targetGroup.Blocks.Import(new FileInfo(sourceFilePath ?? tempFile), options);
                 var first = importedBlocks.Count > 0 ? importedBlocks[0] : null;
+                string fromFile = sourceFilePath == null ? "" : $" from '{sourceFilePath}'";
 
                 return first != null
-                    ? $"Successfully imported block '{first.Name}' (Number {first.Number}, Language {first.ProgrammingLanguage}). Total imported: {importedBlocks.Count}."
-                    : "Successfully imported block(s).";
+                    ? $"Successfully imported block '{first.Name}' (Number {first.Number}, Language {first.ProgrammingLanguage}){fromFile}. Total imported: {importedBlocks.Count}."
+                    : $"Successfully imported block(s){fromFile}.";
             }
             finally
             {
@@ -594,10 +600,12 @@ namespace TiaOpennessMcp.Tia
             string sclCode,
             string? targetFolder = null,
             bool compileAfterImport = true,
-            bool openAfterImport = false)
+            bool openAfterImport = false,
+            bool backup = true,
+            string? sourceFilePath = null)
         {
             if (string.IsNullOrWhiteSpace(sclCode))
-                throw new ArgumentException("scl_code must contain a complete SCL block source.", nameof(sclCode));
+                throw new ArgumentException("The SCL source (scl_code or file_path) must contain a complete SCL block source.", nameof(sclCode));
 
             var (blockName, blockKind) = GetSclBlockDeclaration(sclCode);
             var plc = FindPlc(plcName);
@@ -609,26 +617,109 @@ namespace TiaOpennessMcp.Tia
             }
 
             BlockLocation? existing = matches.Count == 1 ? matches[0] : null;
+
+            // Resolve the destination folder before anything can change the project, so a wrong folder fails first.
+            string destinationFolder = string.IsNullOrWhiteSpace(targetFolder)
+                ? existing?.FolderPath ?? ""
+                : targetFolder ?? "";
+            PlcBlockGroup destinationGroup = FindBlockGroup(plc.BlockGroup, destinationFolder);
+
+            var preImportWarnings = new List<string>();
+            bool? existingWasConsistent = null;
+            CompilationReport? preImportCompilation = null;
+            int? previousNumber = null;
+            if (existing != null)
+            {
+                PlcBlock existingBlock = existing.Block;
+                previousNumber = TryReadBlockValue(() => existingBlock.Number);
+                bool? knowHowProtected = null;
+                bool compileAttempted = false;
+                bool? consistentAfterCompile = null;
+                // Reported in the result whether or not a backup is requested.
+                existingWasConsistent = TryReadBlockValue(() => existingBlock.IsConsistent);
+                if (backup)
+                {
+                    knowHowProtected = TryReadBlockValue(() => existingBlock.IsKnowHowProtected);
+                    if (existingWasConsistent == false && knowHowProtected != true)
+                    {
+                        // Inconsistent blocks cannot be exported; compile only this block once and re-check.
+                        ICompilable? blockCompiler = existingBlock.GetService<ICompilable>();
+                        if (blockCompiler != null)
+                        {
+                            compileAttempted = true;
+                            CompilerResult compileResult;
+                            try
+                            {
+                                compileResult = blockCompiler.Compile();
+                            }
+                            catch (Exception compileException) when (compileException is EngineeringException || compileException is System.Runtime.InteropServices.COMException)
+                            {
+                                throw new InvalidOperationException(
+                                    $"The existing block '{blockName}' is inconsistent, so a single-block compile was attempted before the backup, and the compile failed ({compileException.Message}). " +
+                                    "The compile may have changed the block; it was not replaced. To replace it without a backup, call tia_import_scl_block again with backup:false " +
+                                    "(a failed import then cannot restore the old block), or fix the callee/UDT and run tia_compile first.",
+                                    compileException);
+                            }
+                            preImportCompilation = new CompilationReport
+                            {
+                                State = compileResult.State.ToString(),
+                                ErrorCount = compileResult.ErrorCount,
+                                WarningCount = compileResult.WarningCount
+                            };
+                            CollectCompileMessages(compileResult.Messages, preImportCompilation.Messages);
+                            consistentAfterCompile = TryReadBlockValue(() => existingBlock.IsConsistent);
+                        }
+                    }
+                }
+
+                SclBackupDecision decision = PlcBlockToolLogic.DecideSclBackup(
+                    true, knowHowProtected, existingWasConsistent, compileAttempted, consistentAfterCompile, backup, blockName);
+                if (decision.Action == SclBackupAction.FailNotExportable)
+                    throw new InvalidOperationException(decision.Message);
+                if (!string.IsNullOrEmpty(decision.Message))
+                    preImportWarnings.Add(decision.Message!);
+            }
+
             string sourceFile = Path.Combine(Path.GetTempPath(), $"tia_scl_{Guid.NewGuid():N}.scl");
-            string backupFile = Path.Combine(Path.GetTempPath(), $"tia_scl_backup_{Guid.NewGuid():N}.xml");
+            string? backupFile = existing != null && backup
+                ? Path.Combine(Path.GetTempPath(), $"tia_scl_backup_{Guid.NewGuid():N}.xml")
+                : null;
             bool existingDeleted = false;
+            string compileNote = preImportCompilation != null
+                ? $" Before this, the existing block '{blockName}' was compiled once (single-block compile) because it was inconsistent; that compile may have changed it."
+                : "";
 
             try
             {
-                if (existing != null)
+                if (existing != null && backupFile != null)
                 {
-                    existing.Block.Export(new FileInfo(backupFile), ExportOptions.WithDefaults);
+                    try
+                    {
+                        existing.Block.Export(new FileInfo(backupFile), ExportOptions.WithDefaults);
+                    }
+                    catch (Exception exportException)
+                    {
+                        throw new InvalidOperationException(
+                            $"Could not back up the existing block '{blockName}' ({exportException.Message}); the block was not replaced.{compileNote} " +
+                            "To replace it without a backup, call tia_import_scl_block again with backup:false (a failed import then cannot restore the old block).",
+                            exportException);
+                    }
                 }
 
-                string destinationFolder = string.IsNullOrWhiteSpace(targetFolder)
-                    ? existing?.FolderPath ?? ""
-                    : targetFolder ?? "";
-                PlcBlockGroup destinationGroup = FindBlockGroup(plc.BlockGroup, destinationFolder);
-
-                ExternalSourceFile.Write(sourceFile, sclCode);
-                string sourceName = Path.GetFileNameWithoutExtension(sourceFile);
-                PlcExternalSource source = plc.ExternalSourceGroup.ExternalSources.CreateFromFile(sourceName, sourceFile)
-                    ?? throw new InvalidOperationException("TIA Portal did not create an external SCL source.");
+                PlcExternalSource source;
+                try
+                {
+                    ExternalSourceFile.Write(sourceFile, sclCode);
+                    string sourceName = Path.GetFileNameWithoutExtension(sourceFile);
+                    source = plc.ExternalSourceGroup.ExternalSources.CreateFromFile(sourceName, sourceFile)
+                        ?? throw new InvalidOperationException("TIA Portal did not create an external SCL source.");
+                }
+                catch (Exception sourceException) when (compileNote.Length > 0)
+                {
+                    throw new InvalidOperationException(
+                        $"Could not create the external SCL source ({sourceException.Message}); the block was not replaced.{compileNote}",
+                        sourceException);
+                }
 
                 if (existing != null)
                 {
@@ -680,8 +771,20 @@ namespace TiaOpennessMcp.Tia
                         BlockName = importedBlock.Name,
                         BlockKind = blockKind,
                         Folder = destinationFolder,
-                        ReplacedExistingBlock = existing != null
+                        ReplacedExistingBlock = existing != null,
+                        SourceFile = sourceFilePath,
+                        BackupTaken = backupFile != null,
+                        ExistingWasConsistent = existingWasConsistent,
+                        PreImportBlockCompilation = preImportCompilation,
+                        PreviousBlockNumber = previousNumber,
+                        BlockNumber = TryReadBlockValue(() => importedBlock.Number)
                     };
+                    result.Warnings.AddRange(preImportWarnings);
+                    if (previousNumber != null && result.BlockNumber != null && previousNumber != result.BlockNumber)
+                    {
+                        result.Warnings.Add(
+                            $"Block number changed from {previousNumber} to {result.BlockNumber} because the block was deleted and regenerated from source.");
+                    }
 
                     try
                     {
@@ -692,7 +795,7 @@ namespace TiaOpennessMcp.Tia
                         result.Warnings.Add($"Imported external source could not be removed from the project: {ex.Message}");
                     }
 
-                    if (existing != null)
+                    if (backupFile != null)
                     {
                         try
                         {
@@ -757,8 +860,11 @@ namespace TiaOpennessMcp.Tia
                         string cleanupDetails = string.IsNullOrEmpty(rollback.CleanupError)
                             ? ""
                             : $" Partial generated block cleanup also failed: {rollback.CleanupError}";
+                        string backupDetails = backupFile != null
+                            ? $" Backup retained at '{backupFile}'."
+                            : " Callers of the block (for example OB1 or multi-instances) now reference a missing block.";
                         throw new InvalidOperationException(
-                            $"SCL import failed: {importException.Message} The previous block could not be restored: {rollback.RestoreError}{cleanupDetails} Backup retained at '{backupFile}'.",
+                            $"SCL import failed: {importException.Message} The previous block could not be restored: {rollback.RestoreError}{cleanupDetails}{backupDetails}",
                             importException);
                     }
 
@@ -768,7 +874,8 @@ namespace TiaOpennessMcp.Tia
 
                     try
                     {
-                        File.Delete(backupFile);
+                        if (backupFile != null)
+                            File.Delete(backupFile);
                     }
                     catch (Exception ex)
                     {
@@ -785,7 +892,7 @@ namespace TiaOpennessMcp.Tia
                 if (File.Exists(sourceFile))
                     File.Delete(sourceFile);
 
-                if (File.Exists(backupFile) && !existingDeleted)
+                if (backupFile != null && File.Exists(backupFile) && !existingDeleted)
                     File.Delete(backupFile);
             }
         }
@@ -866,7 +973,7 @@ namespace TiaOpennessMcp.Tia
             string blockName,
             BlockLocation? existing,
             bool existingDeleted,
-            string backupFile)
+            string? backupFile)
         {
             var result = new SclImportRollbackResult();
             foreach (BlockLocation partialBlock in FindBlockLocations(plc.BlockGroup, blockName))
@@ -884,6 +991,12 @@ namespace TiaOpennessMcp.Tia
             if (!existingDeleted || existing == null)
                 return result;
 
+            if (backupFile == null)
+            {
+                result.RestoreError = "no backup was taken (backup:false); the block is now missing from the project.";
+                return result;
+            }
+
             try
             {
                 IList<PlcBlock> restored = existing.Group.Blocks.Import(
@@ -900,6 +1013,18 @@ namespace TiaOpennessMcp.Tia
             }
 
             return result;
+        }
+
+        private static T? TryReadBlockValue<T>(Func<T> read) where T : struct
+        {
+            try
+            {
+                return read();
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         private sealed class BlockLocation
@@ -921,7 +1046,12 @@ namespace TiaOpennessMcp.Tia
             var plc = FindPlc(plcName);
             PlcBlock? block = FindBlockRecursive(plc.BlockGroup, blockName);
             if (block == null)
+            {
+                PlcType? type = FindTypeRecursive(plc.TypeGroup, blockName);
+                if (type != null)
+                    throw new ArgumentException($"'{type.Name}' is a PLC data type (UDT), not a program block; use tia_delete_plc_type.");
                 throw new ArgumentException($"Block '{blockName}' not found in PLC '{plc.Name}'.");
+            }
 
             block.Delete();
         }
@@ -1017,20 +1147,26 @@ namespace TiaOpennessMcp.Tia
             }
         }
 
-        public string ImportPlcType(string? plcName, string xmlContent, bool overwrite = true)
+        public string ImportPlcType(string? plcName, string? xmlContent, bool overwrite = true, string? sourceFilePath = null)
         {
+            if (sourceFilePath == null && string.IsNullOrWhiteSpace(xmlContent))
+                throw new ArgumentException("Provide exactly one of xml_content or file_path.");
+
             var plc = FindPlc(plcName);
             string tempFile = Path.Combine(Path.GetTempPath(), $"tia_type_import_{Guid.NewGuid():N}.xml");
             try
             {
-                File.WriteAllText(tempFile, xmlContent);
+                // A file_path source is handed to Openness directly, so its own XML encoding declaration applies.
+                if (sourceFilePath == null)
+                    File.WriteAllText(tempFile, xmlContent);
                 var options = overwrite ? ImportOptions.Override : ImportOptions.None;
-                IList<PlcType> importedTypes = plc.TypeGroup.Types.Import(new FileInfo(tempFile), options);
+                IList<PlcType> importedTypes = plc.TypeGroup.Types.Import(new FileInfo(sourceFilePath ?? tempFile), options);
                 var first = importedTypes.Count > 0 ? importedTypes[0] : null;
+                string fromFile = sourceFilePath == null ? "" : $" from '{sourceFilePath}'";
 
                 return first != null
-                    ? $"Successfully imported PLC Type '{first.Name}'. Total imported: {importedTypes.Count}."
-                    : "Successfully imported PLC Type(s).";
+                    ? $"Successfully imported PLC Type '{first.Name}'{fromFile}. Total imported: {importedTypes.Count}."
+                    : $"Successfully imported PLC Type(s){fromFile}.";
             }
             finally
             {
@@ -1329,6 +1465,12 @@ namespace TiaOpennessMcp.Tia
         public string BlockKind { get; set; } = "";
         public string Folder { get; set; } = "";
         public bool ReplacedExistingBlock { get; set; }
+        public string? SourceFile { get; set; }
+        public bool BackupTaken { get; set; }
+        public bool? ExistingWasConsistent { get; set; }
+        public CompilationReport? PreImportBlockCompilation { get; set; }
+        public int? PreviousBlockNumber { get; set; }
+        public int? BlockNumber { get; set; }
         public CompilationReport? Compilation { get; set; }
         public string? CompilationError { get; set; }
         public bool? OpenedInEditor { get; set; }

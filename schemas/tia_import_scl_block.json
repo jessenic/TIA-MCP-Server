@@ -1,1 +1,41 @@
-{"name":"tia_import_scl_block","description":"Import a complete SCL block source string; the server creates the temporary .scl file. Existing same-name blocks are backed up, deleted, and replaced; failed imports attempt to restore the backup.","parameters":{"additionalProperties":false,"properties":{"compile_after_import":{"default":true,"description":"Compile the target PLC after import (default true). Compilation errors are reported and do not roll back the imported block.","type":"boolean"},"folder":{"description":"Target block group path (optional; an existing block's group is preserved when omitted).","type":"string"},"open_after_import":{"default":false,"description":"Open the imported block in the TIA Portal editor after import (default false).","type":"boolean"},"plc_name":{"description":"Name of the target PLC (optional, defaults to first PLC).","type":"string"},"scl_code":{"description":"Complete SCL source for exactly one FUNCTION, FUNCTION_BLOCK, ORGANIZATION_BLOCK, or DATA_BLOCK.","type":"string"}},"required":["scl_code"],"type":"object"}}
+{
+  "name": "tia_import_scl_block",
+  "description": "Import a complete SCL block source, given inline (scl_code) or as a server-local .scl file (file_path); the server creates the temporary .scl file. Existing same-name blocks are backed up (unless backup is false), deleted, and replaced; failed imports attempt to restore the backup. An inconsistent existing block is compiled once before the backup; if it stays inconsistent (or is know-how protected) nothing is replaced unless backup is false.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "scl_code": {
+        "type": "string",
+        "description": "Complete SCL source for exactly one FUNCTION, FUNCTION_BLOCK, ORGANIZATION_BLOCK, or DATA_BLOCK. Use this or file_path, not both."
+      },
+      "file_path": {
+        "type": "string",
+        "description": "Fully qualified server-local path to a .scl file with exactly one block declaration (read as UTF-8 unless it has a BOM). Use this or scl_code, not both."
+      },
+      "plc_name": {
+        "type": "string",
+        "description": "Name of the target PLC (optional, defaults to first PLC)."
+      },
+      "folder": {
+        "type": "string",
+        "description": "Target block group path (optional; an existing block\u0027s group is preserved when omitted)."
+      },
+      "compile_after_import": {
+        "type": "boolean",
+        "description": "Compile the target PLC after import (default true). Compilation errors are reported and do not roll back the imported block.",
+        "default": true
+      },
+      "open_after_import": {
+        "type": "boolean",
+        "description": "Open the imported block in the TIA Portal editor after import (default false).",
+        "default": false
+      },
+      "backup": {
+        "type": "boolean",
+        "description": "Export the existing same-name block as a backup before replacing it (default true). If that block is inconsistent it is compiled once first; if it stays inconsistent or is know-how protected, the import fails without replacing it. With false no backup is taken (a warning is returned) and a failed import cannot restore the previous block.",
+        "default": true
+      }
+    },
+    "additionalProperties": false
+  }
+}

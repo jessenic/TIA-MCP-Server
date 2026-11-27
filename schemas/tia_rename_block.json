@@ -1,0 +1,38 @@
+{
+  "name": "tia_rename_block",
+  "description": "Rename one PLC program block (OB/FB/FC/DB) in place and verify by read-back; the block number is left unchanged. Fails without changes when any program block or PLC data type in the PLC already uses the new name (case-insensitive). PLC data types are renamed with tia_rename_plc_type. Only the PLC software\u0027s own folders are searched; objects inside S7-1500 software units are out of scope.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "block_name": {
+        "type": "string",
+        "description": "Exact current name of the program block."
+      },
+      "new_name": {
+        "type": "string",
+        "description": "New name; no leading/trailing whitespace, control characters or path separators."
+      },
+      "plc_name": {
+        "type": "string",
+        "description": "Exact PLC software name; required when the project has multiple PLCs."
+      },
+      "group_path": {
+        "type": "string",
+        "description": "Exact block-folder path of the block. Omit to search all folders; an empty string means the root folder only."
+      },
+      "on_conflict": {
+        "type": "string",
+        "description": "Conflict policy; only \u0027fail\u0027 is supported, existing names are never overwritten.",
+        "enum": [
+          "fail"
+        ],
+        "default": "fail"
+      }
+    },
+    "required": [
+      "block_name",
+      "new_name"
+    ],
+    "additionalProperties": false
+  }
+}

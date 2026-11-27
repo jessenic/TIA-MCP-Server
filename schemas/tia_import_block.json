@@ -1,1 +1,31 @@
-{"name":"tia_import_block","description":"Import or update a PLC block from SimaticML XML.","parameters":{"additionalProperties":false,"properties":{"folder":{"description":"Target group folder path for the block (optional).","type":"string"},"overwrite":{"default":true,"description":"Whether to overwrite existing block if it exists (default true).","type":"boolean"},"plc_name":{"description":"Name of the target PLC (optional, defaults to first PLC).","type":"string"},"xml_content":{"description":"The SimaticML XML string containing the block definition.","type":"string"}},"required":["xml_content"],"type":"object"}}
+{
+  "name": "tia_import_block",
+  "description": "Import or update a PLC block from SimaticML XML, given inline (xml_content) or as a server-local .xml file (file_path, preferred for large blocks).",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "xml_content": {
+        "type": "string",
+        "description": "The SimaticML XML string containing the block definition. Use this or file_path, not both."
+      },
+      "file_path": {
+        "type": "string",
+        "description": "Fully qualified server-local path to a SimaticML .xml file (e.g. one written by tia_export_project_files). Use this or xml_content, not both."
+      },
+      "plc_name": {
+        "type": "string",
+        "description": "Name of the target PLC (optional, defaults to first PLC)."
+      },
+      "overwrite": {
+        "type": "boolean",
+        "description": "Whether to overwrite existing block if it exists (default true).",
+        "default": true
+      },
+      "folder": {
+        "type": "string",
+        "description": "Target group folder path for the block (optional)."
+      }
+    },
+    "additionalProperties": false
+  }
+}

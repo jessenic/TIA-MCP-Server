@@ -1,1 +1,27 @@
-{"name":"tia_import_plc_type","description":"Import or update a PLC User Data Type (UDT) from SimaticML XML.","parameters":{"additionalProperties":false,"properties":{"overwrite":{"default":true,"description":"Whether to overwrite existing UDT (default true).","type":"boolean"},"plc_name":{"description":"Name of the target PLC (optional, defaults to first PLC).","type":"string"},"xml_content":{"description":"The SimaticML XML string containing the UDT definition.","type":"string"}},"required":["xml_content"],"type":"object"}}
+{
+  "name": "tia_import_plc_type",
+  "description": "Import or update a PLC User Data Type (UDT) from SimaticML XML, given inline (xml_content) or as a server-local .xml file (file_path). Importing under a new name creates a second type; use tia_rename_plc_type to rename.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "xml_content": {
+        "type": "string",
+        "description": "The SimaticML XML string containing the UDT definition. Use this or file_path, not both."
+      },
+      "file_path": {
+        "type": "string",
+        "description": "Fully qualified server-local path to a SimaticML .xml file of the UDT (e.g. one written by tia_export_project_files). Use this or xml_content, not both."
+      },
+      "plc_name": {
+        "type": "string",
+        "description": "Name of the target PLC (optional, defaults to first PLC)."
+      },
+      "overwrite": {
+        "type": "boolean",
+        "description": "Whether to overwrite existing UDT (default true).",
+        "default": true
+      }
+    },
+    "additionalProperties": false
+  }
+}
