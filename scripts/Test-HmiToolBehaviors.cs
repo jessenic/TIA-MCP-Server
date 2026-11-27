@@ -198,6 +198,7 @@ internal static class HmiToolBehaviorTests
         TestItemPropertyPathValidation();
         TestItemPropertyPathApply();
         TestHmiPlainTextHelpers();
+        TestHmiTagTools();
     }
 
     private static void TestItemPropertyPathNormalization()
@@ -658,6 +659,310 @@ internal static class HmiToolBehaviorTests
             CallCount++;
         }
 
+    }
+
+    private static void TestHmiTagTools()
+    {
+        var tagFake = new FakeHmiTagOperations();
+        var registry = new ToolRegistry(new FakeHmiToolOperations()).UseHmiTagOperations(tagFake);
+
+        ToolDefinition deleteTool = registry.GetTools().Single(tool => tool.Name == "hmi_delete_tag");
+        ToolDefinition renameTool = registry.GetTools().Single(tool => tool.Name == "hmi_rename_tag");
+        Check(deleteTool.InputSchema.Required.SequenceEqual(new[] { "tag_name" }),
+            "hmi_delete_tag requires only tag_name");
+        Check(deleteTool.InputSchema.Properties["on_referenced"].Enum.SequenceEqual(new[] { "fail", "ignore" }),
+            "hmi_delete_tag exposes on_referenced fail and ignore");
+        Check(renameTool.InputSchema.Required.SequenceEqual(new[] { "tag_name", "new_name", "on_conflict" }),
+            "hmi_rename_tag requires tag_name, new_name and on_conflict");
+        Check(renameTool.InputSchema.Properties["on_conflict"].Enum.SequenceEqual(new[] { "fail" }),
+            "hmi_rename_tag exposes only the fail conflict policy");
+        Check(renameTool.InputSchema.Properties["script_references"].Enum.SequenceEqual(new[] { "report", "replace" }),
+            "hmi_rename_tag exposes script_references report and replace");
+
+        CallToolResult deleteResult = registry.Execute("hmi_delete_tag", Arguments("{\"tag_name\":\"Motor_Speed\"}"));
+        Check(!deleteResult.IsError && tagFake.LastOperation == "delete" && tagFake.TagName == "Motor_Speed" &&
+            tagFake.TableName == null && tagFake.TargetName == null && tagFake.OnReferenced == "fail" && !tagFake.DryRun,
+            "hmi_delete_tag applies the defaults on_referenced=fail and dry_run=false");
+
+        registry.Execute("hmi_delete_tag", Arguments(
+            "{\"tag_name\":\"Motor_Speed\",\"table_name\":\"Drives\",\"target_name\":\"HMI_RT\",\"on_referenced\":\"ignore\",\"dry_run\":true}"));
+        Check(tagFake.TableName == "Drives" && tagFake.TargetName == "HMI_RT" && tagFake.OnReferenced == "ignore" && tagFake.DryRun,
+            "hmi_delete_tag forwards table, target, on_referenced and dry_run");
+
+        tagFake.NextDeleteStatus = "referenced";
+        CallToolResult referencedResult = registry.Execute("hmi_delete_tag", Arguments("{\"tag_name\":\"Motor_Speed\"}"));
+        string referencedJson = FirstText(referencedResult);
+        Check(referencedResult.IsError && referencedJson.Contains("\"referenced\"") &&
+            referencedJson.Contains("tag_dynamization") && referencedJson.Contains("cross_reference") &&
+            referencedJson.Contains("CrossReferenceCount"),
+            "a referenced delete is an error result that lists the references and cross-references separately");
+        Check(!referencedJson.Contains("ReadBack") && !referencedJson.Contains("LeakedReadBackValue") &&
+            !referencedJson.Contains("SiteKey") && !referencedJson.Contains("LeakedSiteKeyValue"),
+            "the internal ReadBack delegate and SiteKey are not serialized");
+        tagFake.NextDeleteStatus = "deleted";
+
+        int calls = tagFake.CallCount;
+        Check(ExecuteQuietly(registry, "hmi_delete_tag", "{\"tag_name\":\"Motor_Speed\",\"on_referenced\":\"force\"}").IsError &&
+            ExecuteQuietly(registry, "hmi_delete_tag", "{\"table_name\":\"Drives\"}").IsError &&
+            tagFake.CallCount == calls,
+            "hmi_delete_tag rejects a bad on_referenced value and a missing tag_name before dispatch");
+
+        CallToolResult renameResult = registry.Execute("hmi_rename_tag", Arguments(
+            "{\"tag_name\":\"Motor_Speed\",\"new_name\":\"Motor_SpeedSetpoint\",\"on_conflict\":\"fail\"}"));
+        Check(!renameResult.IsError && tagFake.LastOperation == "rename" && tagFake.NewName == "Motor_SpeedSetpoint" &&
+            tagFake.OnConflict == "fail" && tagFake.ScriptReferences == "report" && !tagFake.DryRun,
+            "hmi_rename_tag applies the defaults script_references=report and dry_run=false");
+
+        registry.Execute("hmi_rename_tag", Arguments(
+            "{\"tag_name\":\"Motor_Speed\",\"new_name\":\"Speed\",\"on_conflict\":\"fail\",\"table_name\":\"Drives\",\"target_name\":\"HMI_RT\",\"script_references\":\"replace\",\"dry_run\":true}"));
+        Check(tagFake.TableName == "Drives" && tagFake.TargetName == "HMI_RT" && tagFake.ScriptReferences == "replace" && tagFake.DryRun,
+            "hmi_rename_tag forwards table, target, script_references and dry_run");
+
+        calls = tagFake.CallCount;
+        Check(ExecuteQuietly(registry, "hmi_rename_tag", "{\"tag_name\":\"A\",\"new_name\":\"B\",\"on_conflict\":\"replace\"}").IsError &&
+            ExecuteQuietly(registry, "hmi_rename_tag", "{\"tag_name\":\"A\",\"new_name\":\"B\",\"on_conflict\":\"fail\",\"script_references\":\"all\"}").IsError &&
+            ExecuteQuietly(registry, "hmi_rename_tag", "{\"tag_name\":\"A\",\"on_conflict\":\"fail\"}").IsError &&
+            tagFake.CallCount == calls,
+            "hmi_rename_tag rejects bad on_conflict, bad script_references and a missing new_name before dispatch");
+
+        tagFake.NextRenameSuccess = false;
+        Check(registry.Execute("hmi_rename_tag", Arguments("{\"tag_name\":\"A\",\"new_name\":\"B\",\"on_conflict\":\"fail\"}")).IsError,
+            "a failed rename is an error result");
+
+        TestHmiTagReferenceMatching();
+        TestHmiTagScriptLexer();
+        TestHmiTagManagerGuards();
+    }
+
+    private static void TestHmiTagReferenceMatching()
+    {
+        Func<string, bool> noOtherTags = name => false;
+        Check(HmiTagReferenceText.IsTagReference("Motor", "Motor", noOtherTags), "exact tag reference matches");
+        Check(HmiTagReferenceText.IsTagReference("Motor.Speed", "Motor", noOtherTags), "member reference matches");
+        Check(HmiTagReferenceText.IsTagReference("Motor[2]", "Motor", noOtherTags), "array element reference matches");
+        Check(HmiTagReferenceText.IsTagReference("Motor{2}.Fault", "Motor", noOtherTags), "brace element reference matches");
+        Check(!HmiTagReferenceText.IsTagReference("Motor2", "Motor", noOtherTags), "longer tag name does not match");
+        Check(!HmiTagReferenceText.IsTagReference("MotorX.Speed", "Motor", noOtherTags), "other root does not match");
+        Check(!HmiTagReferenceText.IsTagReference("motor", "Motor", noOtherTags), "matching is case-sensitive");
+        Check(!HmiTagReferenceText.IsTagReference(null, "Motor", noOtherTags) &&
+            !HmiTagReferenceText.IsTagReference("", "Motor", noOtherTags), "empty reference does not match");
+        Func<string, bool> dottedTagExists = name => name == "Motor.X";
+        Check(!HmiTagReferenceText.IsTagReference("Motor.X", "Motor", dottedTagExists),
+            "a dotted reference that is another tag's name does not match");
+        Check(!HmiTagReferenceText.IsTagReference("Motor.X.Y", "Motor", dottedTagExists),
+            "a member of a dotted tag does not match the shorter tag");
+        Check(HmiTagReferenceText.IsTagReference("Motor.Z", "Motor", dottedTagExists),
+            "other members still match when a dotted tag exists");
+
+        Check(HmiTagReferenceText.RewriteTagReference("Motor", "Motor", "Pump") == "Pump" &&
+            HmiTagReferenceText.RewriteTagReference("Motor.Speed", "Motor", "Pump") == "Pump.Speed" &&
+            HmiTagReferenceText.RewriteTagReference("Motor[2]", "Motor", "Pump") == "Pump[2]",
+            "reference rewrite keeps member and element suffixes");
+
+        foreach (string bad in new[] { "A.B", "A[1]", "A{1}", "A\"B", "A'B", "A`B", "A\\B", "A:B" })
+        {
+            string candidate = bad;
+            Throws<ArgumentException>(() => HmiTagReferenceText.ValidateNewTagName(candidate), "new tag name rejects " + candidate);
+        }
+        HmiTagReferenceText.ValidateNewTagName("Motor_Speed 2");
+        Check(true, "new tag name accepts underscores and spaces");
+
+        Check(HmiTagReferenceText.IsTagAddressReference("Motor:3", "Motor", noOtherTags) &&
+            HmiTagReferenceText.IsTagAddressReference("Motor.x3", "Motor", noOtherTags) &&
+            HmiTagReferenceText.IsTagAddressReference("Motor", "Motor", noOtherTags),
+            "alarm trigger addresses match the tag, a member, or 'Tag:bit'");
+        Check(!HmiTagReferenceText.IsTagAddressReference("Motor2:3", "Motor", noOtherTags) &&
+            !HmiTagReferenceText.IsTagAddressReference("motor:3", "Motor", noOtherTags) &&
+            !HmiTagReferenceText.IsTagReference("Motor:3", "Motor", noOtherTags),
+            "'Tag:bit' is accepted only for trigger addresses and only for the exact tag name");
+        Check(HmiTagReferenceText.RewriteTagReference("Motor:3", "Motor", "Pump") == "Pump:3",
+            "a 'Tag:bit' address keeps its bit suffix when the expected value is rewritten");
+    }
+
+    private static void TestHmiTagScriptLexer()
+    {
+        HmiScriptScanResult scan = HmiTagReferenceText.FindScriptOccurrences(
+            "let v = Tags(\"Motor\").Read();\nTags('Motor.Speed').Write(1);\n// Motor comment\nlet s = \"Motor2 and Motor x\";\nlet Motor = 1;\nlet t = `${a} Motor`;",
+            "Motor");
+        Check(!scan.Uncertain, "plain script is lexed with certainty");
+        Check(scan.Occurrences.Count(o => o.Kind == HmiTagReferenceText.ExactLiteral && o.Replaceable) == 1 &&
+            scan.Occurrences.Single(o => o.Kind == HmiTagReferenceText.ExactLiteral).Line == 1,
+            "exact double-quoted literal is found and replaceable");
+        Check(scan.Occurrences.Count(o => o.Kind == HmiTagReferenceText.LiteralMember && !o.Replaceable) == 1,
+            "member literal is reported but not replaceable");
+        Check(scan.Occurrences.Count(o => o.Kind == HmiTagReferenceText.Comment) == 1, "comment occurrence is reported");
+        Check(scan.Occurrences.Count(o => o.Kind == HmiTagReferenceText.LiteralOther) == 1,
+            "word inside a longer literal is reported once, not as Motor2");
+        Check(scan.Occurrences.Count(o => o.Kind == HmiTagReferenceText.Code) == 1, "identifier occurrence is reported");
+        Check(scan.Occurrences.Count(o => o.Kind == HmiTagReferenceText.TemplateLiteral) == 1, "template occurrence is reported");
+        Check(HmiTagReferenceText.ScriptMentionsTag("Tags('Motor')", "Motor") &&
+            !HmiTagReferenceText.ScriptMentionsTag("Tags('Motor2')", "Motor"),
+            "ScriptMentionsTag uses whole-name matching");
+
+        int replaced;
+        string rewritten = HmiTagReferenceText.ReplaceExactLiterals(
+            "Tags(\"Motor\").Write(Tags('Motor').Read()); Tags(\"Motor.Speed\"); // \"Motor\"\nlet esc = \"a\\\"Motor\";",
+            "Motor", "Pump", out replaced);
+        Check(replaced == 2 &&
+            rewritten == "Tags(\"Pump\").Write(Tags('Pump').Read()); Tags(\"Motor.Speed\"); // \"Motor\"\nlet esc = \"a\\\"Motor\";",
+            "only exact string literals are replaced; comments, members and escaped text stay");
+
+        HmiScriptScanResult unterminated = HmiTagReferenceText.FindScriptOccurrences("Tags(\"Motor\"); let x = \"open", "Motor");
+        string unchanged = HmiTagReferenceText.ReplaceExactLiterals("Tags(\"Motor\"); let x = \"open", "Motor", "Pump", out replaced);
+        Check(unterminated.Uncertain && replaced == 0 && unchanged == "Tags(\"Motor\"); let x = \"open",
+            "an unterminated literal makes the scan uncertain and blocks replacement");
+
+        HmiScriptScanResult regex = HmiTagReferenceText.FindScriptOccurrences("let r = /\"x/; Tags(\"Motor\");", "Motor");
+        HmiTagReferenceText.ReplaceExactLiterals("let r = /\"x/; Tags(\"Motor\");", "Motor", "Pump", out replaced);
+        Check(regex.Uncertain && replaced == 0, "a regular-expression literal blocks replacement");
+
+        HmiScriptScanResult division = HmiTagReferenceText.FindScriptOccurrences("let r = a / 2; Tags(\"Motor\");", "Motor");
+        Check(!division.Uncertain && division.Occurrences.Count == 1, "division is not mistaken for a regular expression");
+
+        Check(HmiTagReferenceText.IsBlockingKind(HmiTagReferenceText.ExactLiteral) &&
+            HmiTagReferenceText.IsBlockingKind(HmiTagReferenceText.LiteralMember) &&
+            !HmiTagReferenceText.IsBlockingKind(HmiTagReferenceText.Comment) &&
+            !HmiTagReferenceText.IsBlockingKind(HmiTagReferenceText.Code),
+            "only literal script hits block a delete");
+    }
+
+    private static void TestHmiTagManagerGuards()
+    {
+        TiaManager manager = TiaManager.Instance;
+        Throws<ArgumentException>(() => manager.DeleteHmiTag(" ", null, null, "fail", false),
+            "delete rejects a blank tag name before project access");
+        Throws<ArgumentException>(() => manager.DeleteHmiTag("Motor", null, null, "force", false),
+            "delete rejects an unknown on_referenced value before project access");
+        Throws<ArgumentException>(() => manager.RenameHmiTag("Motor", "Motor.X", null, null, "fail", "report", false),
+            "rename rejects reserved characters before project access");
+        Throws<ArgumentException>(() => manager.RenameHmiTag("Motor", "Pump", null, null, "replace", "report", false),
+            "rename rejects a non-fail conflict policy before project access");
+        Throws<ArgumentException>(() => manager.RenameHmiTag("Motor", "Pump", null, null, "fail", "all", false),
+            "rename rejects an unknown script_references value before project access");
+        Throws<ArgumentException>(() => manager.RenameHmiTag("Motor", "Motor", null, null, "fail", "report", false),
+            "rename rejects an unchanged name before project access");
+
+        // The replace guard needs SyntaxCheck: public (ScriptDynamization) or on an interface (IHmiScript).
+        Check(TiaManager.FindScriptSyntaxCheck(new PublicSyntaxCheckScript()) != null,
+            "SyntaxCheck is found on a script object with a public method");
+        Check(TiaManager.FindScriptSyntaxCheck(new ExplicitSyntaxCheckScript()) != null,
+            "SyntaxCheck is found through an explicitly implemented interface");
+        Check(TiaManager.FindScriptSyntaxCheck(new object()) == null && TiaManager.FindScriptSyntaxCheck(null) == null,
+            "a script object without SyntaxCheck (or none at all) is reported as not checkable");
+    }
+
+    public interface IFakeHmiScript
+    {
+        object SyntaxCheck();
+    }
+
+    public sealed class PublicSyntaxCheckScript
+    {
+        public object SyntaxCheck() { return null; }
+    }
+
+    public sealed class ExplicitSyntaxCheckScript : IFakeHmiScript
+    {
+        object IFakeHmiScript.SyntaxCheck() { return null; }
+    }
+
+    private static CallToolResult ExecuteQuietly(ToolRegistry registry, string tool, string json)
+    {
+        TextWriter originalError = Console.Error;
+        using (var discard = new StringWriter())
+        {
+            Console.SetError(discard);
+            try
+            {
+                return registry.Execute(tool, Arguments(json));
+            }
+            finally
+            {
+                Console.SetError(originalError);
+            }
+        }
+    }
+
+    private sealed class FakeHmiTagOperations : IHmiTagOperations
+    {
+        public string LastOperation = "";
+        public int CallCount;
+        public string TagName;
+        public string NewName;
+        public string TableName;
+        public string TargetName;
+        public string OnReferenced;
+        public string OnConflict;
+        public string ScriptReferences;
+        public bool DryRun;
+        public string NextDeleteStatus = "deleted";
+        public bool NextRenameSuccess = true;
+
+        public HmiTagDeleteResult DeleteHmiTag(string tagName, string tableName, string targetName, string onReferenced, bool dryRun)
+        {
+            LastOperation = "delete";
+            CallCount++;
+            TagName = tagName;
+            TableName = tableName;
+            TargetName = targetName;
+            OnReferenced = onReferenced;
+            DryRun = dryRun;
+            var result = new HmiTagDeleteResult
+            {
+                Success = NextDeleteStatus == "deleted",
+                Status = NextDeleteStatus,
+                TagName = tagName
+            };
+            if (NextDeleteStatus == "referenced")
+            {
+                var reference = new HmiTagReference
+                {
+                    Kind = "tag_dynamization",
+                    Owner = "Screen 'Main' item 'io_Speed'",
+                    Property = "ProcessValue",
+                    Value = tagName
+                };
+                // Set the internal members the way TiaManager does, so the test sees whether they leak into JSON.
+                typeof(HmiTagReference).GetProperty("ReadBack", BindingFlags.Instance | BindingFlags.NonPublic)
+                    .SetValue(reference, (Func<string>)(() => "LeakedReadBackValue"));
+                result.References.Add(reference);
+                var occurrence = new HmiScriptTagOccurrence
+                {
+                    Owner = "Screen 'Main'",
+                    Location = "event:Loaded",
+                    Kind = HmiTagReferenceText.ExactLiteral,
+                    Snippet = "Tags('" + tagName + "')"
+                };
+                typeof(HmiScriptTagOccurrence).GetProperty("SiteKey", BindingFlags.Instance | BindingFlags.NonPublic)
+                    .SetValue(occurrence, "LeakedSiteKeyValue");
+                result.ScriptOccurrences.Add(occurrence);
+                result.CrossReferences.Add(new HmiTagReference { Kind = "cross_reference", Owner = "HMI_RT/Main", Value = tagName });
+                result.BlockingReferenceCount = 2;
+                result.CrossReferenceCount = 1;
+            }
+            return result;
+        }
+
+        public HmiTagRenameResult RenameHmiTag(string tagName, string newName, string tableName, string targetName,
+            string onConflict, string scriptReferences, bool dryRun)
+        {
+            LastOperation = "rename";
+            CallCount++;
+            TagName = tagName;
+            NewName = newName;
+            TableName = tableName;
+            TargetName = targetName;
+            OnConflict = onConflict;
+            ScriptReferences = scriptReferences;
+            DryRun = dryRun;
+            return new HmiTagRenameResult
+            {
+                Success = NextRenameSuccess,
+                Status = NextRenameSuccess ? "renamed" : "conflict",
+                OldName = tagName,
+                Name = newName
+            };
+        }
     }
 
     private sealed class TestItemProperties

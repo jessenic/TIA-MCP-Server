@@ -1,0 +1,52 @@
+{
+  "name": "hmi_rename_tag",
+  "description": "Rename one Unified HMI tag in place with TIA\u0027s own rename (the tag is never deleted and recreated), including tags in grouped tag tables. Before renaming, a best-effort scan lists structured references (alarms, other tags, runtime settings, dynamizations, button parts, script trigger tags) and script text occurrences; after renaming, each structured reference is read back and reported with Updated=true or false. TIA cross-references are listed in CrossReferences but not read back. Structured references are never rewritten by this tool. script_references=\u0027replace\u0027 also rewrites script string literals that are exactly the old name (\u0022Old\u0022 or \u0027Old\u0027), only in scripts that have a syntax check; other occurrences are only reported. The PLC tag is not renamed. Run with dry_run=true first.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "tag_name": {
+        "type": "string",
+        "description": "Exact existing HMI tag name (case-sensitive)."
+      },
+      "new_name": {
+        "type": "string",
+        "description": "New HMI tag name. It must not exist yet (compared case-insensitively, system tags included) and must not contain . [ ] { } \u0022 \u0027 \u0060 \\ or :."
+      },
+      "table_name": {
+        "type": "string",
+        "description": "Optional exact tag-table name (or \u0027group/table\u0027 path) that must contain the tag. Tag names are unique per HMI software, so this is only a safety check."
+      },
+      "target_name": {
+        "type": "string",
+        "description": "Exact HMI device, device-item, or software name; required when multiple targets exist."
+      },
+      "on_conflict": {
+        "type": "string",
+        "description": "Required conflict behavior; only \u0027fail\u0027 is supported.",
+        "enum": [
+          "fail"
+        ]
+      },
+      "script_references": {
+        "type": "string",
+        "description": "\u0027report\u0027 (default) only lists script occurrences of the old name; \u0027replace\u0027 also rewrites string literals that are exactly the old name and verifies each script by read-back and by a syntax check that must not report more errors than before.",
+        "enum": [
+          "report",
+          "replace"
+        ],
+        "default": "report"
+      },
+      "dry_run": {
+        "type": "boolean",
+        "description": "Only report what the rename would touch; change nothing (default: false).",
+        "default": false
+      }
+    },
+    "required": [
+      "tag_name",
+      "new_name",
+      "on_conflict"
+    ],
+    "additionalProperties": false
+  }
+}
