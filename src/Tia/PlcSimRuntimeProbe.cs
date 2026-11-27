@@ -172,7 +172,8 @@ namespace TiaOpennessMcp.Tia
             if (loaded != null)
             {
                 result.ApiPath = SafeLocation(loaded);
-                result.ApiVersion = loaded.GetName().Version?.ToString();
+                result.ApiVersion = ApiFolderVersionOf(result.ApiPath);
+                result.ApiAssemblyVersion = loaded.GetName().Version?.ToString();
             }
             else
             {
@@ -204,23 +205,65 @@ namespace TiaOpennessMcp.Tia
             }
         }
 
+        /// <summary>
+        /// The API folder version ("8.0") of an API assembly path inside a PLCSIMADV\API\&lt;version&gt; folder;
+        /// null for any other location (for example a build reference copy).
+        /// </summary>
+        public static string? ApiFolderVersionOf(string? assemblyPath)
+        {
+            if (string.IsNullOrEmpty(assemblyPath)) return null;
+            try
+            {
+                string? directory = Path.GetDirectoryName(assemblyPath);
+                if (string.IsNullOrEmpty(directory)) return null;
+                string? parent = Path.GetFileName(Path.GetDirectoryName(directory));
+                if (!string.Equals(parent, "API", StringComparison.OrdinalIgnoreCase)) return null;
+                return ParseFolderVersion(Path.GetFileName(directory))?.ToString();
+            }
+            catch (ArgumentException)
+            {
+                return null;
+            }
+        }
+
         /// <summary>Unwraps type-initialization and reflection wrappers and names a missing API assembly.</summary>
         public static string DescribeException(Exception ex)
+        {
+            Exception current = Unwrap(ex);
+            if (IsApiLoadFailure(current))
+            {
+                return $"the S7-PLCSIM Advanced API assembly '{ApiAssemblyName}' (API 8.0 or newer) could not be loaded " +
+                    $"({current.GetType().Name}: {current.Message.Trim()}). Install S7-PLCSIM Advanced V8.0 or newer";
+            }
+            return $"{current.GetType().Name}: {current.Message.Trim()}";
+        }
+
+        /// <summary>True when the exception (after unwrapping) is a failure to load the PLCSIM Advanced API assembly.</summary>
+        public static bool IsApiLoadFailure(Exception ex)
+        {
+            Exception current = Unwrap(ex);
+            if (!(current is FileNotFoundException || current is FileLoadException || current is BadImageFormatException)) return false;
+            string? file = (current as FileNotFoundException)?.FileName ?? (current as FileLoadException)?.FileName
+                ?? (current as BadImageFormatException)?.FileName;
+            return file != null && file.IndexOf(ApiAssemblyName, StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        /// <summary>
+        /// Error text for a failed plcsim_* tool call. A missing PLCSIM Advanced API gets the full diagnosis
+        /// and the support hint; any other failure keeps its plain message.
+        /// </summary>
+        public static string DescribeToolFailure(Exception ex)
+        {
+            if (!IsApiLoadFailure(ex)) return ex.Message;
+            return DescribeException(ex) + ". " + BuildConnectHint(DetectStandardPlcSimProcesses());
+        }
+
+        private static Exception Unwrap(Exception ex)
         {
             Exception current = ex;
             while ((current is TypeInitializationException || current is TargetInvocationException) && current.InnerException != null)
                 current = current.InnerException;
-
-            if (current is FileNotFoundException || current is FileLoadException || current is BadImageFormatException)
-            {
-                string? file = (current as FileNotFoundException)?.FileName ?? (current as FileLoadException)?.FileName;
-                if (file != null && file.IndexOf(ApiAssemblyName, StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    return $"the S7-PLCSIM Advanced API assembly '{ApiAssemblyName}' (API 8.0 or newer) could not be loaded " +
-                        $"({current.GetType().Name}: {current.Message.Trim()}). Install S7-PLCSIM Advanced V8.0 or newer";
-                }
-            }
-            return $"{current.GetType().Name}: {current.Message.Trim()}";
+            return current;
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -279,8 +322,13 @@ namespace TiaOpennessMcp.Tia
         [JsonPropertyName("apiPath")]
         public string? ApiPath { get; set; }
 
+        /// <summary>Version of the PLCSIMADV\API folder ("8.0"); null when the API sits elsewhere or is not found.</summary>
         [JsonPropertyName("apiVersion")]
         public string? ApiVersion { get; set; }
+
+        /// <summary>Assembly version of the loaded API ("8.0.0.0"); null until the API is loaded.</summary>
+        [JsonPropertyName("apiAssemblyVersion")]
+        public string? ApiAssemblyVersion { get; set; }
 
         [JsonPropertyName("runtimeManagerAvailable")]
         public bool? RuntimeManagerAvailable { get; set; }

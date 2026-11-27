@@ -1,6 +1,6 @@
 {
   "name": "plcsim_read_tags",
-  "description": "Read multiple live variable/tag values from S7-PLCSIM Advanced memory.",
+  "description": "Read multiple live variable/tag values from S7-PLCSIM Advanced memory. S7-PLCSIM Advanced V8.0\u002B only (S7-1500 / ET 200SP); standard S7-PLCSIM and S7-1200 simulation are not supported.",
   "parameters": {
     "type": "object",
     "properties": {

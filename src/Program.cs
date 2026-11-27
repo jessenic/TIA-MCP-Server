@@ -19,6 +19,19 @@ namespace TiaOpennessMcp
     {
         const string V21ApiPath = @"C:\Program Files\Siemens\Automation\Portal V21\PublicAPI\V21\net48";
 
+        // The PLCSIM Advanced API folder is looked up once: the resolver runs for every unresolved
+        // assembly (including satellite and XmlSerializers probes).
+        static readonly Lazy<PlcSimApiLocation?> PlcSimApiFolder = new Lazy<PlcSimApiLocation?>(() =>
+        {
+            var location = PlcSimRuntimeProbe.FindApiAssembly();
+            if (location != null && location.FolderVersion != PlcSimRuntimeProbe.PreferredApiVersion.ToString())
+            {
+                Console.Error.WriteLine($"[Program] PLCSIM Advanced API {PlcSimRuntimeProbe.PreferredApiVersion} not found; using the newer API folder " +
+                    $"{location.Directory}. The server is built against API {PlcSimRuntimeProbe.PreferredApiVersion}; binary compatibility is not verified.");
+            }
+            return location;
+        });
+
         [STAThread]
         static void Main(string[] args)
         {
@@ -183,7 +196,7 @@ namespace TiaOpennessMcp
             if (File.Exists(path)) return Assembly.LoadFrom(path);
 
             // 4. Check the PLCSIM Advanced API folder (API\8.0 preferred, otherwise the newest API folder >= 8.0)
-            var plcsimApi = PlcSimRuntimeProbe.FindApiAssembly();
+            var plcsimApi = PlcSimApiFolder.Value;
             if (plcsimApi != null)
             {
                 string plcsimPath = Path.Combine(plcsimApi.Directory, name + ".dll");

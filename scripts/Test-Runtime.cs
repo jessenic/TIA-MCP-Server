@@ -32,11 +32,13 @@ internal static class RuntimeTests
         Run("stdio: UTF-8 arguments arrive intact through TiaOpennessMcp.exe --stdio", StdioProcessRoundTrip);
         Run("stdio: Run(reader, writer) writes to its own writer on every call", StdioInProcessRoundTrip);
         Run("http: request encoding defaults to UTF-8 and honours a known charset", HttpRequestEncoding);
+        Run("http: raw UTF-8 bodies arrive intact through HttpListener (direct JSON-RPC and SSE /messages)", HttpListenerRoundTrip);
         Run("scl: external source file is UTF-8 with BOM", SclSourceEncoding);
         Run("plcsim: API folder selection accepts 8.0+ only", PlcSimApiFolderSelection);
         Run("plcsim: diagnosis messages", PlcSimDiagnosis);
         Run("plcsim: runtime errors are reported, not swallowed", PlcSimListResultErrors);
         Run("plcsim: list result JSON shape", PlcSimListResultJson);
+        Run("plcsim: apiVersion is the API folder version, apiAssemblyVersion the assembly version", PlcSimApiVersionFields);
         Run("plcsim: tools without the PLCSIM Advanced API return a diagnosis, not a load error", PlcSimToolsWithoutApi);
         Run("plcsim: descriptions state Advanced-only support", PlcSimDescriptions);
 
@@ -220,6 +222,80 @@ internal static class RuntimeTests
         Equal("ä°", latinReader.ReadToEnd(), "explicit Latin-1 body decodes intact");
     }
 
+    // Starts the real HttpMcpServer on a free loopback port (no bearer token, no TIA call) and posts raw
+    // UTF-8 bodies without a charset, as MCP HTTP clients do.
+    private static void HttpListenerRoundTrip()
+    {
+        int port;
+        var probe = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        probe.Start();
+        try { port = ((System.Net.IPEndPoint)probe.LocalEndpoint).Port; }
+        finally { probe.Stop(); }
+
+        var config = new TiaOpennessMcp.Config.ServerConfig();
+        config.Server.Host = $"http://localhost:{port}/";
+        config.Server.Port = port;
+        config.Server.RequireBearerToken = false;
+        var server = new HttpMcpServer(config, new ToolRegistry());
+        server.Start();
+        try
+        {
+            string baseUrl = $"http://localhost:{port}";
+            string directTool = "http_" + Unicode;
+            byte[] directBody = new UTF8Encoding(false).GetBytes(ToolCall(11, directTool, new { arvo = Unicode }));
+            True(directBody.Any(b => b >= 0x80), "the request bytes must contain raw non-ASCII UTF-8");
+            string directResponse = Post(baseUrl + "/mcp", directBody, "application/json");
+            using (JsonDocument document = JsonDocument.Parse(directResponse))
+                Equal($"Unknown tool: '{directTool}'", ToolText(document.RootElement), "direct JSON-RPC tool name echoed");
+
+            // SSE: GET /sse gives the endpoint; the POST /messages result arrives on the event stream.
+            var sse = (System.Net.HttpWebRequest)System.Net.WebRequest.Create(baseUrl + "/sse");
+            sse.Method = "GET";
+            sse.Timeout = 15000;
+            sse.ReadWriteTimeout = 15000;
+            using var sseResponse = (System.Net.HttpWebResponse)sse.GetResponse();
+            using var sseReader = new StreamReader(sseResponse.GetResponseStream()!, new UTF8Encoding(false));
+            string? endpoint = null;
+            string? line;
+            while ((line = sseReader.ReadLine()) != null)
+            {
+                if (line.StartsWith("data: ")) { endpoint = line.Substring(6).Trim(); break; }
+            }
+            True(endpoint != null && endpoint.StartsWith("/messages?sessionId="), "SSE endpoint event: " + endpoint);
+
+            string sseTool = "sse_" + Unicode;
+            Post(baseUrl + endpoint, new UTF8Encoding(false).GetBytes(ToolCall(12, sseTool, new { })), "application/json");
+            JsonElement? sseResult = null;
+            while (sseResult == null && (line = sseReader.ReadLine()) != null)
+            {
+                if (!line.StartsWith("data: ")) continue;
+                using JsonDocument document = JsonDocument.Parse(line.Substring(6));
+                if (document.RootElement.TryGetProperty("id", out JsonElement id) && id.ValueKind == JsonValueKind.Number && id.GetInt32() == 12)
+                    sseResult = document.RootElement.Clone();
+            }
+            True(sseResult != null, "SSE response for id 12 missing");
+            Equal($"Unknown tool: '{sseTool}'", ToolText(sseResult!.Value), "SSE tool name echoed");
+        }
+        finally
+        {
+            server.Stop();
+        }
+    }
+
+    private static string Post(string url, byte[] body, string contentType)
+    {
+        var request = (System.Net.HttpWebRequest)System.Net.WebRequest.Create(url);
+        request.Method = "POST";
+        request.ContentType = contentType;
+        request.Timeout = 15000;
+        request.ContentLength = body.Length;
+        using (Stream stream = request.GetRequestStream())
+            stream.Write(body, 0, body.Length);
+        using var response = (System.Net.HttpWebResponse)request.GetResponse();
+        using var reader = new StreamReader(response.GetResponseStream()!, new UTF8Encoding(false));
+        return reader.ReadToEnd();
+    }
+
     private static void SclSourceEncoding()
     {
         string path = Path.Combine(Path.GetTempPath(), "tia-runtime-scl-" + Guid.NewGuid().ToString("N") + ".scl");
@@ -333,7 +409,7 @@ internal static class RuntimeTests
         // Same serializer settings as CallToolResult.Json.
         using JsonDocument document = JsonDocument.Parse(JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true }));
         JsonElement root = document.RootElement;
-        foreach (string name in new[] { "runtimeAvailable", "apiPath", "apiVersion", "runtimeManagerAvailable", "runtimeVersion",
+        foreach (string name in new[] { "runtimeAvailable", "apiPath", "apiVersion", "apiAssemblyVersion", "runtimeManagerAvailable", "runtimeVersion",
             "instances", "standardPlcSimProcesses", "message", "error" })
             True(root.TryGetProperty(name, out _), "property " + name);
         Equal(JsonValueKind.Array, root.GetProperty("instances").ValueKind, "instances is an array");
@@ -352,7 +428,7 @@ internal static class RuntimeTests
 
         var registry = new ToolRegistry();
         var list = registry.Execute("plcsim_list_instances", null);
-        True(list.IsError, "plcsim_list_instances is an error without the runtime");
+        True(!list.IsError, "plcsim_list_instances succeeds (runtimeAvailable carries the state) without the runtime");
         using (JsonDocument document = JsonDocument.Parse(list.Content[0].Text))
         {
             JsonElement root = document.RootElement;
@@ -372,6 +448,48 @@ internal static class RuntimeTests
             True(message.Contains("'PLC_1'") && message.Contains("S7-PLCSIM Advanced API assembly")
                 && message.Contains("plcsim_list_instances") && message.Contains("S7-1200"), "connect message: " + message);
         }
+
+        // The other plcsim_* tools go through PlcSimManager directly; their generic error carries the diagnosis too.
+        var calls = new (string Tool, string Args)[]
+        {
+            ("plcsim_get_status", "{}"),
+            ("plcsim_read_tag", "{\"tag_name\":\"DB1.x\"}"),
+            ("plcsim_set_operating_state", "{\"state\":\"Run\"}"),
+            ("plcsim_disconnect", "{}")
+        };
+        foreach (var (tool, json) in calls)
+        {
+            using JsonDocument arguments = JsonDocument.Parse(json);
+            var result = registry.Execute(tool, arguments.RootElement.Clone());
+            string text = result.Content[0].Text;
+            True(result.IsError, tool + " is an error without the API");
+            True(text.StartsWith($"Error executing '{tool}': ") && text.Contains("S7-PLCSIM Advanced API assembly")
+                && text.Contains("S7-1200") && text.Contains("plcsim_list_instances"), tool + " message: " + text);
+        }
+
+        // A plcsim_* failure that is not an API load failure keeps its plain message.
+        var missingArgument = registry.Execute("plcsim_read_tag", null);
+        Equal("Error executing 'plcsim_read_tag': tag_name required.", missingArgument.Content[0].Text, "plain argument error");
+        Equal("boom", PlcSimRuntimeProbe.DescribeToolFailure(new InvalidOperationException("boom")), "non-load failure");
+        True(PlcSimRuntimeProbe.IsApiLoadFailure(new TypeInitializationException("X",
+            new FileNotFoundException("x", PlcSimRuntimeProbe.ApiAssemblyName + ", Version=8.0.0.0"))), "wrapped load failure detected");
+        True(!PlcSimRuntimeProbe.IsApiLoadFailure(new FileNotFoundException("x", "Other.Assembly")), "other assembly is not an API failure");
+    }
+
+    private static void PlcSimApiVersionFields()
+    {
+        Equal("8.0", PlcSimRuntimeProbe.ApiFolderVersionOf(
+            @"C:\Program Files (x86)\Common Files\Siemens\PLCSIMADV\API\8.0\" + PlcSimRuntimeProbe.ApiAssemblyName + ".dll"), "API\\8.0");
+        Equal("9.0", PlcSimRuntimeProbe.ApiFolderVersionOf(@"D:\X\API\9\" + PlcSimRuntimeProbe.ApiAssemblyName + ".dll"), "API\\9");
+        Equal<string?>(null, PlcSimRuntimeProbe.ApiFolderVersionOf(@"C:\repo\src\lib\" + PlcSimRuntimeProbe.ApiAssemblyName + ".dll"), "not an API folder");
+        Equal<string?>(null, PlcSimRuntimeProbe.ApiFolderVersionOf(@"C:\x\8.0\" + PlcSimRuntimeProbe.ApiAssemblyName + ".dll"), "parent is not API");
+        Equal<string?>(null, PlcSimRuntimeProbe.ApiFolderVersionOf(null), "null path");
+
+        // Without a loaded API, apiVersion is the folder version and apiAssemblyVersion stays null.
+        PlcSimListResult result = PlcSimRuntimeProbe.BuildListResult(() => null!, new List<PlcSimProcessInfo>());
+        True(result.ApiAssemblyVersion == null, "apiAssemblyVersion is null while the API is not loaded");
+        True(result.ApiVersion == null || Version.TryParse(result.ApiVersion, out Version? v) && v!.Build == -1,
+            "apiVersion is a folder version (major.minor) or null: " + result.ApiVersion);
     }
 
     private static void PlcSimDescriptions()
@@ -383,5 +501,10 @@ internal static class RuntimeTests
             True(description.Contains("S7-PLCSIM Advanced") && description.Contains("S7-1200") && description.Contains("standard S7-PLCSIM"),
                 name + " description: " + description);
         }
+        var plcsimTools = tools.Where(t => t.Name.StartsWith("plcsim_")).ToList();
+        True(plcsimTools.Count >= 12, "plcsim tool count: " + plcsimTools.Count);
+        foreach (var tool in plcsimTools)
+            True(tool.Description.Contains("S7-PLCSIM Advanced V8.0+ only") && tool.Description.Contains("S7-1200"),
+                tool.Name + " description: " + tool.Description);
     }
 }

@@ -34,7 +34,18 @@ namespace TiaOpennessMcp.Tia
             var result = new PlcSimListResult();
             try
             {
-                ReadRuntimeManagerState(result);
+                // A member that a newer API lacks fails when the helper is JIT-compiled, so the
+                // MissingMemberException surfaces here at the call site, not inside the helper.
+                try { result.RuntimeManagerAvailable = ReadRuntimeManagerAvailable(); }
+                catch (MissingMemberException ex)
+                {
+                    Console.Error.WriteLine($"[PlcSimManager] Runtime manager availability not readable: {ex.Message}");
+                }
+                try { result.RuntimeVersion = ReadRuntimeVersion(); }
+                catch (MissingMemberException ex)
+                {
+                    Console.Error.WriteLine($"[PlcSimManager] Runtime version not readable: {ex.Message}");
+                }
                 var infos = SimulationRuntimeManager.RegisteredInstanceInfo;
                 if (infos != null)
                 {
@@ -75,20 +86,13 @@ namespace TiaOpennessMcp.Tia
             return result;
         }
 
+        // Separate NoInlining helpers: each member reference is resolved when its own helper is
+        // JIT-compiled, so one missing member in a newer API does not hide the other value.
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void ReadRuntimeManagerState(PlcSimListResult result)
-        {
-            try
-            {
-                result.RuntimeManagerAvailable = SimulationRuntimeManager.IsRuntimeManagerAvailable;
-                result.RuntimeVersion = SimulationRuntimeManager.Version;
-            }
-            catch (MissingMemberException ex)
-            {
-                // A newer API without these members: report it, never fail the listing.
-                Console.Error.WriteLine($"[PlcSimManager] Runtime manager state not readable: {ex.Message}");
-            }
-        }
+        private static bool ReadRuntimeManagerAvailable() => SimulationRuntimeManager.IsRuntimeManagerAvailable;
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static uint ReadRuntimeVersion() => SimulationRuntimeManager.Version;
 
         public PlcSimConnectResult Connect(string instanceName = "PLC_1")
         {

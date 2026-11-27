@@ -14,6 +14,9 @@ namespace TiaOpennessMcp.Tools
             new Dictionary<string, Func<JsonElement?, CallToolResult>>(StringComparer.OrdinalIgnoreCase);
         private readonly Lazy<IHmiToolOperations> _hmiToolOperations;
 
+        private const string PlcSimAdvancedOnlyNote =
+            " S7-PLCSIM Advanced V8.0+ only (S7-1500 / ET 200SP); standard S7-PLCSIM and S7-1200 simulation are not supported.";
+
         public ToolRegistry()
             : this(new Lazy<IHmiToolOperations>(() => TiaManager.Instance))
         {
@@ -49,7 +52,11 @@ namespace TiaOpennessMcp.Tools
                 catch (Exception ex)
                 {
                     Console.Error.WriteLine($"[ToolRegistry] Error executing '{toolName}': {ex}");
-                    return CallToolResult.Error($"Error executing '{toolName}': {ex.Message}");
+                    // plcsim_* tools: a missing S7-PLCSIM Advanced API gets the diagnosis, not a bare load error.
+                    string message = toolName.StartsWith("plcsim_", StringComparison.Ordinal)
+                        ? PlcSimRuntimeProbe.DescribeToolFailure(ex)
+                        : ex.Message;
+                    return CallToolResult.Error($"Error executing '{toolName}': {message}");
                 }
             }
             return CallToolResult.Error($"Unknown tool: '{toolName}'");
@@ -1638,14 +1645,10 @@ namespace TiaOpennessMcp.Tools
             // 51. plcsim_list_instances
             Register("plcsim_list_instances", "List all registered Siemens S7-PLCSIM Advanced instances with ID, name, operating state, CPU type, and IP. " +
                 "S7-PLCSIM Advanced V8.0+ only (S7-1500 / ET 200SP virtual controllers); standard S7-PLCSIM (V18-V21), and therefore S7-1200 simulation, has no public API and is not supported. " +
-                "Returns an object {runtimeAvailable, apiPath, apiVersion, runtimeManagerAvailable, runtimeVersion, instances[], standardPlcSimProcesses[], message, error}; " +
-                "message explains an empty list, and standardPlcSimProcesses reports a running standard S7-PLCSIM. isError is set when the PLCSIM Advanced runtime is not available.",
+                "Returns an object {runtimeAvailable, apiPath, apiVersion (API folder, e.g. '8.0'), apiAssemblyVersion, runtimeManagerAvailable, runtimeVersion, instances[], standardPlcSimProcesses[], message, error}; " +
+                "message explains an empty list, and standardPlcSimProcesses reports a running standard S7-PLCSIM. The call succeeds also when the PLCSIM Advanced runtime is not available: check runtimeAvailable.",
                 schema => { },
-                args =>
-                {
-                    var result = PlcSimRuntimeProbe.ListInstancesSafe();
-                    return CallToolResult.Json(result, isError: !result.RuntimeAvailable);
-                });
+                args => CallToolResult.Json(PlcSimRuntimeProbe.ListInstancesSafe()));
 
             // 52. plcsim_connect
             Register("plcsim_connect", "Connect to a running Siemens S7-PLCSIM Advanced instance by name (default 'PLC_1'). " +
@@ -1666,7 +1669,7 @@ namespace TiaOpennessMcp.Tools
                 });
 
             // 53. plcsim_disconnect
-            Register("plcsim_disconnect", "Disconnect from the currently connected S7-PLCSIM Advanced instance.",
+            Register("plcsim_disconnect", "Disconnect from the currently connected S7-PLCSIM Advanced instance." + PlcSimAdvancedOnlyNote,
                 schema => { },
                 args =>
                 {
@@ -1675,12 +1678,12 @@ namespace TiaOpennessMcp.Tools
                 });
 
             // 54. plcsim_get_status
-            Register("plcsim_get_status", "Get live status, operating mode, CPU type, scale factor, and tag count of the connected S7-PLCSIM Advanced instance.",
+            Register("plcsim_get_status", "Get live status, operating mode, CPU type, scale factor, and tag count of the connected S7-PLCSIM Advanced instance." + PlcSimAdvancedOnlyNote,
                 schema => { },
                 args => CallToolResult.Json(PlcSimManager.Instance.GetStatus()));
 
             // 55. plcsim_set_operating_state
-            Register("plcsim_set_operating_state", "Set the operating state of the connected S7-PLCSIM Advanced instance (Run, Stop, MemoryReset).",
+            Register("plcsim_set_operating_state", "Set the operating state of the connected S7-PLCSIM Advanced instance (Run, Stop, MemoryReset)." + PlcSimAdvancedOnlyNote,
                 schema =>
                 {
                     schema.Properties["state"] = new ToolProperty
@@ -1698,7 +1701,7 @@ namespace TiaOpennessMcp.Tools
                 });
 
             // 56. plcsim_set_scale_factor
-            Register("plcsim_set_scale_factor", "Set the simulation time scale factor (e.g. 1.0 = real-time, 2.0 = 2x speed, 5.0 = 5x speed).",
+            Register("plcsim_set_scale_factor", "Set the simulation time scale factor (e.g. 1.0 = real-time, 2.0 = 2x speed, 5.0 = 5x speed)." + PlcSimAdvancedOnlyNote,
                 schema =>
                 {
                     schema.Properties["scale_factor"] = new ToolProperty
@@ -1718,7 +1721,7 @@ namespace TiaOpennessMcp.Tools
                 });
 
             // 57. plcsim_read_tag
-            Register("plcsim_read_tag", "Read a live variable or tag value from S7-PLCSIM Advanced memory by symbolic tag name.",
+            Register("plcsim_read_tag", "Read a live variable or tag value from S7-PLCSIM Advanced memory by symbolic tag name." + PlcSimAdvancedOnlyNote,
                 schema =>
                 {
                     schema.Properties["tag_name"] = new ToolProperty
@@ -1736,7 +1739,7 @@ namespace TiaOpennessMcp.Tools
                 });
 
             // 58. plcsim_write_tag
-            Register("plcsim_write_tag", "Write a live value to a variable or tag in S7-PLCSIM Advanced memory by symbolic tag name.",
+            Register("plcsim_write_tag", "Write a live value to a variable or tag in S7-PLCSIM Advanced memory by symbolic tag name." + PlcSimAdvancedOnlyNote,
                 schema =>
                 {
                     schema.Properties["tag_name"] = new ToolProperty
@@ -1762,7 +1765,7 @@ namespace TiaOpennessMcp.Tools
                 });
 
             // 59. plcsim_read_tags
-            Register("plcsim_read_tags", "Read multiple live variable/tag values from S7-PLCSIM Advanced memory.",
+            Register("plcsim_read_tags", "Read multiple live variable/tag values from S7-PLCSIM Advanced memory." + PlcSimAdvancedOnlyNote,
                 schema =>
                 {
                     schema.Properties["tag_names"] = new ToolProperty
@@ -1781,7 +1784,7 @@ namespace TiaOpennessMcp.Tools
                 });
 
             // 60. plcsim_write_tags
-            Register("plcsim_write_tags", "Write multiple live values to variables/tags in S7-PLCSIM Advanced memory.",
+            Register("plcsim_write_tags", "Write multiple live values to variables/tags in S7-PLCSIM Advanced memory." + PlcSimAdvancedOnlyNote,
                 schema =>
                 {
                     schema.Properties["tags"] = new ToolProperty
@@ -1799,7 +1802,7 @@ namespace TiaOpennessMcp.Tools
                 });
 
             // 61. plcsim_run_mixing_sequence
-            Register("plcsim_run_mixing_sequence", "Execute an automated online sequence test on the mixing line in S7-PLCSIM Advanced. Configures recipe parameters, pulses start, monitors step progression, samples telemetry, and returns a detailed execution report.",
+            Register("plcsim_run_mixing_sequence", "Execute an automated online sequence test on the mixing line in S7-PLCSIM Advanced. Configures recipe parameters, pulses start, monitors step progression, samples telemetry, and returns a detailed execution report." + PlcSimAdvancedOnlyNote,
                 schema =>
                 {
                     schema.Properties["recipe_id"] = new ToolProperty { Type = "string", Description = "Recipe identifier (default 'RECIPE_01')." };
@@ -1832,7 +1835,7 @@ namespace TiaOpennessMcp.Tools
                 });
 
             // 62. plcsim_run_sequence (Generic universal sequence runner)
-            Register("plcsim_run_sequence", "Execute a generic automated online sequence test on any PLC sequence/state machine in S7-PLCSIM Advanced. Writes initial/recipe tags, triggers start, tracks step progression, polls monitored tags, and generates an execution telemetry report.",
+            Register("plcsim_run_sequence", "Execute a generic automated online sequence test on any PLC sequence/state machine in S7-PLCSIM Advanced. Writes initial/recipe tags, triggers start, tracks step progression, polls monitored tags, and generates an execution telemetry report." + PlcSimAdvancedOnlyNote,
                 schema =>
                 {
                     schema.Properties["sequence_name"] = new ToolProperty { Type = "string", Description = "Name or ID of the sequence under test (e.g. 'BottlingCycle', 'PressSequence')." };

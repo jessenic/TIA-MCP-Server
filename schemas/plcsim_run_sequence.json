@@ -1,6 +1,6 @@
 {
   "name": "plcsim_run_sequence",
-  "description": "Execute a generic automated online sequence test on any PLC sequence/state machine in S7-PLCSIM Advanced. Writes initial/recipe tags, triggers start, tracks step progression, polls monitored tags, and generates an execution telemetry report.",
+  "description": "Execute a generic automated online sequence test on any PLC sequence/state machine in S7-PLCSIM Advanced. Writes initial/recipe tags, triggers start, tracks step progression, polls monitored tags, and generates an execution telemetry report. S7-PLCSIM Advanced V8.0\u002B only (S7-1500 / ET 200SP); standard S7-PLCSIM and S7-1200 simulation are not supported.",
   "parameters": {
     "type": "object",
     "properties": {
